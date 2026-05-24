@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mirai</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="stage" aria-label="Mirai floating agent console">
+      <section class="agent-window" aria-label="Agent console">
+        <header class="titlebar">
+          <button
+            class="agent-name"
+            id="agentName"
+            type="button"
+            aria-label="Rename agent"
+            title="Rename agent"
+          >
+            Mirai
+          </button>
+          <div class="window-actions" aria-label="Window controls">
+            <button class="window-button minimize-button" type="button" aria-label="Minimize"></button>
+            <button class="window-button close-button" type="button" aria-label="Close"></button>
+          </div>
+        </header>
+
+        <div class="window-body">
+          <section class="message-card" aria-label="Agent message">
+            <div class="message-copy">
+              <p>
+                <span class="speaker">Agent:</span>
+                <span>This page needs login.</span>
+              </p>
+              <p>Please complete it manually.</p>
+            </div>
+
+            <div class="primary-action-slot">
+              <button class="primary-action" id="primaryAction" type="button">Done</button>
+            </div>
+          </section>
+
+          <section class="status-card" aria-label="Current status">
+            <p><span class="status-label">Now:</span> <span id="statusText">waiting for you</span></p>
+            <details class="details-panel">
+              <summary>details</summary>
+              <dl>
+                <div>
+                  <dt>Current app</dt>
+                  <dd>Browser</dd>
+                </div>
+                <div>
+                  <dt>State</dt>
+                  <dd>login required</dd>
+                </div>
+                <div>
+                  <dt>Next action</dt>
+                  <dd>wait_for_user</dd>
+                </div>
+                <div>
+                  <dt>Risk</dt>
+                  <dd>protected login flow</dd>
+                </div>
+              </dl>
+            </details>
+          </section>
+
+          <div class="emergency-strip" aria-label="Emergency stop shortcut">
+            <span class="warning-icon" aria-hidden="true"><span>!</span></span>
+            <span>Emergency stop: ESC</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <dialog class="rename-dialog" id="renameDialog" aria-labelledby="renameTitle">
+      <form id="renameForm" method="dialog">
+        <h2 id="renameTitle">Rename agent</h2>
+        <input id="renameInput" maxlength="24" autocomplete="off" />
+        <menu>
+          <button value="cancel" type="submit">Cancel</button>
+          <button id="saveName" value="save" type="submit">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
