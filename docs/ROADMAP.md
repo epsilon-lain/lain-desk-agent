@@ -8,17 +8,41 @@ This roadmap keeps the project small and testable. Each stage should work before
 - [x] Python project config.
 - [x] Minimal FastAPI backend.
 - [x] Safety model.
+- [x] Agent Control Panel spec.
 
-## Stage 1: Local control panel
+## Stage 1: Agent Control Panel
 
-Goal: a tiny local web page where the user can start/stop a supervised session.
+Goal: build the first real local UI surface for supervised desktop automation.
+
+The control panel has two main areas:
+
+- Left: Lain enters the task.
+- Right: the program shows its current understanding.
+
+The right panel should show:
+
+- current screen screenshot or placeholder
+- app/page guess
+- recognized buttons, input boxes, menus, links, and dialogs
+- proposed next action
+- reason for the proposed action
+- risk level
+- Approve / Reject / Stop controls
 
 Tasks:
 
-- Add a simple frontend page served by the backend.
+- Serve a local web UI from the backend.
+- Create a two-column control panel layout.
+- Add task input and submit button.
 - Show current session state.
-- Add Start and Stop buttons.
-- Show that real input control is disabled.
+- Show mocked screen understanding first.
+- Show mocked recognized UI elements first.
+- Show mocked next action and reason first.
+- Show risk level.
+- Add Approve / Reject / Stop buttons.
+- Keep real screenshot capture and real input control disabled in this stage.
+
+See `docs/CONTROL_PANEL_SPEC.md`.
 
 ## Stage 2: Read-only screen observation
 
