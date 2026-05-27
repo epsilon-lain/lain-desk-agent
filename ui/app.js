@@ -5,12 +5,13 @@ const renameInput = document.querySelector("#renameInput");
 const primaryAction = document.querySelector("#primaryAction");
 const statusText = document.querySelector("#statusText");
 const detailsPanel = document.querySelector(".details-panel");
+const detailUiStateId = document.querySelector("#detailUiStateId");
 const detailObservationId = document.querySelector("#detailObservationId");
-const detailWindowTitle = document.querySelector("#detailWindowTitle");
-const detailAppName = document.querySelector("#detailAppName");
-const detailScreenSize = document.querySelector("#detailScreenSize");
-const detailCursor = document.querySelector("#detailCursor");
-const detailScreenshotPath = document.querySelector("#detailScreenshotPath");
+const detailAppGuess = document.querySelector("#detailAppGuess");
+const detailStateGuess = document.querySelector("#detailStateGuess");
+const detailSummary = document.querySelector("#detailSummary");
+const detailConfidence = document.querySelector("#detailConfidence");
+const detailVisibleElements = document.querySelector("#detailVisibleElements");
 const detailError = document.querySelector("#detailError");
 
 const savedName = window.localStorage.getItem("agent.displayName");
@@ -44,19 +45,17 @@ renameForm.addEventListener("submit", (event) => {
   }
 });
 
-function setDetailsFromObservation(observation) {
-  const activeWindow = observation.active_window ?? {};
-  const screen = observation.screen ?? {};
-  const cursor = observation.cursor ?? {};
+function setDetailsFromUiState(uiState) {
+  const elements = Array.isArray(uiState.visible_elements) ? uiState.visible_elements : [];
 
-  detailObservationId.textContent = observation.observation_id ?? "unknown";
-  detailWindowTitle.textContent = activeWindow.title ?? "unknown";
-  detailAppName.textContent = activeWindow.app_name ?? "unknown";
-  detailScreenSize.textContent =
-    screen.width && screen.height ? `${screen.width} x ${screen.height}` : "unknown";
-  detailCursor.textContent =
-    Number.isFinite(cursor.x) && Number.isFinite(cursor.y) ? `${cursor.x}, ${cursor.y}` : "unknown";
-  detailScreenshotPath.textContent = screen.screenshot_path ?? "not captured";
+  detailUiStateId.textContent = uiState.ui_state_id ?? "unknown";
+  detailObservationId.textContent = uiState.source_observation_id ?? "unknown";
+  detailAppGuess.textContent = uiState.app_guess ?? "unknown";
+  detailStateGuess.textContent = uiState.state_guess ?? "unknown";
+  detailSummary.textContent = uiState.summary ?? "No summary available.";
+  detailConfidence.textContent =
+    Number.isFinite(uiState.confidence) ? uiState.confidence.toFixed(2) : "unknown";
+  detailVisibleElements.textContent = JSON.stringify(elements);
   detailError.textContent = "none";
 }
 
@@ -66,21 +65,21 @@ function setDetailsError(error) {
 }
 
 primaryAction.addEventListener("click", async () => {
-  statusText.textContent = "observing...";
+  statusText.textContent = "understanding...";
   primaryAction.disabled = true;
 
   try {
-    const response = await fetch("/observation");
+    const response = await fetch("/understanding");
     const payload = await response.json();
 
     if (!response.ok) {
-      throw new Error(payload.error || `Observation failed with HTTP ${response.status}`);
+      throw new Error(payload.error || `Understanding failed with HTTP ${response.status}`);
     }
 
-    setDetailsFromObservation(payload);
+    setDetailsFromUiState(payload);
     statusText.textContent = "waiting for you";
   } catch (error) {
-    statusText.textContent = "observation failed";
+    statusText.textContent = "understanding failed";
     setDetailsError(error);
   } finally {
     primaryAction.disabled = false;

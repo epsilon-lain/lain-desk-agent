@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .observation import observe
+from .understanding import understand
 
 
 UI_DIR = Path(__file__).resolve().parents[2] / "ui"
@@ -26,6 +27,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/observation":
             self._handle_observation()
+            return
+
+        if path == "/understanding":
+            self._handle_understanding()
             return
 
         if path in STATIC_ROUTES:
@@ -46,6 +51,16 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(observation)
+
+    def _handle_understanding(self) -> None:
+        try:
+            observation = observe()
+            ui_state = understand(observation)
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+
+        self._send_json(ui_state)
 
     def _handle_static_file(self, path: str) -> None:
         filename, content_type = STATIC_ROUTES[path]
