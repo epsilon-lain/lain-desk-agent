@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .observation import observe
+from .planner import propose
 from .understanding import understand
 
 
@@ -31,6 +32,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/understanding":
             self._handle_understanding()
+            return
+
+        if path == "/proposal":
+            self._handle_proposal()
             return
 
         if path in STATIC_ROUTES:
@@ -61,6 +66,21 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(ui_state)
+
+    def _handle_proposal(self) -> None:
+        try:
+            observation = observe()
+            ui_state = understand(observation)
+            planner_input = {
+                **ui_state,
+                "window_title": (observation.get("active_window") or {}).get("title"),
+            }
+            proposal = propose(planner_input)
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+
+        self._send_json({"ui_state": ui_state, "proposal": proposal})
 
     def _handle_static_file(self, path: str) -> None:
         filename, content_type = STATIC_ROUTES[path]

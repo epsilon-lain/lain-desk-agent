@@ -12,6 +12,13 @@ const detailStateGuess = document.querySelector("#detailStateGuess");
 const detailSummary = document.querySelector("#detailSummary");
 const detailConfidence = document.querySelector("#detailConfidence");
 const detailVisibleElements = document.querySelector("#detailVisibleElements");
+const detailProposalId = document.querySelector("#detailProposalId");
+const detailActionType = document.querySelector("#detailActionType");
+const detailActionTarget = document.querySelector("#detailActionTarget");
+const detailActionParameters = document.querySelector("#detailActionParameters");
+const detailActionReason = document.querySelector("#detailActionReason");
+const detailActionRisk = document.querySelector("#detailActionRisk");
+const detailRequiresApproval = document.querySelector("#detailRequiresApproval");
 const detailError = document.querySelector("#detailError");
 
 const savedName = window.localStorage.getItem("agent.displayName");
@@ -59,27 +66,41 @@ function setDetailsFromUiState(uiState) {
   detailError.textContent = "none";
 }
 
+function setDetailsFromProposal(proposal) {
+  const action = proposal.action ?? {};
+
+  detailProposalId.textContent = proposal.proposal_id ?? "unknown";
+  detailActionType.textContent = action.type ?? "unknown";
+  detailActionTarget.textContent = action.target ?? "unknown";
+  detailActionParameters.textContent = JSON.stringify(action.parameters ?? {});
+  detailActionReason.textContent = action.reason ?? "No proposal reason.";
+  detailActionRisk.textContent = action.risk ?? "unknown";
+  detailRequiresApproval.textContent =
+    typeof action.requires_approval === "boolean" ? String(action.requires_approval) : "unknown";
+}
+
 function setDetailsError(error) {
   detailError.textContent = error.message || String(error);
   detailsPanel.open = true;
 }
 
 primaryAction.addEventListener("click", async () => {
-  statusText.textContent = "understanding...";
+  statusText.textContent = "planning...";
   primaryAction.disabled = true;
 
   try {
-    const response = await fetch("/understanding");
+    const response = await fetch("/proposal");
     const payload = await response.json();
 
     if (!response.ok) {
-      throw new Error(payload.error || `Understanding failed with HTTP ${response.status}`);
+      throw new Error(payload.error || `Proposal failed with HTTP ${response.status}`);
     }
 
-    setDetailsFromUiState(payload);
+    setDetailsFromUiState(payload.ui_state ?? {});
+    setDetailsFromProposal(payload.proposal ?? {});
     statusText.textContent = "waiting for you";
   } catch (error) {
-    statusText.textContent = "understanding failed";
+    statusText.textContent = "planning failed";
     setDetailsError(error);
   } finally {
     primaryAction.disabled = false;
