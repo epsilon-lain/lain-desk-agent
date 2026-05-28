@@ -51,6 +51,17 @@
 
           <section class="status-card" aria-label="Current status">
             <p><span class="status-label">Now:</span> <span id="statusText">waiting for you</span></p>
+            <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
+              <p id="safetyBrakeMessage">No safety decision yet.</p>
+              <div class="safety-buttons" id="safetyButtons" hidden>
+                <button class="safety-button approve-button" id="approveProposal" type="button">
+                  Approve
+                </button>
+                <button class="safety-button reject-button" id="rejectProposal" type="button">
+                  Reject
+                </button>
+              </div>
+            </section>
             <details class="details-panel">
               <summary>details</summary>
               <dl>

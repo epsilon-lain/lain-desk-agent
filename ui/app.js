@@ -6,6 +6,11 @@ const taskForm = document.querySelector("#taskForm");
 const taskInput = document.querySelector("#taskInput");
 const primaryAction = document.querySelector("#primaryAction");
 const statusText = document.querySelector("#statusText");
+const safetyActionArea = document.querySelector("#safetyActionArea");
+const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
+const safetyButtons = document.querySelector("#safetyButtons");
+const approveProposal = document.querySelector("#approveProposal");
+const rejectProposal = document.querySelector("#rejectProposal");
 const detailsPanel = document.querySelector(".details-panel");
 const detailUiStateId = document.querySelector("#detailUiStateId");
 const detailObservationId = document.querySelector("#detailObservationId");
@@ -71,6 +76,21 @@ taskInput.addEventListener("keydown", (event) => {
 });
 
 resizeTaskInput();
+renderSafetyDecision();
+
+approveProposal.addEventListener("click", () => {
+  safetyActionArea.dataset.decision = "approved";
+  safetyBrakeMessage.textContent = "Approved proposal locally. No action executed.";
+  safetyButtons.hidden = true;
+  statusText.textContent = "approved locally";
+});
+
+rejectProposal.addEventListener("click", () => {
+  safetyActionArea.dataset.decision = "rejected";
+  safetyBrakeMessage.textContent = "Rejected proposal.";
+  safetyButtons.hidden = true;
+  statusText.textContent = "rejected";
+});
 
 function setDetailsFromUiState(uiState) {
   const text = Array.isArray(uiState.visible_text) ? uiState.visible_text : [];
@@ -141,6 +161,7 @@ function setDetailsFromProposal(proposal) {
 function setDetailsFromSafetyDecision(safetyDecision) {
   detailSafetyDecision.textContent = safetyDecision.decision ?? "unknown";
   detailSafetyReason.textContent = safetyDecision.reason ?? "No safety decision reason.";
+  renderSafetyDecision(safetyDecision);
 }
 
 function formatTargetBbox(bbox) {
@@ -168,8 +189,38 @@ function resizeTaskInput() {
   taskInput.style.overflowY = taskInput.scrollHeight > maxHeight ? "auto" : "hidden";
 }
 
+function renderSafetyDecision(safetyDecision = {}) {
+  const decision = safetyDecision.decision ?? "unknown";
+  const reason = safetyDecision.reason ?? "";
+
+  safetyActionArea.dataset.decision = decision;
+  safetyButtons.hidden = true;
+
+  if (decision === "allowed") {
+    safetyBrakeMessage.textContent = "Allowed: read-only proposal only.";
+    return;
+  }
+
+  if (decision === "needs_approval") {
+    safetyBrakeMessage.textContent = "Approval needed. No action will run from this UI.";
+    safetyButtons.hidden = false;
+    return;
+  }
+
+  if (decision === "blocked") {
+    safetyBrakeMessage.textContent = reason ? `Blocked: ${reason}` : "Blocked by Safety Gate.";
+    return;
+  }
+
+  safetyBrakeMessage.textContent = "No safety decision yet.";
+}
+
 function setDetailsError(error) {
   detailError.textContent = error.message || String(error);
+  renderSafetyDecision({
+    decision: "blocked",
+    reason: "Planning failed before Safety Gate returned a decision.",
+  });
   detailsPanel.open = true;
 }
 
@@ -177,6 +228,7 @@ taskForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   statusText.textContent = "planning...";
+  renderSafetyDecision();
   primaryAction.disabled = true;
   taskInput.disabled = true;
 

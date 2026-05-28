@@ -96,6 +96,7 @@ button {
 .agent-name:focus-visible,
 .window-button:focus-visible,
 .primary-action:focus-visible,
+.safety-button:focus-visible,
 .task-form textarea:focus-visible,
 .rename-dialog button:focus-visible,
 .rename-dialog input:focus-visible {
@@ -285,6 +286,67 @@ button {
   margin: 0 0 16px;
   font-size: clamp(18px, 3vw, 22px);
   line-height: 1.25;
+}
+
+.safety-action-area {
+  margin: 0 0 16px;
+  border: 1px solid rgba(134, 184, 220, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(2, 8, 14, 0.36);
+}
+
+.safety-action-area p {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.safety-action-area[data-decision="allowed"] {
+  border-color: rgba(135, 244, 255, 0.46);
+}
+
+.safety-action-area[data-decision="needs_approval"] {
+  border-color: rgba(255, 198, 109, 0.72);
+}
+
+.safety-action-area[data-decision="blocked"] {
+  border-color: rgba(255, 115, 95, 0.9);
+  background: var(--danger-soft);
+}
+
+.safety-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.safety-buttons[hidden] {
+  display: none;
+}
+
+.safety-button {
+  min-height: 38px;
+  border: 1px solid var(--panel-line-soft);
+  border-radius: 8px;
+  background: rgba(5, 13, 22, 0.8);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.safety-button:hover {
+  border-color: var(--panel-line);
+}
+
+.approve-button {
+  border-color: rgba(135, 244, 255, 0.5);
+}
+
+.reject-button {
+  border-color: rgba(255, 115, 95, 0.64);
+  color: #ffd6d0;
 }
 
 .details-panel {
