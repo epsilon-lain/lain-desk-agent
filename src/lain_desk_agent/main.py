@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from .observation import DEFAULT_RUN_DIR, observe
 from .planner import propose
@@ -17,6 +17,7 @@ from .understanding import understand
 
 
 UI_DIR = Path(__file__).resolve().parents[2] / "ui"
+RUNS_DIR = Path.cwd() / "runs"
 STATIC_ROUTES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
@@ -42,6 +43,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path in STATIC_ROUTES:
             self._handle_static_file(path)
+            return
+
+        if path.startswith("/runs/"):
+            self._handle_run_file(path)
             return
 
         if path == "/health":
@@ -83,6 +88,12 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             query = parse_qs(urlparse(self.path).query)
             observation = observe()
             ui_state = understand(observation)
+            screen = observation.get("screen") or {}
+            ui_state = {
+                **ui_state,
+                "screen": screen,
+                "screenshot_path": screen.get("screenshot_path"),
+            }
             planner_input = {
                 **ui_state,
                 "window_title": (observation.get("active_window") or {}).get("title"),
@@ -132,6 +143,24 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _handle_run_file(self, path: str) -> None:
+        file_path = _resolve_run_file_path(path)
+        if file_path is None:
+            self._send_json({"error": "run file not found"}, status=404)
+            return
+
+        try:
+            body = file_path.read_bytes()
+        except OSError:
+            self._send_json({"error": "run file not found"}, status=404)
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _send_json(self, payload: dict[str, Any], status: int = 200) -> None:
         body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
 
@@ -168,6 +197,24 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
 def create_server(host: str = "127.0.0.1", port: int = 8000) -> ThreadingHTTPServer:
     return ThreadingHTTPServer((host, port), AgentRequestHandler)
+
+
+def _resolve_run_file_path(path: str) -> Path | None:
+    if not path.endswith(".png"):
+        return None
+
+    relative_path = Path(unquote(path).lstrip("/"))
+    file_path = (Path.cwd() / relative_path).resolve()
+    runs_dir = RUNS_DIR.resolve()
+
+    if not _is_relative_to(file_path, runs_dir):
+        return None
+
+    return file_path
+
+
+def _is_relative_to(path: Path, parent: Path) -> bool:
+    return path == parent or parent in path.parents
 
 
 def approval_event_from_payload(payload: dict[str, Any]) -> dict[str, Any]:

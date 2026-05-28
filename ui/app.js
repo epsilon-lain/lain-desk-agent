@@ -13,6 +13,9 @@ const approveProposal = document.querySelector("#approveProposal");
 const rejectProposal = document.querySelector("#rejectProposal");
 const dryRunPreview = document.querySelector("#dryRunPreview");
 const dryRunStatus = document.querySelector("#dryRunStatus");
+const dryRunShot = document.querySelector("#dryRunShot");
+const dryRunImage = document.querySelector("#dryRunImage");
+const dryRunOverlay = document.querySelector("#dryRunOverlay");
 const dryRunDetails = document.querySelector("#dryRunDetails");
 const dryRunTargetLabel = document.querySelector("#dryRunTargetLabel");
 const dryRunBbox = document.querySelector("#dryRunBbox");
@@ -48,6 +51,7 @@ let currentProposal = null;
 let currentSafetyDecision = null;
 let currentTask = "";
 let currentDryRunAction = null;
+let currentUiState = null;
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 
@@ -103,6 +107,7 @@ rejectProposal.addEventListener("click", async () => {
 });
 
 function setDetailsFromUiState(uiState) {
+  currentUiState = uiState;
   const text = Array.isArray(uiState.visible_text) ? uiState.visible_text : [];
   const textBoxes = Array.isArray(uiState.visible_text_boxes) ? uiState.visible_text_boxes : [];
   const elements = Array.isArray(uiState.visible_elements) ? uiState.visible_elements : [];
@@ -222,6 +227,7 @@ function buildDryRunAction(action) {
       y: Math.round(bbox.y + bbox.height / 2),
     },
     executed: false,
+    screenshot_path: screenshotPathFromUiState(currentUiState),
   };
 }
 
@@ -247,6 +253,7 @@ function normalizeBbox(bbox) {
 function renderDryRunAction(dryRunAction = null) {
   currentDryRunAction = dryRunAction;
   dryRunPreview.dataset.state = dryRunAction ? "ready" : "empty";
+  hideDryRunScreenshot();
 
   if (!dryRunAction) {
     dryRunStatus.textContent = "No dry-run preview yet.";
@@ -264,6 +271,67 @@ function renderDryRunAction(dryRunAction = null) {
   dryRunBbox.textContent = formatTargetBbox(dryRunAction.bbox);
   dryRunCenter.textContent = `${dryRunAction.center.x},${dryRunAction.center.y}`;
   dryRunExecuted.textContent = String(dryRunAction.executed);
+  renderDryRunScreenshot(dryRunAction);
+}
+
+function screenshotPathFromUiState(uiState) {
+  if (!uiState || typeof uiState !== "object") {
+    return "";
+  }
+
+  return uiState.screenshot_path || uiState.screen?.screenshot_path || "";
+}
+
+function screenshotUrlFromPath(path) {
+  if (!path) {
+    return "";
+  }
+
+  return `/${path
+    .replaceAll("\\", "/")
+    .replace(/^\/+/, "")
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/")}`;
+}
+
+function renderDryRunScreenshot(dryRunAction) {
+  const screenshotUrl = screenshotUrlFromPath(dryRunAction.screenshot_path);
+  if (!screenshotUrl) {
+    return;
+  }
+
+  dryRunShot.hidden = false;
+  dryRunImage.onload = () => {
+    positionDryRunOverlay(dryRunAction.bbox);
+  };
+  dryRunImage.onerror = hideDryRunScreenshot;
+  dryRunImage.src = screenshotUrl;
+
+  if (dryRunImage.complete && dryRunImage.naturalWidth > 0) {
+    positionDryRunOverlay(dryRunAction.bbox);
+  }
+}
+
+function positionDryRunOverlay(bbox) {
+  if (!dryRunImage.naturalWidth || !dryRunImage.naturalHeight) {
+    return;
+  }
+
+  dryRunOverlay.hidden = false;
+  dryRunOverlay.style.left = `${(bbox.x / dryRunImage.naturalWidth) * 100}%`;
+  dryRunOverlay.style.top = `${(bbox.y / dryRunImage.naturalHeight) * 100}%`;
+  dryRunOverlay.style.width = `${(bbox.width / dryRunImage.naturalWidth) * 100}%`;
+  dryRunOverlay.style.height = `${(bbox.height / dryRunImage.naturalHeight) * 100}%`;
+}
+
+function hideDryRunScreenshot() {
+  dryRunShot.hidden = true;
+  dryRunImage.removeAttribute("src");
+  dryRunImage.onload = null;
+  dryRunImage.onerror = null;
+  dryRunOverlay.hidden = true;
+  dryRunOverlay.removeAttribute("style");
 }
 
 function renderSafetyDecision(safetyDecision = {}) {
@@ -360,6 +428,7 @@ taskForm.addEventListener("submit", async (event) => {
   renderSafetyDecision();
   currentProposal = null;
   currentSafetyDecision = null;
+  currentUiState = null;
   renderDryRunAction();
   primaryAction.disabled = true;
   taskInput.disabled = true;
