@@ -68,7 +68,7 @@ function setDetailsFromUiState(uiState) {
     Number.isFinite(uiState.confidence) ? uiState.confidence.toFixed(2) : "unknown";
   detailVisibleText.textContent = JSON.stringify(text);
   detailVisibleTextBoxes.textContent = formatTextBoxes(textBoxes);
-  detailVisibleElements.textContent = JSON.stringify(elements);
+  detailVisibleElements.textContent = formatVisibleElements(elements);
   detailError.textContent = "none";
 }
 
@@ -86,6 +86,22 @@ function formatTextBoxes(textBoxes) {
   });
 
   return `${textBoxes.length} box(es): ${preview.join("; ")}`;
+}
+
+function formatVisibleElements(elements) {
+  if (!elements.length) {
+    return "0 elements";
+  }
+
+  const preview = elements.slice(0, 3).map((element) => {
+    const bbox = element.bbox ?? {};
+    const confidence = Number.isFinite(element.confidence) ? element.confidence.toFixed(2) : "unknown";
+    return `${element.type ?? "unknown"}:${element.label ?? ""} @ ${bbox.x ?? "?"},${
+      bbox.y ?? "?"
+    } ${bbox.width ?? "?"}x${bbox.height ?? "?"} (${confidence})`;
+  });
+
+  return `${elements.length} element(s): ${preview.join("; ")}`;
 }
 
 function setDetailsFromProposal(proposal) {

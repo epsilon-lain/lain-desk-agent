@@ -1,4 +1,4 @@
-"""Understanding v1.1: convert an observation into a simple read-only UI state."""
+"""Understanding v1.2: convert an observation into a simple read-only UI state."""
 
 from __future__ import annotations
 
@@ -41,6 +41,7 @@ def understand(observation: dict[str, Any]) -> dict[str, Any]:
     state_guess = _guess_state(app_guess, app_name, title)
     visible_text = _extract_visible_text(screenshot_path)
     visible_text_boxes = _extract_visible_text_boxes(screenshot_path)
+    visible_elements = _visible_elements_from_text_boxes(visible_text_boxes)
     confidence = _confidence(app_guess, visible_text)
     summary = _build_summary(app_guess, visible_text)
 
@@ -51,7 +52,7 @@ def understand(observation: dict[str, Any]) -> dict[str, Any]:
         state_guess=state_guess,
         visible_text=visible_text,
         visible_text_boxes=visible_text_boxes,
-        visible_elements=[],
+        visible_elements=visible_elements,
         summary=summary,
         confidence=confidence,
     )
@@ -244,6 +245,25 @@ def _normalize_ocr_confidence(value: Any) -> float:
         confidence = confidence / 100.0
 
     return max(0.0, min(confidence, 1.0))
+
+
+def _visible_elements_from_text_boxes(text_boxes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    elements = []
+
+    for text_box in text_boxes:
+        elements.append(
+            {
+                "id": f"element_{len(elements) + 1:04d}",
+                "source": "ocr",
+                "type": "text",
+                "label": str(text_box.get("text") or ""),
+                "bbox": text_box.get("bbox") or {},
+                "confidence": text_box.get("confidence", 0.0),
+                "source_ref": text_box.get("id"),
+            }
+        )
+
+    return elements
 
 
 def _configure_tesseract(pytesseract: Any) -> bool:
