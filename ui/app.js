@@ -35,26 +35,30 @@ const detailSafetyDecision = document.querySelector("#detailSafetyDecision");
 const detailSafetyReason = document.querySelector("#detailSafetyReason");
 const detailError = document.querySelector("#detailError");
 
+const DEFAULT_AGENT_NAME = "Mirai";
 const savedName = window.localStorage.getItem("agent.displayName");
 let currentProposal = null;
 let currentSafetyDecision = null;
 let currentTask = "";
 
-if (savedName) {
-  agentName.textContent = savedName;
-  document.title = savedName;
-}
+setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 
 function setAgentName(name) {
   const trimmed = name.trim();
 
   if (!trimmed) {
+    setDisplayedAgentName(DEFAULT_AGENT_NAME);
+    window.localStorage.removeItem("agent.displayName");
     return;
   }
 
-  agentName.textContent = trimmed;
-  document.title = trimmed;
+  setDisplayedAgentName(trimmed);
   window.localStorage.setItem("agent.displayName", trimmed);
+}
+
+function setDisplayedAgentName(name) {
+  agentName.textContent = name;
+  document.title = name;
 }
 
 agentName.addEventListener("click", () => {
