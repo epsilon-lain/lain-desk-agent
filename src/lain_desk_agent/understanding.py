@@ -1,10 +1,14 @@
-"""Understanding v0: convert an observation into a simple read-only UI state."""
+"""Understanding v1.0: convert an observation into a simple read-only UI state."""
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from shutil import which
 from typing import Any
+
+
+DEFAULT_WINDOWS_TESSERACT = Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe")
 
 
 @dataclass(frozen=True)
@@ -13,6 +17,7 @@ class UIState:
     source_observation_id: str
     app_guess: str | None
     state_guess: str
+    visible_text: list[str] = field(default_factory=list)
     visible_elements: list[dict[str, Any]] = field(default_factory=list)
     summary: str = ""
     confidence: float = 0.0
@@ -22,23 +27,27 @@ class UIState:
 
 
 def understand(observation: dict[str, Any]) -> dict[str, Any]:
-    """Create a conservative UI state from an Observation v0 snapshot."""
+    """Create a conservative UI state from an Observation snapshot."""
 
     observation_id = str(observation.get("observation_id") or "obs_0001")
     active_window = observation.get("active_window") or {}
+    screen = observation.get("screen") or {}
     title = active_window.get("title")
     app_name = active_window.get("app_name")
+    screenshot_path = screen.get("screenshot_path")
 
     app_guess = _guess_app(app_name, title)
     state_guess = _guess_state(app_guess, app_name, title)
-    confidence = 0.25 if app_guess else 0.1
-    summary = _build_summary(app_guess, state_guess)
+    visible_text = _extract_visible_text(screenshot_path)
+    confidence = _confidence(app_guess, visible_text)
+    summary = _build_summary(app_guess, visible_text)
 
     ui_state = UIState(
         ui_state_id=_state_id_from_observation_id(observation_id),
         source_observation_id=observation_id,
         app_guess=app_guess,
         state_guess=state_guess,
+        visible_text=visible_text,
         visible_elements=[],
         summary=summary,
         confidence=confidence,
@@ -111,11 +120,80 @@ def _guess_state(app_guess: str | None, app_name: str | None, title: str | None)
     return "application_window"
 
 
-def _build_summary(app_guess: str | None, state_guess: str) -> str:
+def _extract_visible_text(screenshot_path: str | None) -> list[str]:
+    if not screenshot_path:
+        return []
+
+    try:
+        from PIL import Image
+        import pytesseract
+    except Exception:
+        return []
+
+    if not _configure_tesseract(pytesseract):
+        return []
+
+    try:
+        image_path = Path(screenshot_path)
+        if not image_path.exists():
+            return []
+
+        raw_text = pytesseract.image_to_string(Image.open(image_path))
+    except Exception:
+        return []
+
+    lines = []
+    for line in raw_text.splitlines():
+        normalized = " ".join(line.split())
+        if normalized:
+            lines.append(normalized)
+
+    return lines
+
+
+def _configure_tesseract(pytesseract: Any) -> bool:
+    if which("tesseract"):
+        return True
+
+    if DEFAULT_WINDOWS_TESSERACT.exists():
+        pytesseract.pytesseract.tesseract_cmd = str(DEFAULT_WINDOWS_TESSERACT)
+        return True
+
+    return False
+
+
+def _confidence(app_guess: str | None, visible_text: list[str]) -> float:
+    if app_guess and visible_text:
+        return 0.35
+
     if app_guess:
+        return 0.25
+
+    if visible_text:
+        return 0.2
+
+    return 0.1
+
+
+def _build_summary(app_guess: str | None, visible_text: list[str]) -> str:
+    if app_guess:
+        text_summary = (
+            f"OCR detected {len(visible_text)} text line(s)."
+            if visible_text
+            else "No visible text was detected by OCR."
+        )
         return (
             f"The active window appears to be {app_guess}. "
+            f"{text_summary} No UI elements are recognized yet."
+        )
+
+    if visible_text:
+        return (
+            f"The active window is unknown. OCR detected {len(visible_text)} text line(s). "
             "No UI elements are recognized yet."
         )
 
-    return "The active window is unknown. No UI elements are recognized yet."
+    return (
+        "The active window is unknown. No visible text was detected by OCR. "
+        "No UI elements are recognized yet."
+    )

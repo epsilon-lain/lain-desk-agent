@@ -1,15 +1,18 @@
-# Understanding v0
+# Understanding v1.0
 
-Understanding v0 is a read-only layer that converts an Observation snapshot into
-a simple UI state snapshot.
+Understanding v1.0 is a read-only layer that converts an Observation snapshot
+into a simple UI state snapshot.
 
-It does not use OCR, AI vision, planning, safety decisions, actuation,
-verification, or mouse/keyboard control. It only uses metadata already present in
-the Observation JSON.
+OCR belongs in Understanding, not Observation. Observation captures raw desktop
+state and saves the screenshot path. Understanding may read that screenshot and
+extract `visible_text` from it.
+
+This layer does not use AI vision, planning, safety decisions, actuation,
+verification, or mouse/keyboard control.
 
 ## Input
 
-Understanding v0 receives the Observation JSON returned by `observe()`:
+Understanding v1.0 receives the Observation JSON returned by `observe()`:
 
 ```json
 {
@@ -39,22 +42,86 @@ Understanding v0 receives the Observation JSON returned by `observe()`:
   "source_observation_id": "obs_0001",
   "app_guess": "Chrome",
   "state_guess": "browser_window",
+  "visible_text": ["Example text"],
   "visible_elements": [],
-  "summary": "The active window appears to be Chrome. No UI elements are recognized yet.",
-  "confidence": 0.25
+  "summary": "The active window appears to be Chrome. OCR detected 1 text line(s). No UI elements are recognized yet.",
+  "confidence": 0.35
 }
 ```
 
 ## Behavior
 
-The first implementation is intentionally conservative:
+The implementation is intentionally conservative:
 
 - `app_guess` comes from deterministic matching against `active_window.app_name`
   and `active_window.title`.
 - `state_guess` is a broad window category such as `browser_window`,
   `messaging_window`, `text_editor_window`, or `application_window`.
+- `visible_text` comes from OCR against `observation.screen.screenshot_path`.
 - `visible_elements` remains `[]` unless a future deterministic detector exists.
-- `confidence` is low because no screenshot interpretation is performed.
+- `confidence` remains low because OCR text is not the same as UI element
+  detection.
+
+## OCR Behavior
+
+OCR is optional and best-effort. If OCR is unavailable, not installed, cannot
+read the screenshot, or fails for any reason, Understanding returns:
+
+```json
+{
+  "visible_text": []
+}
+```
+
+The request must not crash because OCR is missing.
+
+The implementation uses `pytesseract` when it is available. Enabling OCR on a
+developer machine requires both the Python package and the local Tesseract OCR
+engine. Without those, Understanding still works and returns `visible_text: []`.
+
+### Windows install steps
+
+Install the Python packages:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+Install Tesseract OCR for Windows. The recommended Windows installer is the
+UB Mannheim build:
+
+```text
+https://ub-mannheim.github.io/Tesseract_Dokumentation/Tesseract_Doku_Windows.html
+```
+
+Install it to the default location:
+
+```text
+C:\Program Files\Tesseract-OCR\tesseract.exe
+```
+
+Adding Tesseract to `PATH` is recommended. After opening a new PowerShell,
+verify:
+
+```powershell
+tesseract --version
+```
+
+If Tesseract is not on `PATH`, Understanding v1.0 also tries the default Windows
+path:
+
+```text
+C:\Program Files\Tesseract-OCR\tesseract.exe
+```
+
+Verify that Python can call Tesseract:
+
+```powershell
+python -c "import pytesseract; print(pytesseract.get_tesseract_version())"
+```
+
+Understanding v1.0 does not infer buttons, input boxes, menus, or clickable
+elements from OCR text. `visible_elements` stays `[]`.
 
 ## HTTP Endpoint
 

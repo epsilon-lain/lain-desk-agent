@@ -11,6 +11,7 @@ const detailAppGuess = document.querySelector("#detailAppGuess");
 const detailStateGuess = document.querySelector("#detailStateGuess");
 const detailSummary = document.querySelector("#detailSummary");
 const detailConfidence = document.querySelector("#detailConfidence");
+const detailVisibleText = document.querySelector("#detailVisibleText");
 const detailVisibleElements = document.querySelector("#detailVisibleElements");
 const detailProposalId = document.querySelector("#detailProposalId");
 const detailActionType = document.querySelector("#detailActionType");
@@ -53,6 +54,7 @@ renameForm.addEventListener("submit", (event) => {
 });
 
 function setDetailsFromUiState(uiState) {
+  const text = Array.isArray(uiState.visible_text) ? uiState.visible_text : [];
   const elements = Array.isArray(uiState.visible_elements) ? uiState.visible_elements : [];
 
   detailUiStateId.textContent = uiState.ui_state_id ?? "unknown";
@@ -62,6 +64,7 @@ function setDetailsFromUiState(uiState) {
   detailSummary.textContent = uiState.summary ?? "No summary available.";
   detailConfidence.textContent =
     Number.isFinite(uiState.confidence) ? uiState.confidence.toFixed(2) : "unknown";
+  detailVisibleText.textContent = JSON.stringify(text);
   detailVisibleElements.textContent = JSON.stringify(elements);
   detailError.textContent = "none";
 }
