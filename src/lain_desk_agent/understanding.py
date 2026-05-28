@@ -1,4 +1,4 @@
-"""Understanding v1.0: convert an observation into a simple read-only UI state."""
+"""Understanding v1.1: convert an observation into a simple read-only UI state."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ class UIState:
     app_guess: str | None
     state_guess: str
     visible_text: list[str] = field(default_factory=list)
+    visible_text_boxes: list[dict[str, Any]] = field(default_factory=list)
     visible_elements: list[dict[str, Any]] = field(default_factory=list)
     summary: str = ""
     confidence: float = 0.0
@@ -39,6 +40,7 @@ def understand(observation: dict[str, Any]) -> dict[str, Any]:
     app_guess = _guess_app(app_name, title)
     state_guess = _guess_state(app_guess, app_name, title)
     visible_text = _extract_visible_text(screenshot_path)
+    visible_text_boxes = _extract_visible_text_boxes(screenshot_path)
     confidence = _confidence(app_guess, visible_text)
     summary = _build_summary(app_guess, visible_text)
 
@@ -48,6 +50,7 @@ def understand(observation: dict[str, Any]) -> dict[str, Any]:
         app_guess=app_guess,
         state_guess=state_guess,
         visible_text=visible_text,
+        visible_text_boxes=visible_text_boxes,
         visible_elements=[],
         summary=summary,
         confidence=confidence,
@@ -149,6 +152,98 @@ def _extract_visible_text(screenshot_path: str | None) -> list[str]:
             lines.append(normalized)
 
     return lines
+
+
+def _extract_visible_text_boxes(screenshot_path: str | None) -> list[dict[str, Any]]:
+    if not screenshot_path:
+        return []
+
+    try:
+        from PIL import Image
+        import pytesseract
+    except Exception:
+        return []
+
+    if not _configure_tesseract(pytesseract):
+        return []
+
+    try:
+        image_path = Path(screenshot_path)
+        if not image_path.exists():
+            return []
+
+        with Image.open(image_path) as image:
+            data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+    except Exception:
+        return []
+
+    return _text_boxes_from_ocr_data(data)
+
+
+def _text_boxes_from_ocr_data(data: dict[str, list[Any]]) -> list[dict[str, Any]]:
+    boxes = []
+    texts = data.get("text") or []
+
+    for index, raw_text in enumerate(texts):
+        text = " ".join(str(raw_text).split())
+        if not text:
+            continue
+
+        bbox = _bbox_from_ocr_data(data, index)
+        if bbox is None:
+            continue
+
+        boxes.append(
+            {
+                "id": f"ocr_{len(boxes) + 1:04d}",
+                "source": "ocr",
+                "text": text,
+                "bbox": bbox,
+                "confidence": _normalize_ocr_confidence(_ocr_value(data, "conf", index)),
+            }
+        )
+
+    return boxes
+
+
+def _bbox_from_ocr_data(data: dict[str, list[Any]], index: int) -> dict[str, int] | None:
+    try:
+        x = int(float(_ocr_value(data, "left", index)))
+        y = int(float(_ocr_value(data, "top", index)))
+        width = int(float(_ocr_value(data, "width", index)))
+        height = int(float(_ocr_value(data, "height", index)))
+    except (TypeError, ValueError):
+        return None
+
+    return {
+        "x": x,
+        "y": y,
+        "width": width,
+        "height": height,
+    }
+
+
+def _ocr_value(data: dict[str, list[Any]], key: str, index: int) -> Any:
+    values = data.get(key) or []
+    if index >= len(values):
+        return None
+
+    return values[index]
+
+
+def _normalize_ocr_confidence(value: Any) -> float:
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+    if confidence < 0:
+        return 0.0
+
+    if confidence > 1:
+        confidence = confidence / 100.0
+
+    return max(0.0, min(confidence, 1.0))
 
 
 def _configure_tesseract(pytesseract: Any) -> bool:

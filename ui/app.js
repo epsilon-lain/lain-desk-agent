@@ -12,6 +12,7 @@ const detailStateGuess = document.querySelector("#detailStateGuess");
 const detailSummary = document.querySelector("#detailSummary");
 const detailConfidence = document.querySelector("#detailConfidence");
 const detailVisibleText = document.querySelector("#detailVisibleText");
+const detailVisibleTextBoxes = document.querySelector("#detailVisibleTextBoxes");
 const detailVisibleElements = document.querySelector("#detailVisibleElements");
 const detailProposalId = document.querySelector("#detailProposalId");
 const detailActionType = document.querySelector("#detailActionType");
@@ -55,6 +56,7 @@ renameForm.addEventListener("submit", (event) => {
 
 function setDetailsFromUiState(uiState) {
   const text = Array.isArray(uiState.visible_text) ? uiState.visible_text : [];
+  const textBoxes = Array.isArray(uiState.visible_text_boxes) ? uiState.visible_text_boxes : [];
   const elements = Array.isArray(uiState.visible_elements) ? uiState.visible_elements : [];
 
   detailUiStateId.textContent = uiState.ui_state_id ?? "unknown";
@@ -65,8 +67,25 @@ function setDetailsFromUiState(uiState) {
   detailConfidence.textContent =
     Number.isFinite(uiState.confidence) ? uiState.confidence.toFixed(2) : "unknown";
   detailVisibleText.textContent = JSON.stringify(text);
+  detailVisibleTextBoxes.textContent = formatTextBoxes(textBoxes);
   detailVisibleElements.textContent = JSON.stringify(elements);
   detailError.textContent = "none";
+}
+
+function formatTextBoxes(textBoxes) {
+  if (!textBoxes.length) {
+    return "0 boxes";
+  }
+
+  const preview = textBoxes.slice(0, 3).map((box) => {
+    const bbox = box.bbox ?? {};
+    const confidence = Number.isFinite(box.confidence) ? box.confidence.toFixed(2) : "unknown";
+    return `${box.text ?? ""} @ ${bbox.x ?? "?"},${bbox.y ?? "?"} ${bbox.width ?? "?"}x${
+      bbox.height ?? "?"
+    } (${confidence})`;
+  });
+
+  return `${textBoxes.length} box(es): ${preview.join("; ")}`;
 }
 
 function setDetailsFromProposal(proposal) {

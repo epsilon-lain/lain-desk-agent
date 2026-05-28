@@ -1,6 +1,6 @@
-# Understanding v1.0
+# Understanding v1.1
 
-Understanding v1.0 is a read-only layer that converts an Observation snapshot
+Understanding v1.1 is a read-only layer that converts an Observation snapshot
 into a simple UI state snapshot.
 
 OCR belongs in Understanding, not Observation. Observation captures raw desktop
@@ -12,7 +12,7 @@ verification, or mouse/keyboard control.
 
 ## Input
 
-Understanding v1.0 receives the Observation JSON returned by `observe()`:
+Understanding v1.1 receives the Observation JSON returned by `observe()`:
 
 ```json
 {
@@ -43,6 +43,20 @@ Understanding v1.0 receives the Observation JSON returned by `observe()`:
   "app_guess": "Chrome",
   "state_guess": "browser_window",
   "visible_text": ["Example text"],
+  "visible_text_boxes": [
+    {
+      "id": "ocr_0001",
+      "source": "ocr",
+      "text": "Example",
+      "bbox": {
+        "x": 120,
+        "y": 240,
+        "width": 80,
+        "height": 24
+      },
+      "confidence": 0.86
+    }
+  ],
   "visible_elements": [],
   "summary": "The active window appears to be Chrome. OCR detected 1 text line(s). No UI elements are recognized yet.",
   "confidence": 0.35
@@ -58,6 +72,8 @@ The implementation is intentionally conservative:
 - `state_guess` is a broad window category such as `browser_window`,
   `messaging_window`, `text_editor_window`, or `application_window`.
 - `visible_text` comes from OCR against `observation.screen.screenshot_path`.
+- `visible_text_boxes` comes from OCR word-level data and includes text,
+  bounding box, and normalized confidence.
 - `visible_elements` remains `[]` unless a future deterministic detector exists.
 - `confidence` remains low because OCR text is not the same as UI element
   detection.
@@ -69,7 +85,8 @@ read the screenshot, or fails for any reason, Understanding returns:
 
 ```json
 {
-  "visible_text": []
+  "visible_text": [],
+  "visible_text_boxes": []
 }
 ```
 
@@ -107,7 +124,7 @@ verify:
 tesseract --version
 ```
 
-If Tesseract is not on `PATH`, Understanding v1.0 also tries the default Windows
+If Tesseract is not on `PATH`, Understanding v1.1 also tries the default Windows
 path:
 
 ```text
@@ -120,8 +137,9 @@ Verify that Python can call Tesseract:
 python -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 ```
 
-Understanding v1.0 does not infer buttons, input boxes, menus, or clickable
-elements from OCR text. `visible_elements` stays `[]`.
+Understanding v1.1 does not infer buttons, input boxes, menus, links, or
+clickable elements from OCR text boxes. OCR boxes are not mapped into
+`visible_elements`; `visible_elements` stays `[]`.
 
 ## HTTP Endpoint
 
