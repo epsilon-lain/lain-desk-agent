@@ -36,6 +36,9 @@ const detailSafetyReason = document.querySelector("#detailSafetyReason");
 const detailError = document.querySelector("#detailError");
 
 const savedName = window.localStorage.getItem("agent.displayName");
+let currentProposal = null;
+let currentSafetyDecision = null;
+let currentTask = "";
 
 if (savedName) {
   agentName.textContent = savedName;
@@ -78,18 +81,12 @@ taskInput.addEventListener("keydown", (event) => {
 resizeTaskInput();
 renderSafetyDecision();
 
-approveProposal.addEventListener("click", () => {
-  safetyActionArea.dataset.decision = "approved";
-  safetyBrakeMessage.textContent = "Approved proposal locally. No action executed.";
-  safetyButtons.hidden = true;
-  statusText.textContent = "approved locally";
+approveProposal.addEventListener("click", async () => {
+  await recordApprovalDecision("approved");
 });
 
-rejectProposal.addEventListener("click", () => {
-  safetyActionArea.dataset.decision = "rejected";
-  safetyBrakeMessage.textContent = "Rejected proposal.";
-  safetyButtons.hidden = true;
-  statusText.textContent = "rejected";
+rejectProposal.addEventListener("click", async () => {
+  await recordApprovalDecision("rejected");
 });
 
 function setDetailsFromUiState(uiState) {
@@ -203,6 +200,7 @@ function renderSafetyDecision(safetyDecision = {}) {
 
   if (decision === "needs_approval") {
     safetyBrakeMessage.textContent = "Approval needed. No action will run from this UI.";
+    setApprovalButtonsDisabled(false);
     safetyButtons.hidden = false;
     return;
   }
@@ -213,6 +211,57 @@ function renderSafetyDecision(safetyDecision = {}) {
   }
 
   safetyBrakeMessage.textContent = "No safety decision yet.";
+}
+
+async function recordApprovalDecision(decision) {
+  setApprovalButtonsDisabled(true);
+
+  try {
+    if (!currentProposal || !currentSafetyDecision) {
+      throw new Error("No proposal is available to record.");
+    }
+
+    const response = await fetch("/approval", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        decision,
+        proposal_id: currentProposal.proposal_id,
+        proposal: currentProposal,
+        safety_decision: currentSafetyDecision,
+        task: currentTask,
+      }),
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Approval logging failed with HTTP ${response.status}`);
+    }
+
+    safetyActionArea.dataset.decision = decision;
+    safetyButtons.hidden = true;
+    detailError.textContent = "none";
+
+    if (decision === "approved") {
+      safetyBrakeMessage.textContent = "Approved proposal recorded. No action executed.";
+      statusText.textContent = "approved recorded";
+    } else {
+      safetyBrakeMessage.textContent = "Rejected proposal recorded.";
+      statusText.textContent = "rejected recorded";
+    }
+  } catch (error) {
+    detailError.textContent = `Approval log failed: ${error.message || String(error)}`;
+    detailsPanel.open = true;
+    safetyBrakeMessage.textContent = "Approval logging failed. No action executed.";
+    setApprovalButtonsDisabled(false);
+  }
+}
+
+function setApprovalButtonsDisabled(disabled) {
+  approveProposal.disabled = disabled;
+  rejectProposal.disabled = disabled;
 }
 
 function setDetailsError(error) {
@@ -229,6 +278,8 @@ taskForm.addEventListener("submit", async (event) => {
 
   statusText.textContent = "planning...";
   renderSafetyDecision();
+  currentProposal = null;
+  currentSafetyDecision = null;
   primaryAction.disabled = true;
   taskInput.disabled = true;
 
@@ -251,6 +302,9 @@ taskForm.addEventListener("submit", async (event) => {
     setDetailsFromUiState(payload.ui_state ?? {});
     setDetailsFromProposal(payload.proposal ?? {});
     setDetailsFromSafetyDecision(payload.safety_decision ?? {});
+    currentProposal = payload.proposal ?? null;
+    currentSafetyDecision = payload.safety_decision ?? null;
+    currentTask = task;
     statusText.textContent = "waiting for you";
     detailsPanel.open = true;
   } catch (error) {
