@@ -11,6 +11,13 @@ const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
 const approveProposal = document.querySelector("#approveProposal");
 const rejectProposal = document.querySelector("#rejectProposal");
+const dryRunPreview = document.querySelector("#dryRunPreview");
+const dryRunStatus = document.querySelector("#dryRunStatus");
+const dryRunDetails = document.querySelector("#dryRunDetails");
+const dryRunTargetLabel = document.querySelector("#dryRunTargetLabel");
+const dryRunBbox = document.querySelector("#dryRunBbox");
+const dryRunCenter = document.querySelector("#dryRunCenter");
+const dryRunExecuted = document.querySelector("#dryRunExecuted");
 const detailsPanel = document.querySelector(".details-panel");
 const detailUiStateId = document.querySelector("#detailUiStateId");
 const detailObservationId = document.querySelector("#detailObservationId");
@@ -40,6 +47,7 @@ const savedName = window.localStorage.getItem("agent.displayName");
 let currentProposal = null;
 let currentSafetyDecision = null;
 let currentTask = "";
+let currentDryRunAction = null;
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 
@@ -84,6 +92,7 @@ taskInput.addEventListener("keydown", (event) => {
 
 resizeTaskInput();
 renderSafetyDecision();
+renderDryRunAction();
 
 approveProposal.addEventListener("click", async () => {
   await recordApprovalDecision("approved");
@@ -145,6 +154,7 @@ function formatVisibleElements(elements) {
 
 function setDetailsFromProposal(proposal) {
   const action = proposal.action ?? {};
+  const dryRunAction = buildDryRunAction(action);
 
   detailProposalId.textContent = proposal.proposal_id ?? "unknown";
   detailActionType.textContent = action.type ?? "unknown";
@@ -157,6 +167,8 @@ function setDetailsFromProposal(proposal) {
   detailActionRisk.textContent = action.risk ?? "unknown";
   detailRequiresApproval.textContent =
     typeof action.requires_approval === "boolean" ? String(action.requires_approval) : "unknown";
+  currentDryRunAction = dryRunAction;
+  renderDryRunAction(dryRunAction);
 }
 
 function setDetailsFromSafetyDecision(safetyDecision) {
@@ -188,6 +200,70 @@ function resizeTaskInput() {
   const nextHeight = Math.max(minHeight, Math.min(taskInput.scrollHeight, maxHeight));
   taskInput.style.height = `${nextHeight}px`;
   taskInput.style.overflowY = taskInput.scrollHeight > maxHeight ? "auto" : "hidden";
+}
+
+function buildDryRunAction(action) {
+  if (action.type !== "target_hint") {
+    return null;
+  }
+
+  const bbox = normalizeBbox(action.target_bbox);
+  if (!bbox) {
+    return null;
+  }
+
+  return {
+    type: "click_preview",
+    target_element_id: action.target_element_id ?? "",
+    target_label: action.target_label ?? "",
+    bbox,
+    center: {
+      x: Math.round(bbox.x + bbox.width / 2),
+      y: Math.round(bbox.y + bbox.height / 2),
+    },
+    executed: false,
+  };
+}
+
+function normalizeBbox(bbox) {
+  if (!bbox || typeof bbox !== "object") {
+    return null;
+  }
+
+  const normalized = {
+    x: Number(bbox.x),
+    y: Number(bbox.y),
+    width: Number(bbox.width),
+    height: Number(bbox.height),
+  };
+
+  if (Object.values(normalized).some((value) => !Number.isFinite(value))) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function renderDryRunAction(dryRunAction = null) {
+  currentDryRunAction = dryRunAction;
+  dryRunPreview.dataset.state = dryRunAction ? "ready" : "empty";
+
+  if (!dryRunAction) {
+    dryRunStatus.textContent = "No dry-run preview yet.";
+    dryRunDetails.hidden = true;
+    dryRunTargetLabel.textContent = "none";
+    dryRunBbox.textContent = "none";
+    dryRunCenter.textContent = "none";
+    dryRunExecuted.textContent = "false";
+    return;
+  }
+
+  dryRunStatus.textContent = "Would target this area. No action executed.";
+  dryRunDetails.hidden = false;
+  dryRunTargetLabel.textContent = dryRunAction.target_label || dryRunAction.target_element_id || "unknown";
+  dryRunBbox.textContent = formatTargetBbox(dryRunAction.bbox);
+  dryRunCenter.textContent = `${dryRunAction.center.x},${dryRunAction.center.y}`;
+  dryRunExecuted.textContent = String(dryRunAction.executed);
 }
 
 function renderSafetyDecision(safetyDecision = {}) {
@@ -284,6 +360,7 @@ taskForm.addEventListener("submit", async (event) => {
   renderSafetyDecision();
   currentProposal = null;
   currentSafetyDecision = null;
+  renderDryRunAction();
   primaryAction.disabled = true;
   taskInput.disabled = true;
 
