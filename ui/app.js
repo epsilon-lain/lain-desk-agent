@@ -61,6 +61,17 @@ renameForm.addEventListener("submit", (event) => {
   }
 });
 
+taskInput.addEventListener("input", resizeTaskInput);
+
+taskInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && event.ctrlKey) {
+    event.preventDefault();
+    taskForm.requestSubmit();
+  }
+});
+
+resizeTaskInput();
+
 function setDetailsFromUiState(uiState) {
   const text = Array.isArray(uiState.visible_text) ? uiState.visible_text : [];
   const textBoxes = Array.isArray(uiState.visible_text_boxes) ? uiState.visible_text_boxes : [];
@@ -143,6 +154,18 @@ function formatTargetBbox(bbox) {
   }
 
   return `${bbox.x ?? "?"},${bbox.y ?? "?"} ${bbox.width ?? "?"}x${bbox.height ?? "?"}`;
+}
+
+function resizeTaskInput() {
+  const styles = window.getComputedStyle(taskInput);
+  const minHeight = parseFloat(styles.minHeight) || 64;
+  const maxHeight = parseFloat(styles.maxHeight) || 140;
+
+  taskInput.style.height = `${minHeight}px`;
+
+  const nextHeight = Math.max(minHeight, Math.min(taskInput.scrollHeight, maxHeight));
+  taskInput.style.height = `${nextHeight}px`;
+  taskInput.style.overflowY = taskInput.scrollHeight > maxHeight ? "auto" : "hidden";
 }
 
 function setDetailsError(error) {
