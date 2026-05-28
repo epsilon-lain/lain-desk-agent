@@ -33,14 +33,30 @@ def propose(ui_state: dict[str, Any]) -> dict[str, Any]:
     """Return a single deterministic next-action proposal without executing it."""
 
     ui_state_id = str(ui_state.get("ui_state_id") or "state_0001")
+    app_guess = str(ui_state.get("app_guess") or "unknown")
     state_guess = str(ui_state.get("state_guess") or "unknown")
     summary = str(ui_state.get("summary") or "")
     window_title = str(ui_state.get("window_title") or "")
     visible_text = " ".join(str(text) for text in ui_state.get("visible_text") or [])
     task = str(ui_state.get("task") or ui_state.get("goal") or "")
     visible_elements = _visible_elements(ui_state)
+    target_app = _target_app_from_task(task)
 
-    if state_guess == "browser_window" and _suggests_login(
+    if target_app and not _app_matches(app_guess, target_app):
+        action = ProposedAction(
+            type="switch_app_hint",
+            target=target_app,
+            parameters={
+                "current_app": app_guess,
+            },
+            reason=(
+                f"The task mentions {target_app}, but the active window appears to be "
+                f"{app_guess}. Switch to {target_app} before planning the next step."
+            ),
+            risk="low",
+            requires_approval=False,
+        )
+    elif state_guess == "browser_window" and _suggests_login(
         f"{window_title} {summary} {visible_text}"
     ):
         action = ProposedAction(
@@ -116,6 +132,58 @@ def _suggests_login(text: str) -> bool:
     ]
 
     return any(token in haystack for token in login_tokens)
+
+
+def _target_app_from_task(task: str) -> str | None:
+    normalized = _normalized_task_text(task)
+    tokens = set(normalized.split())
+
+    if "微信" in task or tokens & {"wechat", "weixin"}:
+        return "WeChat"
+
+    if tokens & {"chrome", "browser"}:
+        return "Chrome"
+
+    if "vs code" in normalized or tokens & {"vscode", "code"}:
+        return "VS Code"
+
+    if "notepad" in tokens:
+        return "Notepad"
+
+    if tokens & {"powershell", "terminal"}:
+        return "PowerShell"
+
+    return None
+
+
+def _app_matches(app_guess: str, target_app: str) -> bool:
+    return _canonical_app_name(app_guess) == target_app
+
+
+def _canonical_app_name(app_name: str) -> str:
+    normalized = _normalized_task_text(app_name)
+    tokens = set(normalized.split())
+
+    if "wechat" in tokens or "weixin" in tokens:
+        return "WeChat"
+
+    if "chrome" in tokens:
+        return "Chrome"
+
+    if "vs code" in normalized or "vscode" in tokens or "code" in tokens:
+        return "VS Code"
+
+    if "notepad" in tokens:
+        return "Notepad"
+
+    if "powershell" in tokens or "terminal" in tokens:
+        return "PowerShell"
+
+    return app_name
+
+
+def _normalized_task_text(text: str) -> str:
+    return " ".join("".join(character.lower() if character.isalnum() else " " for character in text).split())
 
 
 def _visible_elements(ui_state: dict[str, Any]) -> list[dict[str, Any]]:

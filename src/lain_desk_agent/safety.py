@@ -66,6 +66,7 @@ def _highest_risk(left: str, right: str) -> str:
 
 _ALLOWED_READ_ONLY_ACTION_TYPES = {
     "no_op",
+    "switch_app_hint",
     "target_hint",
 }
 

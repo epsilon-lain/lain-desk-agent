@@ -1,8 +1,8 @@
-# Planner Proposal v1
+# Planner Proposal v1.1
 
-Planner Proposal v1 creates one conservative next-step proposal from the current
-UI state. It is proposal-only and read-only: it never executes the proposed
-action and never emits executable desktop input such as `click`, `type`,
+Planner Proposal v1.1 creates one conservative next-step proposal from the
+current UI state. It is proposal-only and read-only: it never executes the
+proposed action and never emits executable desktop input such as `click`, `type`,
 `hotkey`, or `submit`.
 
 ## Flow
@@ -53,8 +53,10 @@ The HTTP endpoint returns:
 
 ## Rules
 
-Planner v1 is deterministic and rule-based:
+Planner v1.1 is deterministic and rule-based:
 
+- If the task mentions a known target app and `app_guess` does not match it,
+  propose `switch_app_hint` before considering visible elements.
 - If `state_guess` is `browser_window` and the active window title or summary
   suggests a login flow, propose `wait_for_user` with `risk: high`.
 - If a `task` query parameter is supplied, match task tokens against
@@ -67,7 +69,7 @@ Planner v1 is deterministic and rule-based:
 
 ## Boundaries
 
-Planner Proposal v1 does not use:
+Planner Proposal v1.1 does not use:
 
 - LLMs
 - AI vision
@@ -78,6 +80,34 @@ Planner Proposal v1 does not use:
 It does not add executable `click`, `type`, `hotkey`, or `scroll` actions.
 Planner reads `visible_elements` only; it does not care whether an element came
 from OCR, DOM, accessibility, or vision.
+
+## App mismatch hint
+
+Planner detects simple app mentions in the task:
+
+- `wechat`, `微信`, `weixin` -> `WeChat`
+- `chrome`, `browser` -> `Chrome`
+- `vscode`, `vs code`, `code` -> `VS Code`
+- `notepad` -> `Notepad`
+- `powershell`, `terminal` -> `PowerShell`
+
+If the task asks for a different app than the active `app_guess`, Planner
+returns:
+
+```json
+{
+  "type": "switch_app_hint",
+  "target": "WeChat",
+  "parameters": {
+    "current_app": "Chrome"
+  },
+  "reason": "The task mentions WeChat, but the active window appears to be Chrome. Switch to WeChat before planning the next step.",
+  "risk": "low",
+  "requires_approval": false
+}
+```
+
+This is only a hint. It does not open, focus, move to, or control any app.
 
 ## Task hint
 
