@@ -7,10 +7,11 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from .observation import observe
 from .planner import propose
+from .safety import assess_proposal
 from .understanding import understand
 
 
@@ -69,18 +70,27 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_proposal(self) -> None:
         try:
+            query = parse_qs(urlparse(self.path).query)
             observation = observe()
             ui_state = understand(observation)
             planner_input = {
                 **ui_state,
                 "window_title": (observation.get("active_window") or {}).get("title"),
+                "task": _first_query_value(query, "task"),
             }
             proposal = propose(planner_input)
+            safety_decision = assess_proposal(proposal)
         except Exception as exc:
             self._send_json({"error": str(exc)}, status=500)
             return
 
-        self._send_json({"ui_state": ui_state, "proposal": proposal})
+        self._send_json(
+            {
+                "ui_state": ui_state,
+                "proposal": proposal,
+                "safety_decision": safety_decision,
+            }
+        )
 
     def _handle_static_file(self, path: str) -> None:
         filename, content_type = STATIC_ROUTES[path]
@@ -113,6 +123,11 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
 def create_server(host: str = "127.0.0.1", port: int = 8000) -> ThreadingHTTPServer:
     return ThreadingHTTPServer((host, port), AgentRequestHandler)
+
+
+def _first_query_value(query: dict[str, list[str]], key: str) -> str:
+    values = query.get(key) or []
+    return values[0] if values else ""
 
 
 def main() -> None:

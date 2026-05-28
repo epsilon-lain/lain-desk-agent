@@ -1,4 +1,4 @@
-"""Planner Proposal v0: create one conservative, non-executed action proposal."""
+"""Planner Proposal v1: create one conservative, non-executed proposal."""
 
 from __future__ import annotations
 
@@ -9,7 +9,10 @@ from typing import Any
 @dataclass(frozen=True)
 class ProposedAction:
     type: str
-    target: str
+    target: str = "current_window"
+    target_element_id: str | None = None
+    target_label: str | None = None
+    target_bbox: dict[str, Any] | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
     reason: str = ""
     risk: str = "low"
@@ -33,8 +36,13 @@ def propose(ui_state: dict[str, Any]) -> dict[str, Any]:
     state_guess = str(ui_state.get("state_guess") or "unknown")
     summary = str(ui_state.get("summary") or "")
     window_title = str(ui_state.get("window_title") or "")
+    visible_text = " ".join(str(text) for text in ui_state.get("visible_text") or [])
+    task = str(ui_state.get("task") or ui_state.get("goal") or "")
+    visible_elements = _visible_elements(ui_state)
 
-    if state_guess == "browser_window" and _suggests_login(f"{window_title} {summary}"):
+    if state_guess == "browser_window" and _suggests_login(
+        f"{window_title} {summary} {visible_text}"
+    ):
         action = ProposedAction(
             type="wait_for_user",
             target="current_window",
@@ -45,6 +53,28 @@ def propose(ui_state: dict[str, Any]) -> dict[str, Any]:
             risk="high",
             requires_approval=True,
         )
+    elif visible_elements:
+        target = _select_target_element(visible_elements, task)
+        if target:
+            action = ProposedAction(
+                type="target_hint",
+                target=str(target.get("id") or "unknown"),
+                target_element_id=str(target.get("id") or ""),
+                target_label=str(target.get("label") or ""),
+                target_bbox=target.get("bbox") if isinstance(target.get("bbox"), dict) else {},
+                parameters={},
+                reason=_target_hint_reason(target, task),
+                risk="low",
+                requires_approval=False,
+            )
+        else:
+            action = ProposedAction(
+                type="no_op",
+                target="current_window",
+                reason="Visible elements exist, but none are reliable enough to target.",
+                risk="low",
+                requires_approval=False,
+            )
     else:
         action = ProposedAction(
             type="no_op",
@@ -86,3 +116,109 @@ def _suggests_login(text: str) -> bool:
     ]
 
     return any(token in haystack for token in login_tokens)
+
+
+def _visible_elements(ui_state: dict[str, Any]) -> list[dict[str, Any]]:
+    elements = ui_state.get("visible_elements")
+    if not isinstance(elements, list):
+        return []
+
+    return [element for element in elements if isinstance(element, dict)]
+
+
+def _select_target_element(
+    visible_elements: list[dict[str, Any]],
+    task: str,
+) -> dict[str, Any] | None:
+    candidates = [
+        element
+        for element in visible_elements
+        if _has_element_id(element)
+        and _has_visible_label(element)
+        and _element_confidence(element) >= 0.45
+    ]
+
+    if not candidates:
+        return None
+
+    task_tokens = _tokens(task)
+    if task_tokens:
+        scored = [
+            (_task_match_score(element, task_tokens), _element_confidence(element), element)
+            for element in candidates
+        ]
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        if scored[0][0] > 0:
+            return scored[0][2]
+
+        return None
+
+    general_targets = [
+        element
+        for element in candidates
+        if _normalized_label(element) in _GENERAL_TARGET_LABELS
+    ]
+    if general_targets:
+        return max(general_targets, key=_element_confidence)
+
+    return None
+
+
+def _target_hint_reason(element: dict[str, Any], task: str) -> str:
+    label = str(element.get("label") or "")
+
+    if task.strip():
+        return (
+            f"The task mentions text similar to '{label}', and visible_elements "
+            "contains a matching read-only element."
+        )
+
+    return (
+        f"visible_elements contains a conservative target candidate labeled '{label}'. "
+        "This is only a target hint, not an executable action."
+    )
+
+
+def _has_element_id(element: dict[str, Any]) -> bool:
+    return bool(str(element.get("id") or "").strip())
+
+
+def _has_visible_label(element: dict[str, Any]) -> bool:
+    return bool(str(element.get("label") or "").strip())
+
+
+def _element_confidence(element: dict[str, Any]) -> float:
+    try:
+        confidence = float(element.get("confidence", 0.0))
+    except (TypeError, ValueError):
+        return 0.0
+
+    return max(0.0, min(confidence, 1.0))
+
+
+def _task_match_score(element: dict[str, Any], task_tokens: set[str]) -> int:
+    return len(_tokens(str(element.get("label") or "")) & task_tokens)
+
+
+def _tokens(text: str) -> set[str]:
+    normalized = "".join(character.lower() if character.isalnum() else " " for character in text)
+    return {token for token in normalized.split() if len(token) >= 2}
+
+
+def _normalized_label(element: dict[str, Any]) -> str:
+    return " ".join(str(element.get("label") or "").lower().split())
+
+
+_GENERAL_TARGET_LABELS = {
+    "search",
+    "find",
+    "ok",
+    "done",
+    "continue",
+    "next",
+    "back",
+    "open",
+    "new",
+    "save",
+    "cancel",
+}

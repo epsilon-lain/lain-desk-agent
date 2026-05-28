@@ -2,6 +2,8 @@ const agentName = document.querySelector("#agentName");
 const renameDialog = document.querySelector("#renameDialog");
 const renameForm = document.querySelector("#renameForm");
 const renameInput = document.querySelector("#renameInput");
+const taskForm = document.querySelector("#taskForm");
+const taskInput = document.querySelector("#taskInput");
 const primaryAction = document.querySelector("#primaryAction");
 const statusText = document.querySelector("#statusText");
 const detailsPanel = document.querySelector(".details-panel");
@@ -17,10 +19,15 @@ const detailVisibleElements = document.querySelector("#detailVisibleElements");
 const detailProposalId = document.querySelector("#detailProposalId");
 const detailActionType = document.querySelector("#detailActionType");
 const detailActionTarget = document.querySelector("#detailActionTarget");
+const detailTargetElementId = document.querySelector("#detailTargetElementId");
+const detailTargetLabel = document.querySelector("#detailTargetLabel");
+const detailTargetBbox = document.querySelector("#detailTargetBbox");
 const detailActionParameters = document.querySelector("#detailActionParameters");
 const detailActionReason = document.querySelector("#detailActionReason");
 const detailActionRisk = document.querySelector("#detailActionRisk");
 const detailRequiresApproval = document.querySelector("#detailRequiresApproval");
+const detailSafetyDecision = document.querySelector("#detailSafetyDecision");
+const detailSafetyReason = document.querySelector("#detailSafetyReason");
 const detailError = document.querySelector("#detailError");
 
 const savedName = window.localStorage.getItem("agent.displayName");
@@ -110,6 +117,9 @@ function setDetailsFromProposal(proposal) {
   detailProposalId.textContent = proposal.proposal_id ?? "unknown";
   detailActionType.textContent = action.type ?? "unknown";
   detailActionTarget.textContent = action.target ?? "unknown";
+  detailTargetElementId.textContent = action.target_element_id ?? "none";
+  detailTargetLabel.textContent = action.target_label ?? "none";
+  detailTargetBbox.textContent = formatTargetBbox(action.target_bbox);
   detailActionParameters.textContent = JSON.stringify(action.parameters ?? {});
   detailActionReason.textContent = action.reason ?? "No proposal reason.";
   detailActionRisk.textContent = action.risk ?? "unknown";
@@ -117,17 +127,46 @@ function setDetailsFromProposal(proposal) {
     typeof action.requires_approval === "boolean" ? String(action.requires_approval) : "unknown";
 }
 
+function setDetailsFromSafetyDecision(safetyDecision) {
+  detailSafetyDecision.textContent = safetyDecision.decision ?? "unknown";
+  detailSafetyReason.textContent = safetyDecision.reason ?? "No safety decision reason.";
+}
+
+function formatTargetBbox(bbox) {
+  if (!bbox || typeof bbox !== "object") {
+    return "none";
+  }
+
+  const hasValues = ["x", "y", "width", "height"].some((key) => bbox[key] !== undefined);
+  if (!hasValues) {
+    return "none";
+  }
+
+  return `${bbox.x ?? "?"},${bbox.y ?? "?"} ${bbox.width ?? "?"}x${bbox.height ?? "?"}`;
+}
+
 function setDetailsError(error) {
   detailError.textContent = error.message || String(error);
   detailsPanel.open = true;
 }
 
-primaryAction.addEventListener("click", async () => {
+taskForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
   statusText.textContent = "planning...";
   primaryAction.disabled = true;
+  taskInput.disabled = true;
 
   try {
-    const response = await fetch("/proposal");
+    const task = taskInput.value.trim();
+    const params = new URLSearchParams();
+
+    if (task) {
+      params.set("task", task);
+    }
+
+    const endpoint = params.toString() ? `/proposal?${params.toString()}` : "/proposal";
+    const response = await fetch(endpoint);
     const payload = await response.json();
 
     if (!response.ok) {
@@ -136,11 +175,14 @@ primaryAction.addEventListener("click", async () => {
 
     setDetailsFromUiState(payload.ui_state ?? {});
     setDetailsFromProposal(payload.proposal ?? {});
+    setDetailsFromSafetyDecision(payload.safety_decision ?? {});
     statusText.textContent = "waiting for you";
+    detailsPanel.open = true;
   } catch (error) {
     statusText.textContent = "planning failed";
     setDetailsError(error);
   } finally {
     primaryAction.disabled = false;
+    taskInput.disabled = false;
   }
 });

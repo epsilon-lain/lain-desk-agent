@@ -95,6 +95,7 @@ button {
 .agent-name:focus-visible,
 .window-button:focus-visible,
 .primary-action:focus-visible,
+.task-form input:focus-visible,
 .rename-dialog button:focus-visible,
 .rename-dialog input:focus-visible {
   outline: 2px solid var(--accent);
@@ -177,6 +178,9 @@ button {
 }
 
 .message-copy {
+  display: grid;
+  align-content: start;
+  gap: 18px;
   padding: 24px 20px 14px;
   color: var(--text);
   font-size: clamp(18px, 3.3vw, 21px);
@@ -185,6 +189,41 @@ button {
 
 .message-copy p {
   margin: 0;
+}
+
+.task-form {
+  display: grid;
+}
+
+.task-form input {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  border: 1px solid var(--panel-line-soft);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: rgba(2, 8, 14, 0.66);
+  color: var(--text);
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.task-form input::placeholder {
+  color: var(--muted);
+}
+
+.task-form input:disabled {
+  opacity: 0.62;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .speaker,

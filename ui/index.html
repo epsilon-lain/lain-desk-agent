@@ -30,13 +30,21 @@
             <div class="message-copy">
               <p>
                 <span class="speaker">Agent:</span>
-                <span>This page needs login.</span>
+                <span id="agentMessage">Ready.</span>
               </p>
-              <p>Please complete it manually.</p>
+              <form class="task-form" id="taskForm">
+                <label class="visually-hidden" for="taskInput">Task</label>
+                <input
+                  id="taskInput"
+                  maxlength="160"
+                  autocomplete="off"
+                  placeholder="Task"
+                />
+              </form>
             </div>
 
             <div class="primary-action-slot">
-              <button class="primary-action" id="primaryAction" type="button">Done</button>
+              <button class="primary-action" id="primaryAction" type="submit" form="taskForm">Plan</button>
             </div>
           </section>
 
@@ -94,6 +102,18 @@
                   <dd id="detailActionTarget">unknown</dd>
                 </div>
                 <div>
+                  <dt>Target element</dt>
+                  <dd id="detailTargetElementId">none</dd>
+                </div>
+                <div>
+                  <dt>Target label</dt>
+                  <dd id="detailTargetLabel">none</dd>
+                </div>
+                <div>
+                  <dt>Target bbox</dt>
+                  <dd id="detailTargetBbox">none</dd>
+                </div>
+                <div>
                   <dt>Parameters</dt>
                   <dd id="detailActionParameters">{}</dd>
                 </div>
@@ -108,6 +128,14 @@
                 <div>
                   <dt>Approval</dt>
                   <dd id="detailRequiresApproval">unknown</dd>
+                </div>
+                <div>
+                  <dt>Safety</dt>
+                  <dd id="detailSafetyDecision">unknown</dd>
+                </div>
+                <div>
+                  <dt>Safety reason</dt>
+                  <dd id="detailSafetyReason">No safety decision yet.</dd>
                 </div>
                 <div>
                   <dt>Error</dt>
