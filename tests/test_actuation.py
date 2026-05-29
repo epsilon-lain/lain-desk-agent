@@ -9,6 +9,8 @@ from lain_desk_agent.main import (
     action_contract_from_execute_payload,
     action_executed_event,
     action_execution_requested_event,
+    action_verification_failed_event,
+    action_verified_event,
 )
 
 
@@ -125,6 +127,50 @@ class WaitOnlyActuationTests(unittest.TestCase):
         self.assertEqual(executed["result"], result)
         self.assertIs(executed["executed"], True)
         self.assertEqual(blocked["reason"], "blocked for test")
+
+    def test_verification_audit_events_use_small_contract_fields(self) -> None:
+        contract = {
+            "action_id": "action_wait_0006",
+            "source_proposal_id": "proposal_wait_0006",
+            "type": "wait",
+            "status": "approved_for_execution",
+            "executed": False,
+        }
+        result = {
+            "status": "executed",
+            "type": "wait",
+            "duration_ms": 100,
+            "executed": True,
+        }
+        verification_result = {
+            "status": "verified",
+            "reason": "Wait action completed and a post-execution observation was captured.",
+            "expected_change": "none",
+            "confidence": 0.8,
+        }
+
+        verified = action_verified_event(
+            contract,
+            result,
+            verification_result,
+            post_observation_id="obs_0002",
+            task="wait",
+        )
+        failed = action_verification_failed_event(
+            contract,
+            result,
+            {"status": "unknown", "reason": "Post-execution observation failed: disk low"},
+            task="wait",
+        )
+
+        self.assertEqual(verified["type"], "action.verified")
+        self.assertEqual(verified["action_contract_type"], "wait")
+        self.assertEqual(verified["post_observation_id"], "obs_0002")
+        self.assertEqual(verified["verification_result"], verification_result)
+        self.assertIs(verified["executed"], True)
+        self.assertNotIn("screenshot_path", verified)
+        self.assertEqual(failed["type"], "action.verification_failed")
+        self.assertEqual(failed["reason"], "Post-execution observation failed: disk low")
 
 
 if __name__ == "__main__":

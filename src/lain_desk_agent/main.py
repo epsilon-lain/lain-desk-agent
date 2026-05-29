@@ -17,6 +17,7 @@ from .planner import propose
 from .resource_guard import ResourceGuardError
 from .safety import assess_proposal
 from .understanding import understand
+from .verification import verification_failed_result, verify_execution
 
 
 UI_DIR = Path(__file__).resolve().parents[2] / "ui"
@@ -166,6 +167,11 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             append_run_event(action_execution_requested_event(action_contract, task=task))
             result = execute_action_contract(action_contract)
             append_run_event(action_executed_event(action_contract, result, task=task))
+            verification_result, post_observation_id = verify_wait_execution_after_observe(
+                action_contract,
+                result,
+                task=task,
+            )
         except ValueError as exc:
             self._send_json({"error": str(exc)}, status=400)
             return
@@ -184,7 +190,14 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": str(exc)}, status=500)
             return
 
-        self._send_json(result)
+        self._send_json(
+            {
+                **result,
+                "execution_result": result,
+                "verification_result": verification_result,
+                "post_observation_id": post_observation_id,
+            }
+        )
 
     def _handle_events(self) -> None:
         query = parse_qs(urlparse(self.path).query)
@@ -412,6 +425,113 @@ def action_blocked_event(
         event["task"] = task
 
     return event
+
+
+def verify_wait_execution_after_observe(
+    action_contract: dict[str, Any],
+    result: dict[str, Any],
+    task: str = "",
+) -> tuple[dict[str, Any], str | None]:
+    post_observation: dict[str, Any] | None = None
+
+    try:
+        post_observation = observe()
+        verification_result = verify_execution(action_contract, result, post_observation)
+    except Exception as exc:
+        verification_result = verification_failed_result(str(exc))
+        append_run_event(
+            action_verification_failed_event(
+                action_contract,
+                result,
+                verification_result,
+                task=task,
+            )
+        )
+        return verification_result, None
+
+    post_observation_id = _observation_id(post_observation)
+
+    if verification_result.get("status") == "verified":
+        append_run_event(
+            action_verified_event(
+                action_contract,
+                result,
+                verification_result,
+                post_observation_id=post_observation_id,
+                task=task,
+            )
+        )
+    else:
+        append_run_event(
+            action_verification_failed_event(
+                action_contract,
+                result,
+                verification_result,
+                post_observation_id=post_observation_id,
+                task=task,
+            )
+        )
+
+    return verification_result, post_observation_id
+
+
+def action_verified_event(
+    action_contract: dict[str, Any],
+    result: dict[str, Any],
+    verification_result: dict[str, Any],
+    post_observation_id: str | None = None,
+    task: str = "",
+) -> dict[str, Any]:
+    event = {
+        "type": "action.verified",
+        "timestamp": _utc_timestamp(),
+        **_action_event_fields(action_contract),
+        "executed": bool(result.get("executed")),
+        "result": result,
+        "verification_result": verification_result,
+    }
+
+    if post_observation_id:
+        event["post_observation_id"] = post_observation_id
+
+    if task:
+        event["task"] = task
+
+    return event
+
+
+def action_verification_failed_event(
+    action_contract: dict[str, Any],
+    result: dict[str, Any],
+    verification_result: dict[str, Any],
+    post_observation_id: str | None = None,
+    task: str = "",
+) -> dict[str, Any]:
+    event = {
+        "type": "action.verification_failed",
+        "timestamp": _utc_timestamp(),
+        **_action_event_fields(action_contract),
+        "executed": bool(result.get("executed")),
+        "result": result,
+        "verification_result": verification_result,
+        "reason": str(verification_result.get("reason") or "Verification failed."),
+    }
+
+    if post_observation_id:
+        event["post_observation_id"] = post_observation_id
+
+    if task:
+        event["task"] = task
+
+    return event
+
+
+def _observation_id(observation: dict[str, Any] | None) -> str | None:
+    if not isinstance(observation, dict):
+        return None
+
+    observation_id = observation.get("observation_id")
+    return str(observation_id) if observation_id else None
 
 
 def _action_event_fields(action_contract: dict[str, Any]) -> dict[str, Any]:

@@ -729,6 +729,14 @@ function friendlyEventType(type) {
     return "Action blocked";
   }
 
+  if (type === "action.verified") {
+    return "Action verified";
+  }
+
+  if (type === "action.verification_failed") {
+    return "Action verification failed";
+  }
+
   return type || "Audit event";
 }
 
@@ -774,6 +782,15 @@ function eventSummary(event) {
 
   if (event.type === "action.blocked") {
     return event.reason || `${actionContractEventType(event)} blocked`;
+  }
+
+  if (event.type === "action.verified") {
+    const result = event.result || {};
+    return `Action verified: ${result.type || actionContractEventType(event)}`;
+  }
+
+  if (event.type === "action.verification_failed") {
+    return event.reason || "Action verification failed";
   }
 
   return event.proposal_id || event.observation_id || "audit event";
