@@ -6,6 +6,10 @@ const taskForm = document.querySelector("#taskForm");
 const taskInput = document.querySelector("#taskInput");
 const primaryAction = document.querySelector("#primaryAction");
 const statusText = document.querySelector("#statusText");
+const proposalPanel = document.querySelector("#proposalPanel");
+const proposalTitle = document.querySelector("#proposalTitle");
+const proposalSummary = document.querySelector("#proposalSummary");
+const proposalFacts = document.querySelector("#proposalFacts");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -97,6 +101,7 @@ taskInput.addEventListener("keydown", (event) => {
 });
 
 resizeTaskInput();
+renderProposalSummary();
 renderSafetyDecision();
 renderDryRunAction();
 fetchRecentEvents({ silent: true });
@@ -126,7 +131,7 @@ function setDetailsFromUiState(uiState) {
   detailSummary.textContent = uiState.summary ?? "No summary available.";
   detailConfidence.textContent =
     Number.isFinite(uiState.confidence) ? uiState.confidence.toFixed(2) : "unknown";
-  detailVisibleText.textContent = JSON.stringify(text);
+  detailVisibleText.textContent = text.length ? JSON.stringify(text) : "OCR found no text.";
   detailVisibleTextBoxes.textContent = formatTextBoxes(textBoxes);
   detailVisibleElements.textContent = formatVisibleElements(elements);
   detailError.textContent = "none";
@@ -134,7 +139,7 @@ function setDetailsFromUiState(uiState) {
 
 function formatTextBoxes(textBoxes) {
   if (!textBoxes.length) {
-    return "0 boxes";
+    return "OCR found no text boxes.";
   }
 
   const preview = textBoxes.slice(0, 3).map((box) => {
@@ -150,7 +155,7 @@ function formatTextBoxes(textBoxes) {
 
 function formatVisibleElements(elements) {
   if (!elements.length) {
-    return "0 elements";
+    return "No visible elements found. Mirai is staying read-only.";
   }
 
   const preview = elements.slice(0, 3).map((element) => {
@@ -168,6 +173,7 @@ function setDetailsFromProposal(proposal) {
   const action = proposal.action ?? {};
   const dryRunAction = buildDryRunAction(action);
 
+  renderProposalSummary(action);
   detailProposalId.textContent = proposal.proposal_id ?? "unknown";
   detailActionType.textContent = action.type ?? "unknown";
   detailActionTarget.textContent = action.target ?? "unknown";
@@ -202,6 +208,78 @@ function formatTargetBbox(bbox) {
   return `${bbox.x ?? "?"},${bbox.y ?? "?"} ${bbox.width ?? "?"}x${bbox.height ?? "?"}`;
 }
 
+function formatTargetCenter(bbox) {
+  const normalized = normalizeBbox(bbox);
+  if (!normalized) {
+    return "none";
+  }
+
+  return `${Math.round(normalized.x + normalized.width / 2)},${Math.round(
+    normalized.y + normalized.height / 2
+  )}`;
+}
+
+function renderProposalSummary(action = null) {
+  proposalFacts.replaceChildren();
+  proposalFacts.hidden = true;
+  proposalPanel.dataset.state = action?.type || "empty";
+
+  if (!action) {
+    proposalTitle.textContent = "Read-only proposal";
+    proposalSummary.textContent =
+      "Enter a task and choose Plan. Mirai will inspect the screen and stay read-only.";
+    return;
+  }
+
+  if (action.type === "target_hint") {
+    proposalTitle.textContent = "Target found";
+    proposalSummary.textContent = "Mirai found a likely screen target. No action will be executed.";
+    setProposalFacts([
+      ["Label", action.target_label || "unknown"],
+      ["Element", action.target_element_id || "none"],
+      ["Bbox", formatTargetBbox(action.target_bbox)],
+      ["Center", formatTargetCenter(action.target_bbox)],
+    ]);
+    return;
+  }
+
+  if (action.type === "switch_app_hint") {
+    const currentApp = action.parameters?.current_app || "unknown";
+    proposalTitle.textContent = "Switch app needed";
+    proposalSummary.textContent = "The task points at a different app, so Mirai is stopping at a hint.";
+    setProposalFacts([
+      ["Target app", action.target || "unknown"],
+      ["Current app", currentApp],
+    ]);
+    return;
+  }
+
+  if (action.type === "no_op") {
+    proposalTitle.textContent = "No reliable next step yet";
+    proposalSummary.textContent =
+      "Mirai did not find a safe target for this task and is staying read-only.";
+    return;
+  }
+
+  proposalTitle.textContent = action.type || "Unknown proposal";
+  proposalSummary.textContent = action.reason || "Mirai returned a read-only proposal.";
+}
+
+function setProposalFacts(rows) {
+  proposalFacts.hidden = false;
+
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    const detail = document.createElement("dd");
+
+    term.textContent = label;
+    detail.textContent = value;
+    row.append(term, detail);
+    proposalFacts.appendChild(row);
+  }
+}
+
 function resizeTaskInput() {
   const styles = window.getComputedStyle(taskInput);
   const minHeight = parseFloat(styles.minHeight) || 64;
@@ -215,6 +293,15 @@ function resizeTaskInput() {
 }
 
 function buildDryRunAction(action) {
+  if (action.type === "switch_app_hint") {
+    return {
+      type: "switch_app_preview",
+      target_app: action.target || "unknown",
+      current_app: action.parameters?.current_app || "unknown",
+      executed: false,
+    };
+  }
+
   if (action.type !== "target_hint") {
     return null;
   }
@@ -263,12 +350,23 @@ function renderDryRunAction(dryRunAction = null) {
   hideDryRunScreenshot();
 
   if (!dryRunAction) {
-    dryRunStatus.textContent = "No dry-run preview yet.";
+    dryRunStatus.textContent =
+      "No dry-run preview yet. Mirai will stay read-only until a reliable target appears.";
     dryRunDetails.hidden = true;
     dryRunTargetLabel.textContent = "none";
     dryRunBbox.textContent = "none";
     dryRunCenter.textContent = "none";
     dryRunExecuted.textContent = "false";
+    return;
+  }
+
+  if (dryRunAction.type === "switch_app_preview") {
+    dryRunStatus.textContent = `Preview only: would ask user to switch to ${dryRunAction.target_app}. No action executed.`;
+    dryRunDetails.hidden = true;
+    dryRunTargetLabel.textContent = dryRunAction.target_app;
+    dryRunBbox.textContent = "none";
+    dryRunCenter.textContent = "none";
+    dryRunExecuted.textContent = String(dryRunAction.executed);
     return;
   }
 
@@ -469,9 +567,29 @@ function eventListItem(text) {
 }
 
 function formatEvent(event) {
-  const type = event.type || "unknown";
+  const type = friendlyEventType(event.type);
   const timestamp = event.timestamp ? formatEventTimestamp(event.timestamp) : "no timestamp";
   return `${type} - ${timestamp} - ${eventSummary(event)}`;
+}
+
+function friendlyEventType(type) {
+  if (type === "observation.created") {
+    return "Screen observed";
+  }
+
+  if (type === "proposal.approved") {
+    return "Proposal approved";
+  }
+
+  if (type === "proposal.rejected") {
+    return "Proposal rejected";
+  }
+
+  if (type === "snapshot.deleted") {
+    return "Snapshot cleaned";
+  }
+
+  return type || "Audit event";
 }
 
 function formatEventTimestamp(timestamp) {
@@ -484,16 +602,16 @@ function formatEventTimestamp(timestamp) {
 
 function eventSummary(event) {
   if (event.type === "observation.created") {
-    return event.observation_id || "observation captured";
+    return event.observation_id ? `Captured ${event.observation_id}` : "Captured a read-only snapshot";
   }
 
   if (event.type === "proposal.approved" || event.type === "proposal.rejected") {
-    return event.task || event.proposal_id || "proposal decision recorded";
+    return event.task ? `Task: ${event.task}` : event.proposal_id || "Decision recorded";
   }
 
   if (event.type === "snapshot.deleted") {
-    const reason = event.reason ? ` (${event.reason})` : "";
-    return `${event.observation_id || "snapshot"} deleted${reason}`;
+    const reason = event.reason ? ` for ${event.reason}` : "";
+    return `${event.observation_id || "Old snapshot"} removed${reason}`;
   }
 
   return event.proposal_id || event.observation_id || "audit event";
@@ -516,6 +634,7 @@ taskForm.addEventListener("submit", async (event) => {
   currentProposal = null;
   currentSafetyDecision = null;
   currentUiState = null;
+  renderProposalSummary();
   renderDryRunAction();
   primaryAction.disabled = true;
   taskInput.disabled = true;

@@ -51,6 +51,11 @@
 
           <section class="status-card" aria-label="Current status">
             <p><span class="status-label">Now:</span> <span id="statusText">waiting for you</span></p>
+            <section class="proposal-panel" id="proposalPanel" aria-label="Proposal summary">
+              <p class="proposal-title" id="proposalTitle">Read-only proposal</p>
+              <p id="proposalSummary">Enter a task and choose Plan. Mirai will inspect the screen and stay read-only.</p>
+              <dl class="proposal-facts" id="proposalFacts" hidden></dl>
+            </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
               <p id="safetyBrakeMessage">No safety decision yet.</p>
               <div class="safety-buttons" id="safetyButtons" hidden>
