@@ -97,6 +97,7 @@ button {
 .window-button:focus-visible,
 .primary-action:focus-visible,
 .safety-button:focus-visible,
+.execution-self-test-button:focus-visible,
 .events-refresh:focus-visible,
 .task-form textarea:focus-visible,
 .rename-dialog button:focus-visible,
@@ -558,6 +559,103 @@ button {
   overflow-wrap: anywhere;
 }
 
+.execution-self-test {
+  margin: 0 0 16px;
+  border: 1px solid rgba(134, 184, 220, 0.26);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(2, 8, 14, 0.24);
+}
+
+.execution-self-test[data-state="running"] {
+  border-color: rgba(255, 198, 109, 0.58);
+}
+
+.execution-self-test[data-state="done"] {
+  border-color: rgba(135, 244, 255, 0.48);
+}
+
+.execution-self-test[data-state="error"] {
+  border-color: rgba(255, 115, 95, 0.9);
+  background: var(--danger-soft);
+}
+
+.execution-self-test-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.execution-self-test-title {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.execution-self-test-helper,
+.execution-self-test-status {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.execution-self-test-status {
+  margin-top: 12px;
+}
+
+.execution-self-test-button {
+  min-height: 34px;
+  border: 1px solid var(--panel-line-soft);
+  border-radius: 8px;
+  padding: 0 11px;
+  background: rgba(5, 13, 22, 0.8);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.execution-self-test-button:hover {
+  border-color: var(--panel-line);
+}
+
+.execution-self-test-button:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.execution-self-test-result {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.execution-self-test-result[hidden] {
+  display: none;
+}
+
+.execution-self-test-result div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.execution-self-test-result dt {
+  color: var(--blue);
+}
+
+.execution-self-test-result dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .events-panel {
   margin: 0 0 16px;
   border: 1px solid rgba(134, 184, 220, 0.26);
@@ -823,6 +921,10 @@ button {
   .details-panel div {
     grid-template-columns: 1fr;
     gap: 3px;
+  }
+
+  .execution-self-test-header {
+    grid-template-columns: 1fr;
   }
 
   .window-actions {

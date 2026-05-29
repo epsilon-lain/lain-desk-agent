@@ -29,6 +29,16 @@ const dryRunTargetLabel = document.querySelector("#dryRunTargetLabel");
 const dryRunBbox = document.querySelector("#dryRunBbox");
 const dryRunCenter = document.querySelector("#dryRunCenter");
 const dryRunExecuted = document.querySelector("#dryRunExecuted");
+const executionSelfTest = document.querySelector("#executionSelfTest");
+const runWaitSelfTest = document.querySelector("#runWaitSelfTest");
+const waitSelfTestStatus = document.querySelector("#waitSelfTestStatus");
+const waitSelfTestResult = document.querySelector("#waitSelfTestResult");
+const waitSelfTestExecutionStatus = document.querySelector("#waitSelfTestExecutionStatus");
+const waitSelfTestExecutionType = document.querySelector("#waitSelfTestExecutionType");
+const waitSelfTestDuration = document.querySelector("#waitSelfTestDuration");
+const waitSelfTestVerificationStatus = document.querySelector("#waitSelfTestVerificationStatus");
+const waitSelfTestVerificationReason = document.querySelector("#waitSelfTestVerificationReason");
+const waitSelfTestPostObservation = document.querySelector("#waitSelfTestPostObservation");
 const refreshEvents = document.querySelector("#refreshEvents");
 const recentEventsList = document.querySelector("#recentEventsList");
 const detailsPanel = document.querySelector(".details-panel");
@@ -110,6 +120,7 @@ renderProposalSummary();
 renderActionContract();
 renderSafetyDecision();
 renderDryRunAction();
+renderWaitSelfTestResult();
 fetchRecentEvents({ silent: true });
 
 approveProposal.addEventListener("click", async () => {
@@ -122,6 +133,10 @@ rejectProposal.addEventListener("click", async () => {
 
 refreshEvents.addEventListener("click", async () => {
   await fetchRecentEvents();
+});
+
+runWaitSelfTest.addEventListener("click", async () => {
+  await runWaitExecutionSelfTest();
 });
 
 function setDetailsFromUiState(uiState) {
@@ -556,6 +571,81 @@ function hideDryRunScreenshot() {
   dryRunImage.onerror = null;
   dryRunOverlay.hidden = true;
   dryRunOverlay.removeAttribute("style");
+}
+
+async function runWaitExecutionSelfTest() {
+  const actionContract = {
+    action_id: "manual_wait_0001",
+    type: "wait",
+    parameters: { duration_ms: 1000 },
+    status: "approved_for_execution",
+    executed: false,
+  };
+
+  executionSelfTest.dataset.state = "running";
+  runWaitSelfTest.disabled = true;
+  waitSelfTestStatus.textContent = "Running wait self-test...";
+  waitSelfTestResult.hidden = true;
+  statusText.textContent = "running wait self-test...";
+
+  try {
+    const response = await fetch("/execute", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action_contract: actionContract,
+        task: "wait self-test",
+      }),
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || payload.reason || `Execution failed with HTTP ${response.status}`);
+    }
+
+    renderWaitSelfTestResult(payload);
+    executionSelfTest.dataset.state = "done";
+    waitSelfTestStatus.textContent = "Wait self-test complete. No mouse/keyboard action executed.";
+    statusText.textContent = "wait self-test complete";
+    detailError.textContent = "none";
+    await fetchRecentEvents({ silent: true });
+  } catch (error) {
+    executionSelfTest.dataset.state = "error";
+    waitSelfTestStatus.textContent = "Wait self-test failed. No mouse/keyboard action executed.";
+    detailError.textContent = `Wait self-test failed: ${error.message || String(error)}`;
+    statusText.textContent = "wait self-test failed";
+    detailsPanel.open = true;
+  } finally {
+    runWaitSelfTest.disabled = false;
+  }
+}
+
+function renderWaitSelfTestResult(payload = null) {
+  if (!payload) {
+    executionSelfTest.dataset.state = "empty";
+    waitSelfTestResult.hidden = true;
+    waitSelfTestExecutionStatus.textContent = "unknown";
+    waitSelfTestExecutionType.textContent = "unknown";
+    waitSelfTestDuration.textContent = "unknown";
+    waitSelfTestVerificationStatus.textContent = "unknown";
+    waitSelfTestVerificationReason.textContent = "unknown";
+    waitSelfTestPostObservation.textContent = "unknown";
+    return;
+  }
+
+  const executionResult = payload.execution_result || payload;
+  const verificationResult = payload.verification_result || {};
+
+  waitSelfTestResult.hidden = false;
+  waitSelfTestExecutionStatus.textContent = executionResult.status || "unknown";
+  waitSelfTestExecutionType.textContent = executionResult.type || "unknown";
+  waitSelfTestDuration.textContent =
+    executionResult.duration_ms !== undefined ? `${executionResult.duration_ms} ms` : "unknown";
+  waitSelfTestVerificationStatus.textContent = verificationResult.status || "unknown";
+  waitSelfTestVerificationReason.textContent = verificationResult.reason || "No verification reason.";
+  waitSelfTestPostObservation.textContent = payload.post_observation_id || "none";
 }
 
 function renderSafetyDecision(safetyDecision = {}) {

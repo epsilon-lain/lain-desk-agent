@@ -98,6 +98,46 @@
                 </div>
               </dl>
             </section>
+            <section class="execution-self-test" id="executionSelfTest" aria-label="Execution self-test">
+              <div class="execution-self-test-header">
+                <div>
+                  <p class="execution-self-test-title">Execution self-test</p>
+                  <p class="execution-self-test-helper">
+                    Runs a safe wait-only execution test. No mouse or keyboard action.
+                  </p>
+                </div>
+                <button class="execution-self-test-button" id="runWaitSelfTest" type="button">
+                  Run wait self-test
+                </button>
+              </div>
+              <p class="execution-self-test-status" id="waitSelfTestStatus">Not run yet.</p>
+              <dl class="execution-self-test-result" id="waitSelfTestResult" hidden>
+                <div>
+                  <dt>Status</dt>
+                  <dd id="waitSelfTestExecutionStatus">unknown</dd>
+                </div>
+                <div>
+                  <dt>Type</dt>
+                  <dd id="waitSelfTestExecutionType">unknown</dd>
+                </div>
+                <div>
+                  <dt>Duration</dt>
+                  <dd id="waitSelfTestDuration">unknown</dd>
+                </div>
+                <div>
+                  <dt>Verification</dt>
+                  <dd id="waitSelfTestVerificationStatus">unknown</dd>
+                </div>
+                <div>
+                  <dt>Reason</dt>
+                  <dd id="waitSelfTestVerificationReason">unknown</dd>
+                </div>
+                <div>
+                  <dt>Post observation</dt>
+                  <dd id="waitSelfTestPostObservation">unknown</dd>
+                </div>
+              </dl>
+            </section>
             <section class="events-panel" aria-label="Recent events">
               <div class="events-header">
                 <p class="events-title">Recent events</p>
