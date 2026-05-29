@@ -12,7 +12,12 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .actuation import ActuationBlockedError, execute_action_contract
 from .action_contract import action_contract_from_proposal
-from .capabilities import get_capabilities
+from .capabilities import get_capabilities, get_capability
+from .click_policy import (
+    click_readiness_metadata,
+    click_readiness_not_applicable,
+    evaluate_click_readiness,
+)
 from .observation import DEFAULT_RUN_DIR, observe
 from .permission_profile import get_permission_profile_payload
 from .planner import propose
@@ -59,6 +64,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/permission-profile":
             self._handle_permission_profile()
+            return
+
+        if path == "/click-readiness":
+            self._handle_click_readiness()
             return
 
         if path in STATIC_ROUTES:
@@ -139,6 +148,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                     )
                 )
             safety_decision = assess_proposal(proposal)
+            click_readiness = click_readiness_for_response(action_contract, safety_decision)
         except ResourceGuardError as exc:
             self._send_json(exc.to_payload(), status=507)
             return
@@ -152,6 +162,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 "proposal": proposal,
                 "action_contract": action_contract,
                 "safety_decision": safety_decision,
+                "click_readiness": click_readiness,
             }
         )
 
@@ -220,6 +231,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_permission_profile(self) -> None:
         self._send_json(get_permission_profile_payload())
+
+    def _handle_click_readiness(self) -> None:
+        self._send_json(click_readiness_metadata())
 
     def _handle_static_file(self, path: str) -> None:
         filename, content_type = STATIC_ROUTES[path]
@@ -388,6 +402,21 @@ def action_contract_from_execute_payload(payload: dict[str, Any]) -> dict[str, A
         raise ValueError("action_contract is required.")
 
     return action_contract
+
+
+def click_readiness_for_response(
+    action_contract: dict[str, Any] | None,
+    safety_decision: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not isinstance(action_contract, dict) or action_contract.get("type") != "click":
+        return click_readiness_not_applicable()
+
+    return evaluate_click_readiness(
+        action_contract,
+        safety_decision,
+        get_capability("click"),
+        get_permission_profile_payload(),
+    )
 
 
 def action_execution_requested_event(

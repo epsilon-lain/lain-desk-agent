@@ -14,6 +14,9 @@ const actionContractPanel = document.querySelector("#actionContractPanel");
 const actionContractTitle = document.querySelector("#actionContractTitle");
 const actionContractSummary = document.querySelector("#actionContractSummary");
 const actionContractFacts = document.querySelector("#actionContractFacts");
+const clickReadinessPanel = document.querySelector("#clickReadinessPanel");
+const clickReadinessSummary = document.querySelector("#clickReadinessSummary");
+const clickReadinessReasons = document.querySelector("#clickReadinessReasons");
 const permissionProfileStatus = document.querySelector("#permissionProfileStatus");
 const capabilitiesList = document.querySelector("#capabilitiesList");
 const safetyActionArea = document.querySelector("#safetyActionArea");
@@ -126,6 +129,7 @@ window.addEventListener("resize", () => {
 resizeTaskInput();
 renderProposalSummary();
 renderActionContract();
+renderClickReadiness();
 renderSafetyDecision();
 renderDryRunAction();
 renderWaitSelfTestResult();
@@ -407,6 +411,34 @@ function renderActionContract(actionContract = null, action = null) {
     ["Status", actionContract.status || "unknown"],
     ["Executed", String(actionContract.executed)],
   ]);
+}
+
+function renderClickReadiness(clickReadiness = null, actionContract = null) {
+  clickReadinessReasons.replaceChildren();
+  clickReadinessReasons.hidden = true;
+  const isClickContract = actionContract?.type === "click";
+  const status = clickReadiness?.status || "not_applicable";
+
+  if (!isClickContract || status === "not_applicable") {
+    clickReadinessPanel.dataset.state = "not_applicable";
+    clickReadinessSummary.textContent = "Click readiness: not applicable";
+    return;
+  }
+
+  clickReadinessPanel.dataset.state = status;
+  clickReadinessSummary.textContent = `Click readiness: ${status}`;
+
+  const reasons = Array.isArray(clickReadiness.reasons) ? clickReadiness.reasons : [];
+  if (!reasons.length) {
+    return;
+  }
+
+  clickReadinessReasons.hidden = false;
+  for (const reason of reasons) {
+    const item = document.createElement("li");
+    item.textContent = reason;
+    clickReadinessReasons.appendChild(item);
+  }
 }
 
 function waitDurationMs(actionContract) {
@@ -1024,6 +1056,7 @@ taskForm.addEventListener("submit", async (event) => {
   currentActionContract = null;
   renderProposalSummary();
   renderActionContract();
+  renderClickReadiness();
   renderDryRunAction();
   primaryAction.disabled = true;
   taskInput.disabled = true;
@@ -1047,6 +1080,7 @@ taskForm.addEventListener("submit", async (event) => {
     setDetailsFromUiState(payload.ui_state ?? {});
     setDetailsFromProposal(payload.proposal ?? {});
     setDetailsFromActionContract(payload.action_contract ?? null, payload.proposal?.action ?? null);
+    renderClickReadiness(payload.click_readiness ?? null, payload.action_contract ?? null);
     setDetailsFromSafetyDecision(payload.safety_decision ?? {});
     currentProposal = payload.proposal ?? null;
     currentSafetyDecision = payload.safety_decision ?? null;

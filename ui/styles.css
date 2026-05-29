@@ -483,6 +483,51 @@ button {
   overflow-wrap: anywhere;
 }
 
+.click-readiness-panel {
+  margin: 0 0 16px;
+  border: 1px solid rgba(134, 184, 220, 0.24);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(2, 8, 14, 0.2);
+}
+
+.click-readiness-panel[data-state="blocked"] {
+  border-color: rgba(255, 115, 95, 0.74);
+  background: var(--danger-soft);
+}
+
+.click-readiness-panel[data-state="ready"] {
+  border-color: rgba(135, 244, 255, 0.48);
+}
+
+.click-readiness-title {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.click-readiness-panel p {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.click-readiness-reasons {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.click-readiness-reasons[hidden] {
+  display: none;
+}
+
 .capabilities-panel {
   margin: 0 0 16px;
   border: 1px solid rgba(134, 184, 220, 0.22);
