@@ -49,13 +49,18 @@ button {
 
 .stage {
   display: grid;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   place-items: center;
   padding: 28px;
 }
 
 .agent-window {
+  display: flex;
+  flex-direction: column;
   width: min(92vw, 460px);
+  max-height: 90vh;
+  min-height: 0;
   border: 1px solid var(--panel-line);
   border-radius: 8px;
   overflow: hidden;
@@ -65,6 +70,7 @@ button {
 }
 
 .titlebar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -161,8 +167,12 @@ button {
 }
 
 .window-body {
+  flex: 1 1 auto;
   display: grid;
   gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px;
 }
 
@@ -501,8 +511,9 @@ button {
 
 .dry-run-shot {
   position: relative;
+  max-height: 260px;
   margin-top: 12px;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid rgba(134, 184, 220, 0.3);
   border-radius: 8px;
   background: rgba(1, 5, 10, 0.72);
@@ -702,7 +713,7 @@ button {
 .events-list {
   display: grid;
   gap: 7px;
-  max-height: 132px;
+  max-height: 180px;
   margin: 0;
   padding: 0;
   overflow-y: auto;
@@ -746,11 +757,14 @@ button {
 .details-panel dl {
   display: grid;
   gap: 12px;
+  max-height: 300px;
   margin: 18px 0 0;
   padding-top: 18px;
   border-top: 1px solid rgba(134, 184, 220, 0.22);
   font-size: 15px;
   line-height: 1.35;
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .details-panel div {
@@ -881,15 +895,15 @@ button {
 
 @media (max-height: 720px) {
   body {
-    overflow: auto;
+    overflow: hidden;
   }
 
   .stage {
-    min-height: 560px;
+    min-height: 0;
   }
 
   .message-card {
-    min-height: 230px;
+    min-height: 190px;
   }
 }
 

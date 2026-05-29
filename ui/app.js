@@ -115,6 +115,12 @@ taskInput.addEventListener("keydown", (event) => {
   }
 });
 
+window.addEventListener("resize", () => {
+  if (currentDryRunAction?.bbox && !dryRunShot.hidden) {
+    positionDryRunOverlay(currentDryRunAction.bbox);
+  }
+});
+
 resizeTaskInput();
 renderProposalSummary();
 renderActionContract();
@@ -152,10 +158,19 @@ function setDetailsFromUiState(uiState) {
   detailSummary.textContent = uiState.summary ?? "No summary available.";
   detailConfidence.textContent =
     Number.isFinite(uiState.confidence) ? uiState.confidence.toFixed(2) : "unknown";
-  detailVisibleText.textContent = text.length ? JSON.stringify(text) : "OCR found no text.";
+  detailVisibleText.textContent = formatVisibleText(text);
   detailVisibleTextBoxes.textContent = formatTextBoxes(textBoxes);
   detailVisibleElements.textContent = formatVisibleElements(elements);
   detailError.textContent = "none";
+}
+
+function formatVisibleText(text) {
+  if (!text.length) {
+    return "OCR found no text.";
+  }
+
+  const preview = text.slice(0, 6).map((item) => `"${compactText(item, 64)}"`);
+  return `${text.length} text item(s): ${preview.join("; ")}${remainingCount(text.length, preview.length)}`;
 }
 
 function formatTextBoxes(textBoxes) {
@@ -166,12 +181,12 @@ function formatTextBoxes(textBoxes) {
   const preview = textBoxes.slice(0, 3).map((box) => {
     const bbox = box.bbox ?? {};
     const confidence = Number.isFinite(box.confidence) ? box.confidence.toFixed(2) : "unknown";
-    return `${box.text ?? ""} @ ${bbox.x ?? "?"},${bbox.y ?? "?"} ${bbox.width ?? "?"}x${
+    return `${compactText(box.text ?? "", 48)} @ ${bbox.x ?? "?"},${bbox.y ?? "?"} ${bbox.width ?? "?"}x${
       bbox.height ?? "?"
     } (${confidence})`;
   });
 
-  return `${textBoxes.length} box(es): ${preview.join("; ")}`;
+  return `${textBoxes.length} box(es): ${preview.join("; ")}${remainingCount(textBoxes.length, preview.length)}`;
 }
 
 function formatVisibleElements(elements) {
@@ -182,12 +197,27 @@ function formatVisibleElements(elements) {
   const preview = elements.slice(0, 3).map((element) => {
     const bbox = element.bbox ?? {};
     const confidence = Number.isFinite(element.confidence) ? element.confidence.toFixed(2) : "unknown";
-    return `${element.type ?? "unknown"}:${element.label ?? ""} @ ${bbox.x ?? "?"},${
+    return `${element.type ?? "unknown"}:${compactText(element.label ?? "", 48)} @ ${bbox.x ?? "?"},${
       bbox.y ?? "?"
     } ${bbox.width ?? "?"}x${bbox.height ?? "?"} (${confidence})`;
   });
 
-  return `${elements.length} element(s): ${preview.join("; ")}`;
+  return `${elements.length} element(s): ${preview.join("; ")}${remainingCount(elements.length, preview.length)}`;
+}
+
+function compactText(value, maxLength) {
+  const text = String(value).replace(/\s+/g, " ").trim();
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function remainingCount(total, shown) {
+  const remaining = total - shown;
+  return remaining > 0 ? `; +${remaining} more` : "";
 }
 
 function setDetailsFromProposal(proposal) {
@@ -558,10 +588,12 @@ function positionDryRunOverlay(bbox) {
   }
 
   dryRunOverlay.hidden = false;
-  dryRunOverlay.style.left = `${(bbox.x / dryRunImage.naturalWidth) * 100}%`;
-  dryRunOverlay.style.top = `${(bbox.y / dryRunImage.naturalHeight) * 100}%`;
-  dryRunOverlay.style.width = `${(bbox.width / dryRunImage.naturalWidth) * 100}%`;
-  dryRunOverlay.style.height = `${(bbox.height / dryRunImage.naturalHeight) * 100}%`;
+  const scaleX = dryRunImage.clientWidth / dryRunImage.naturalWidth;
+  const scaleY = dryRunImage.clientHeight / dryRunImage.naturalHeight;
+  dryRunOverlay.style.left = `${bbox.x * scaleX}px`;
+  dryRunOverlay.style.top = `${bbox.y * scaleY}px`;
+  dryRunOverlay.style.width = `${bbox.width * scaleX}px`;
+  dryRunOverlay.style.height = `${bbox.height * scaleY}px`;
 }
 
 function hideDryRunScreenshot() {
@@ -934,7 +966,6 @@ taskForm.addEventListener("submit", async (event) => {
     currentSafetyDecision = payload.safety_decision ?? null;
     currentTask = task;
     statusText.textContent = "waiting for you";
-    detailsPanel.open = true;
     await fetchRecentEvents({ silent: true });
   } catch (error) {
     statusText.textContent = "planning failed";
