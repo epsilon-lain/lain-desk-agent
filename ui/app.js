@@ -10,6 +10,10 @@ const proposalPanel = document.querySelector("#proposalPanel");
 const proposalTitle = document.querySelector("#proposalTitle");
 const proposalSummary = document.querySelector("#proposalSummary");
 const proposalFacts = document.querySelector("#proposalFacts");
+const actionContractPanel = document.querySelector("#actionContractPanel");
+const actionContractTitle = document.querySelector("#actionContractTitle");
+const actionContractSummary = document.querySelector("#actionContractSummary");
+const actionContractFacts = document.querySelector("#actionContractFacts");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -58,6 +62,7 @@ let currentSafetyDecision = null;
 let currentTask = "";
 let currentDryRunAction = null;
 let currentUiState = null;
+let currentActionContract = null;
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 
@@ -102,6 +107,7 @@ taskInput.addEventListener("keydown", (event) => {
 
 resizeTaskInput();
 renderProposalSummary();
+renderActionContract();
 renderSafetyDecision();
 renderDryRunAction();
 fetchRecentEvents({ silent: true });
@@ -187,6 +193,11 @@ function setDetailsFromProposal(proposal) {
     typeof action.requires_approval === "boolean" ? String(action.requires_approval) : "unknown";
   currentDryRunAction = dryRunAction;
   renderDryRunAction(dryRunAction);
+}
+
+function setDetailsFromActionContract(actionContract, action = null) {
+  currentActionContract = actionContract;
+  renderActionContract(actionContract, action);
 }
 
 function setDetailsFromSafetyDecision(safetyDecision) {
@@ -278,6 +289,87 @@ function setProposalFacts(rows) {
     row.append(term, detail);
     proposalFacts.appendChild(row);
   }
+}
+
+function renderActionContract(actionContract = null, action = null) {
+  actionContractFacts.replaceChildren();
+  actionContractFacts.hidden = true;
+  actionContractPanel.dataset.state = actionContract?.type || "empty";
+
+  if (!actionContract) {
+    actionContractTitle.textContent = "Preview action contract";
+    actionContractSummary.textContent =
+      action?.type === "no_op"
+        ? "No preview contract was created. Mirai is staying read-only."
+        : "No action contract yet.";
+    return;
+  }
+
+  if (actionContract.type === "click") {
+    actionContractTitle.textContent = "Preview click contract";
+    actionContractSummary.textContent = "Standard preview-only contract. Nothing will be executed.";
+    setActionContractFacts([
+      ["Type", actionContract.type],
+      ["Status", actionContract.status || "unknown"],
+      ["Executed", String(actionContract.executed)],
+      ["Element", actionContract.target_element_id || "none"],
+      ["Label", actionContract.target_label || "unknown"],
+      ["Bbox", formatTargetBbox(actionContract.bbox)],
+      ["Center", formatPoint(actionContract.center)],
+    ]);
+    return;
+  }
+
+  if (actionContract.type === "switch_app") {
+    actionContractTitle.textContent = "Preview switch-app contract";
+    actionContractSummary.textContent = "Standard preview-only contract. Nothing will be executed.";
+    setActionContractFacts([
+      ["Type", actionContract.type],
+      ["Status", actionContract.status || "unknown"],
+      ["Executed", String(actionContract.executed)],
+      ["Target app", actionContract.target_app || "unknown"],
+      ["Current app", actionContract.parameters?.current_app || "unknown"],
+    ]);
+    return;
+  }
+
+  actionContractTitle.textContent = "Preview action contract";
+  actionContractSummary.textContent = "Mirai produced a preview-only contract. Nothing will be executed.";
+  setActionContractFacts([
+    ["Type", actionContract.type || "unknown"],
+    ["Status", actionContract.status || "unknown"],
+    ["Executed", String(actionContract.executed)],
+  ]);
+}
+
+function setActionContractFacts(rows) {
+  actionContractFacts.hidden = false;
+
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    const detail = document.createElement("dd");
+
+    term.textContent = label;
+    detail.textContent = value;
+    row.append(term, detail);
+    actionContractFacts.appendChild(row);
+  }
+}
+
+function formatPoint(point) {
+  if (!point || typeof point !== "object") {
+    return "none";
+  }
+
+  const x = Number(point.x);
+  const y = Number(point.y);
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return "none";
+  }
+
+  return `${Math.round(x)},${Math.round(y)}`;
 }
 
 function resizeTaskInput() {
@@ -634,7 +726,9 @@ taskForm.addEventListener("submit", async (event) => {
   currentProposal = null;
   currentSafetyDecision = null;
   currentUiState = null;
+  currentActionContract = null;
   renderProposalSummary();
+  renderActionContract();
   renderDryRunAction();
   primaryAction.disabled = true;
   taskInput.disabled = true;
@@ -657,6 +751,7 @@ taskForm.addEventListener("submit", async (event) => {
 
     setDetailsFromUiState(payload.ui_state ?? {});
     setDetailsFromProposal(payload.proposal ?? {});
+    setDetailsFromActionContract(payload.action_contract ?? null, payload.proposal?.action ?? null);
     setDetailsFromSafetyDecision(payload.safety_decision ?? {});
     currentProposal = payload.proposal ?? null;
     currentSafetyDecision = payload.safety_decision ?? null;

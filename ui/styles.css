@@ -413,6 +413,65 @@ button {
   overflow-wrap: anywhere;
 }
 
+.action-contract-panel {
+  margin: 0 0 16px;
+  border: 1px solid rgba(134, 184, 220, 0.26);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(2, 8, 14, 0.24);
+}
+
+.action-contract-panel[data-state="click"] {
+  border-color: rgba(135, 244, 255, 0.42);
+}
+
+.action-contract-panel[data-state="switch_app"] {
+  border-color: rgba(255, 198, 109, 0.58);
+}
+
+.action-contract-title {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.action-contract-panel p {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.action-contract-facts {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.action-contract-facts[hidden] {
+  display: none;
+}
+
+.action-contract-facts div {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.action-contract-facts dt {
+  color: var(--blue);
+}
+
+.action-contract-facts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .dry-run-preview {
   margin: 0 0 16px;
   border: 1px solid rgba(134, 184, 220, 0.3);

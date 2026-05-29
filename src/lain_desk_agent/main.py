@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
+from .action_contract import action_contract_from_proposal
 from .observation import DEFAULT_RUN_DIR, observe
 from .planner import propose
 from .resource_guard import ResourceGuardError
@@ -113,6 +114,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 "task": _first_query_value(query, "task"),
             }
             proposal = propose(planner_input)
+            action_contract = action_contract_from_proposal(proposal)
             safety_decision = assess_proposal(proposal)
         except ResourceGuardError as exc:
             self._send_json(exc.to_payload(), status=507)
@@ -125,6 +127,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             {
                 "ui_state": ui_state,
                 "proposal": proposal,
+                "action_contract": action_contract,
                 "safety_decision": safety_decision,
             }
         )
