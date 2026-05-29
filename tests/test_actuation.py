@@ -51,7 +51,7 @@ class WaitOnlyActuationTests(unittest.TestCase):
                 sleep_fn=lambda _: None,
             )
 
-        self.assertEqual(context.exception.reason, "Only wait action contracts can be executed.")
+        self.assertEqual(context.exception.reason, "Click execution is disabled in Capability Registry v0.")
 
     def test_switch_app_contract_is_blocked(self) -> None:
         with self.assertRaises(ActuationBlockedError) as context:
@@ -65,7 +65,21 @@ class WaitOnlyActuationTests(unittest.TestCase):
                 sleep_fn=lambda _: None,
             )
 
-        self.assertEqual(context.exception.reason, "Only wait action contracts can be executed.")
+        self.assertEqual(context.exception.reason, "App switching is disabled in Capability Registry v0.")
+
+    def test_type_contract_is_blocked_by_capability_registry(self) -> None:
+        with self.assertRaises(ActuationBlockedError) as context:
+            execute_action_contract(
+                {
+                    "action_id": "action_type_0001",
+                    "type": "type",
+                    "status": "approved_for_execution",
+                    "executed": False,
+                },
+                sleep_fn=lambda _: None,
+            )
+
+        self.assertEqual(context.exception.reason, "Typing execution is disabled in Capability Registry v0.")
 
     def test_preview_only_wait_contract_is_blocked(self) -> None:
         with self.assertRaises(ActuationBlockedError) as context:

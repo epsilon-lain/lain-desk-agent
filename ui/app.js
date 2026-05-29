@@ -14,6 +14,7 @@ const actionContractPanel = document.querySelector("#actionContractPanel");
 const actionContractTitle = document.querySelector("#actionContractTitle");
 const actionContractSummary = document.querySelector("#actionContractSummary");
 const actionContractFacts = document.querySelector("#actionContractFacts");
+const capabilitiesList = document.querySelector("#capabilitiesList");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -127,6 +128,8 @@ renderActionContract();
 renderSafetyDecision();
 renderDryRunAction();
 renderWaitSelfTestResult();
+renderCapabilities();
+fetchCapabilities({ silent: true });
 fetchRecentEvents({ silent: true });
 
 approveProposal.addEventListener("click", async () => {
@@ -427,6 +430,59 @@ function setActionContractFacts(rows) {
     row.append(term, detail);
     actionContractFacts.appendChild(row);
   }
+}
+
+async function fetchCapabilities(options = {}) {
+  const { silent = false } = options;
+
+  try {
+    const response = await fetch("/capabilities");
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Capabilities failed with HTTP ${response.status}`);
+    }
+
+    renderCapabilities(payload.capabilities ?? {});
+  } catch (error) {
+    renderCapabilities();
+
+    if (!silent) {
+      detailError.textContent = `Capabilities refresh failed: ${error.message || String(error)}`;
+      detailsPanel.open = true;
+    }
+  }
+}
+
+function renderCapabilities(capabilities = null) {
+  capabilitiesList.replaceChildren();
+
+  if (!capabilities) {
+    capabilitiesList.appendChild(capabilityListItem("wait", "unknown"));
+    capabilitiesList.appendChild(capabilityListItem("click", "unknown"));
+    capabilitiesList.appendChild(capabilityListItem("type", "unknown"));
+    capabilitiesList.appendChild(capabilityListItem("hotkey", "unknown"));
+    capabilitiesList.appendChild(capabilityListItem("scroll", "unknown"));
+    return;
+  }
+
+  for (const actionType of ["wait", "click", "type", "hotkey", "scroll", "switch_app"]) {
+    const capability = capabilities[actionType] ?? {};
+    const state = capability.enabled && capability.executable ? "enabled" : "disabled";
+    capabilitiesList.appendChild(capabilityListItem(actionType, state, capability));
+  }
+}
+
+function capabilityListItem(actionType, state, capability = {}) {
+  const item = document.createElement("li");
+  item.textContent = `${displayCapabilityName(actionType)}: ${state}`;
+  item.dataset.enabled = String(state === "enabled");
+  item.title = capability.reason || "";
+  return item;
+}
+
+function displayCapabilityName(actionType) {
+  return actionType === "switch_app" ? "switch app" : actionType;
 }
 
 function formatPoint(point) {

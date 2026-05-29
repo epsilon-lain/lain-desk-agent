@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .actuation import ActuationBlockedError, execute_action_contract
 from .action_contract import action_contract_from_proposal
+from .capabilities import get_capabilities
 from .observation import DEFAULT_RUN_DIR, observe
 from .planner import propose
 from .resource_guard import ResourceGuardError
@@ -49,6 +50,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/events":
             self._handle_events()
+            return
+
+        if path == "/capabilities":
+            self._handle_capabilities()
             return
 
         if path in STATIC_ROUTES:
@@ -204,6 +209,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
         limit = _event_limit_from_query(query)
         events = read_recent_events(limit=limit)
         self._send_json({"events": events})
+
+    def _handle_capabilities(self) -> None:
+        self._send_json({"capabilities": get_capabilities()})
 
     def _handle_static_file(self, path: str) -> None:
         filename, content_type = STATIC_ROUTES[path]

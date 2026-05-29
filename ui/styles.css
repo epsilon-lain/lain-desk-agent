@@ -483,6 +483,49 @@ button {
   overflow-wrap: anywhere;
 }
 
+.capabilities-panel {
+  margin: 0 0 16px;
+  border: 1px solid rgba(134, 184, 220, 0.22);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(2, 8, 14, 0.2);
+}
+
+.capabilities-title {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.capabilities-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capabilities-list li {
+  border: 1px solid rgba(134, 184, 220, 0.28);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: rgba(5, 13, 22, 0.62);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.capabilities-list li[data-enabled="true"] {
+  border-color: rgba(135, 244, 255, 0.46);
+  color: var(--accent);
+}
+
+.capabilities-list li[data-enabled="false"] {
+  color: var(--muted);
+}
+
 .dry-run-preview {
   margin: 0 0 16px;
   border: 1px solid rgba(134, 184, 220, 0.3);

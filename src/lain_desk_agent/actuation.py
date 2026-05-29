@@ -5,6 +5,8 @@ from __future__ import annotations
 import time
 from typing import Any, Callable
 
+from .capabilities import get_capability, is_action_executable
+
 
 MAX_WAIT_DURATION_MS = 3000
 
@@ -25,8 +27,9 @@ def execute_action_contract(
     status = str(action_contract.get("status") or "")
     executed = bool(action_contract.get("executed"))
 
-    if action_type != "wait":
-        raise ActuationBlockedError("Only wait action contracts can be executed.")
+    if not is_action_executable(action_type):
+        capability = get_capability(action_type)
+        raise ActuationBlockedError(str(capability.get("reason") or "Action is not executable."))
 
     if status != "approved_for_execution":
         raise ActuationBlockedError("Action contract is not approved for execution.")
