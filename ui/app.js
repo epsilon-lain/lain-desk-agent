@@ -298,14 +298,15 @@ function renderActionContract(actionContract = null, action = null) {
 
   if (!actionContract) {
     actionContractTitle.textContent = "Preview action contract";
-    actionContractSummary.textContent = "No preview action contract.";
+    actionContractSummary.textContent = "No preview action contract. Execution unavailable.";
     return;
   }
 
   actionContractTitle.textContent = "Preview action contract";
 
   if (actionContract.type === "click") {
-    actionContractSummary.textContent = "Preview-only click contract. Nothing will be executed.";
+    actionContractSummary.textContent =
+      "Preview-only click contract. Execution unavailable in this cockpit.";
     setActionContractFacts([
       ["Contract", actionContract.type],
       ["Proposal", actionContract.source_proposal_id || "unknown"],
@@ -320,7 +321,8 @@ function renderActionContract(actionContract = null, action = null) {
   }
 
   if (actionContract.type === "switch_app") {
-    actionContractSummary.textContent = "Preview-only switch-app contract. Nothing will be executed.";
+    actionContractSummary.textContent =
+      "Preview-only switch-app contract. Execution unavailable in this cockpit.";
     setActionContractFacts([
       ["Contract", actionContract.type],
       ["Proposal", actionContract.source_proposal_id || "unknown"],
@@ -332,6 +334,21 @@ function renderActionContract(actionContract = null, action = null) {
     return;
   }
 
+  if (actionContract.type === "wait") {
+    actionContractSummary.textContent =
+      actionContract.status === "approved_for_execution"
+        ? "Wait-only contract. Execution is available only through the /execute endpoint."
+        : "Wait contract is not approved for execution.";
+    setActionContractFacts([
+      ["Contract", actionContract.type],
+      ["Proposal", actionContract.source_proposal_id || "unknown"],
+      ["Status", actionContract.status || "unknown"],
+      ["Executed", String(actionContract.executed)],
+      ["Duration", `${waitDurationMs(actionContract)} ms`],
+    ]);
+    return;
+  }
+
   actionContractSummary.textContent = "Mirai produced a preview-only contract. Nothing will be executed.";
   setActionContractFacts([
     ["Contract", actionContract.type || "unknown"],
@@ -339,6 +356,17 @@ function renderActionContract(actionContract = null, action = null) {
     ["Status", actionContract.status || "unknown"],
     ["Executed", String(actionContract.executed)],
   ]);
+}
+
+function waitDurationMs(actionContract) {
+  const rawDuration = actionContract.duration_ms ?? actionContract.parameters?.duration_ms ?? 0;
+  const duration = Number(rawDuration);
+
+  if (!Number.isFinite(duration)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(Math.round(duration), 3000));
 }
 
 function setActionContractFacts(rows) {
@@ -689,6 +717,18 @@ function friendlyEventType(type) {
     return "Preview action contract";
   }
 
+  if (type === "action.execution_requested") {
+    return "Execution requested";
+  }
+
+  if (type === "action.executed") {
+    return "Action executed";
+  }
+
+  if (type === "action.blocked") {
+    return "Action blocked";
+  }
+
   return type || "Audit event";
 }
 
@@ -720,6 +760,20 @@ function eventSummary(event) {
 
   if (event.type === "action_contract.created") {
     return `Preview action contract created: ${actionContractEventType(event)}`;
+  }
+
+  if (event.type === "action.execution_requested") {
+    return `${actionContractEventType(event)} requested`;
+  }
+
+  if (event.type === "action.executed") {
+    const result = event.result || {};
+    const duration = result.duration_ms !== undefined ? ` for ${result.duration_ms} ms` : "";
+    return `${result.type || actionContractEventType(event)} executed${duration}`;
+  }
+
+  if (event.type === "action.blocked") {
+    return event.reason || `${actionContractEventType(event)} blocked`;
   }
 
   return event.proposal_id || event.observation_id || "audit event";

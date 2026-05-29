@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
+from .actuation import ActuationBlockedError, execute_action_contract
 from .action_contract import action_contract_from_proposal
 from .observation import DEFAULT_RUN_DIR, observe
 from .planner import propose
@@ -68,6 +69,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/approval":
             self._handle_approval()
+            return
+
+        if path == "/execute":
+            self._handle_execute()
             return
 
         self._send_json({"error": "not found"}, status=404)
@@ -152,6 +157,34 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json({"status": "recorded"})
+
+    def _handle_execute(self) -> None:
+        try:
+            payload = self._read_json_body()
+            action_contract = action_contract_from_execute_payload(payload)
+            task = str(payload.get("task") or "")
+            append_run_event(action_execution_requested_event(action_contract, task=task))
+            result = execute_action_contract(action_contract)
+            append_run_event(action_executed_event(action_contract, result, task=task))
+        except ValueError as exc:
+            self._send_json({"error": str(exc)}, status=400)
+            return
+        except ActuationBlockedError as exc:
+            append_run_event(action_blocked_event(action_contract, exc.reason, task=task))
+            self._send_json(
+                {
+                    "status": "blocked",
+                    "reason": exc.reason,
+                    "executed": False,
+                },
+                status=403,
+            )
+            return
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+
+        self._send_json(result)
 
     def _handle_events(self) -> None:
         query = parse_qs(urlparse(self.path).query)
@@ -314,6 +347,81 @@ def append_action_contract_event(
     run_dir: str | Path = DEFAULT_RUN_DIR,
 ) -> None:
     append_run_event(event, run_dir=run_dir)
+
+
+def action_contract_from_execute_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    action_contract = payload.get("action_contract")
+
+    if action_contract is None and "type" in payload:
+        action_contract = payload
+
+    if not isinstance(action_contract, dict):
+        raise ValueError("action_contract is required.")
+
+    return action_contract
+
+
+def action_execution_requested_event(
+    action_contract: dict[str, Any],
+    task: str = "",
+) -> dict[str, Any]:
+    event = {
+        "type": "action.execution_requested",
+        "timestamp": _utc_timestamp(),
+        **_action_event_fields(action_contract),
+    }
+
+    if task:
+        event["task"] = task
+
+    return event
+
+
+def action_executed_event(
+    action_contract: dict[str, Any],
+    result: dict[str, Any],
+    task: str = "",
+) -> dict[str, Any]:
+    event = {
+        "type": "action.executed",
+        "timestamp": _utc_timestamp(),
+        **_action_event_fields(action_contract),
+        "executed": bool(result.get("executed")),
+        "result": result,
+    }
+
+    if task:
+        event["task"] = task
+
+    return event
+
+
+def action_blocked_event(
+    action_contract: dict[str, Any],
+    reason: str,
+    task: str = "",
+) -> dict[str, Any]:
+    event = {
+        "type": "action.blocked",
+        "timestamp": _utc_timestamp(),
+        **_action_event_fields(action_contract),
+        "reason": reason,
+    }
+
+    if task:
+        event["task"] = task
+
+    return event
+
+
+def _action_event_fields(action_contract: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "action_id": str(action_contract.get("action_id") or ""),
+        "source_proposal_id": str(action_contract.get("source_proposal_id") or ""),
+        "action_contract_type": str(action_contract.get("type") or ""),
+        "status": str(action_contract.get("status") or ""),
+        "executed": bool(action_contract.get("executed")),
+    }
 
 
 def append_run_event(
