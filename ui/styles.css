@@ -103,9 +103,12 @@ button {
 .window-button:focus-visible,
 .primary-action:focus-visible,
 .safety-button:focus-visible,
+.demo-scenario-button:focus-visible,
 .execution-self-test-button:focus-visible,
 .events-refresh:focus-visible,
 .task-form textarea:focus-visible,
+.demo-scenario-controls select:focus-visible,
+.demo-scenario-controls input:focus-visible,
 .rename-dialog button:focus-visible,
 .rename-dialog input:focus-visible {
   outline: 2px solid var(--accent);
@@ -619,6 +622,102 @@ button {
   color: var(--muted);
 }
 
+.demo-scenario-panel {
+  margin: 0 0 16px;
+  border: 1px solid rgba(134, 184, 220, 0.24);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(2, 8, 14, 0.2);
+}
+
+.demo-scenario-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.demo-scenario-title {
+  margin: 0;
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.demo-scenario-button {
+  min-height: 34px;
+  border: 1px solid rgba(135, 244, 255, 0.44);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: rgba(5, 13, 22, 0.82);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.demo-scenario-button:hover {
+  border-color: var(--panel-line);
+}
+
+.demo-scenario-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.demo-scenario-controls {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.9fr) minmax(0, 1.1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.demo-scenario-controls select,
+.demo-scenario-controls input {
+  min-width: 0;
+  min-height: 36px;
+  border: 1px solid var(--panel-line-soft);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: rgba(2, 8, 14, 0.66);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.demo-scenario-controls option {
+  background: #06111c;
+  color: var(--text);
+}
+
+.demo-scenario-result {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.demo-scenario-result[hidden] {
+  display: none;
+}
+
+.demo-scenario-result div {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.demo-scenario-result dt {
+  color: var(--blue);
+}
+
+.demo-scenario-result dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .dry-run-preview {
   margin: 0 0 16px;
   border: 1px solid rgba(134, 184, 220, 0.3);
@@ -1074,6 +1173,12 @@ button {
   }
 
   .execution-self-test-header {
+    grid-template-columns: 1fr;
+  }
+
+  .demo-scenario-header,
+  .demo-scenario-controls,
+  .demo-scenario-result div {
     grid-template-columns: 1fr;
   }
 

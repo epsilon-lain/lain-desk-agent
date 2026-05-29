@@ -25,6 +25,13 @@ const runtimeClick = document.querySelector("#runtimeClick");
 const runtimeResourceGuard = document.querySelector("#runtimeResourceGuard");
 const permissionProfileStatus = document.querySelector("#permissionProfileStatus");
 const capabilitiesList = document.querySelector("#capabilitiesList");
+const demoScenarioSelect = document.querySelector("#demoScenarioSelect");
+const demoTaskInput = document.querySelector("#demoTaskInput");
+const runDemoScenarioButton = document.querySelector("#runDemoScenario");
+const demoScenarioResult = document.querySelector("#demoScenarioResult");
+const demoScenarioName = document.querySelector("#demoScenarioName");
+const demoScenarioTask = document.querySelector("#demoScenarioTask");
+const demoScenarioApp = document.querySelector("#demoScenarioApp");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -77,6 +84,12 @@ const detailSafetyReason = document.querySelector("#detailSafetyReason");
 const detailError = document.querySelector("#detailError");
 
 const DEFAULT_AGENT_NAME = "Mirai";
+const DEMO_SCENARIO_DEFAULT_TASKS = {
+  browser_search: "Search",
+  dangerous_send: "Send",
+  dangerous_delete: "Delete",
+  app_mismatch: "Use WeChat to send a message",
+};
 const savedName = window.localStorage.getItem("agent.displayName");
 let currentProposal = null;
 let currentSafetyDecision = null;
@@ -86,6 +99,7 @@ let currentUiState = null;
 let currentActionContract = null;
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
+setDemoScenarioTaskDefault();
 
 function setAgentName(name) {
   const trimmed = name.trim();
@@ -161,6 +175,14 @@ refreshEvents.addEventListener("click", async () => {
 
 runWaitSelfTest.addEventListener("click", async () => {
   await runWaitExecutionSelfTest();
+});
+
+demoScenarioSelect.addEventListener("change", () => {
+  setDemoScenarioTaskDefault();
+});
+
+runDemoScenarioButton.addEventListener("click", async () => {
+  await runSelectedDemoScenario();
 });
 
 function setDetailsFromUiState(uiState) {
@@ -599,6 +621,83 @@ function capabilityListItem(actionType, state, capability = {}) {
 
 function displayCapabilityName(actionType) {
   return actionType === "switch_app" ? "switch app" : actionType;
+}
+
+function setDemoScenarioTaskDefault() {
+  const defaultTask = DEMO_SCENARIO_DEFAULT_TASKS[demoScenarioSelect.value] || "";
+  demoTaskInput.value = defaultTask;
+  demoTaskInput.placeholder = defaultTask || "Demo task";
+}
+
+async function runSelectedDemoScenario() {
+  statusText.textContent = "running demo scenario...";
+  renderSafetyDecision();
+  currentProposal = null;
+  currentSafetyDecision = null;
+  currentUiState = null;
+  currentActionContract = null;
+  renderProposalSummary();
+  renderActionContract();
+  renderClickReadiness();
+  renderDryRunAction();
+  renderDemoScenarioResult();
+  setDemoScenarioControlsDisabled(true);
+
+  try {
+    const scenarioName = demoScenarioSelect.value;
+    const task = demoTaskInput.value.trim();
+    const params = new URLSearchParams({ name: scenarioName });
+
+    if (task) {
+      params.set("task", task);
+    }
+
+    const response = await fetch(`/demo/scenario?${params.toString()}`);
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Demo scenario failed with HTTP ${response.status}`);
+    }
+
+    setDetailsFromUiState(payload.ui_state ?? {});
+    setDetailsFromProposal(payload.proposal ?? {});
+    setDetailsFromActionContract(payload.action_contract ?? null, payload.proposal?.action ?? null);
+    renderClickReadiness(payload.click_readiness ?? null, payload.action_contract ?? null);
+    setDetailsFromSafetyDecision(payload.safety_decision ?? {});
+    renderDemoScenarioResult(payload);
+    currentProposal = payload.proposal ?? null;
+    currentSafetyDecision = payload.safety_decision ?? null;
+    currentTask = payload.task ?? task;
+    detailError.textContent = "none";
+    statusText.textContent = "demo scenario ready";
+    await fetchRuntimeStatus({ silent: true });
+  } catch (error) {
+    statusText.textContent = "demo scenario failed";
+    setDetailsError(error);
+  } finally {
+    setDemoScenarioControlsDisabled(false);
+  }
+}
+
+function setDemoScenarioControlsDisabled(disabled) {
+  demoScenarioSelect.disabled = disabled;
+  demoTaskInput.disabled = disabled;
+  runDemoScenarioButton.disabled = disabled;
+}
+
+function renderDemoScenarioResult(payload = null) {
+  if (!payload) {
+    demoScenarioResult.hidden = true;
+    demoScenarioName.textContent = "none";
+    demoScenarioTask.textContent = "none";
+    demoScenarioApp.textContent = "unknown";
+    return;
+  }
+
+  demoScenarioResult.hidden = false;
+  demoScenarioName.textContent = payload.scenario || "unknown";
+  demoScenarioTask.textContent = payload.task || payload.ui_state?.task || "none";
+  demoScenarioApp.textContent = payload.ui_state?.app_guess || "unknown";
 }
 
 function formatPoint(point) {

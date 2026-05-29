@@ -104,6 +104,39 @@
                 <li>Loading capabilities...</li>
               </ul>
             </section>
+            <section class="demo-scenario-panel" id="demoScenarioPanel" aria-label="Demo scenario simulator">
+              <div class="demo-scenario-header">
+                <p class="demo-scenario-title">Demo scenario</p>
+                <button class="demo-scenario-button" id="runDemoScenario" type="button">
+                  Run demo scenario
+                </button>
+              </div>
+              <div class="demo-scenario-controls">
+                <label class="visually-hidden" for="demoScenarioSelect">Scenario</label>
+                <select id="demoScenarioSelect">
+                  <option value="browser_search">Browser search</option>
+                  <option value="dangerous_send">Dangerous send</option>
+                  <option value="dangerous_delete">Dangerous delete</option>
+                  <option value="app_mismatch">App mismatch</option>
+                </select>
+                <label class="visually-hidden" for="demoTaskInput">Demo task</label>
+                <input id="demoTaskInput" maxlength="240" autocomplete="off" placeholder="Demo task" />
+              </div>
+              <dl class="demo-scenario-result" id="demoScenarioResult" hidden>
+                <div>
+                  <dt>Scenario</dt>
+                  <dd id="demoScenarioName">none</dd>
+                </div>
+                <div>
+                  <dt>Task</dt>
+                  <dd id="demoScenarioTask">none</dd>
+                </div>
+                <div>
+                  <dt>App</dt>
+                  <dd id="demoScenarioApp">unknown</dd>
+                </div>
+              </dl>
+            </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
               <p id="safetyBrakeMessage">No safety decision yet.</p>
               <div class="safety-buttons" id="safetyButtons" hidden>

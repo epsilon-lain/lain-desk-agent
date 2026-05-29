@@ -18,6 +18,7 @@ from .click_policy import (
     click_readiness_not_applicable,
     evaluate_click_readiness,
 )
+from .demo_scenarios import UnknownDemoScenarioError, run_demo_scenario
 from .observation import DEFAULT_RUN_DIR, observe
 from .permission_profile import get_permission_profile_payload
 from .planner import propose
@@ -52,6 +53,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/proposal":
             self._handle_proposal()
+            return
+
+        if path == "/demo/scenario":
+            self._handle_demo_scenario()
             return
 
         if path == "/events":
@@ -169,6 +174,22 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 "click_readiness": click_readiness,
             }
         )
+
+    def _handle_demo_scenario(self) -> None:
+        try:
+            query = parse_qs(urlparse(self.path).query)
+            payload = run_demo_scenario(
+                name=_first_query_value(query, "name") or "browser_search",
+                task=_first_query_value(query, "task"),
+            )
+        except UnknownDemoScenarioError as exc:
+            self._send_json({"error": str(exc)}, status=404)
+            return
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+
+        self._send_json(payload)
 
     def _handle_approval(self) -> None:
         try:

@@ -1,0 +1,92 @@
+from __future__ import annotations
+
+import json
+import os
+import threading
+import unittest
+from urllib.request import urlopen
+from unittest.mock import patch
+
+import _path  # noqa: F401
+from lain_desk_agent.demo_scenarios import run_demo_scenario
+from lain_desk_agent.main import create_server
+
+
+class DemoScenarioTests(unittest.TestCase):
+    def test_browser_search_returns_target_hint_with_blocked_click_readiness(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            payload = run_demo_scenario("browser_search", task="Search")
+
+        action = payload["proposal"]["action"]
+        self.assertEqual(payload["scenario"], "browser_search")
+        self.assertEqual(payload["ui_state"]["app_guess"], "Chrome")
+        self.assertEqual(action["type"], "target_hint")
+        self.assertEqual(action["target_label"], "Search")
+        self.assertEqual(payload["action_contract"]["type"], "click")
+        self.assertEqual(payload["action_contract"]["status"], "preview_only")
+        self.assertIs(payload["action_contract"]["executed"], False)
+        self.assertEqual(payload["click_readiness"]["status"], "blocked")
+        self.assertIs(payload["click_readiness"]["ready"], False)
+        self.assertIn("preview-only contract", payload["click_readiness"]["reasons"])
+        self.assertIn("click capability disabled", payload["click_readiness"]["reasons"])
+
+    def test_dangerous_send_blocks_readiness_for_high_risk_label(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            payload = run_demo_scenario("dangerous_send", task="Send")
+
+        self.assertEqual(payload["proposal"]["action"]["type"], "target_hint")
+        self.assertEqual(payload["action_contract"]["target_label"], "Send")
+        self.assertEqual(payload["click_readiness"]["status"], "blocked")
+        self.assertIs(payload["click_readiness"]["ready"], False)
+        self.assertEqual(payload["click_readiness"]["risk"], "high")
+        self.assertIn("high-risk target label", payload["click_readiness"]["reasons"])
+
+    def test_dangerous_delete_blocks_readiness_for_high_risk_label(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            payload = run_demo_scenario("dangerous_delete", task="Delete")
+
+        self.assertEqual(payload["proposal"]["action"]["type"], "target_hint")
+        self.assertEqual(payload["action_contract"]["target_label"], "Delete")
+        self.assertEqual(payload["click_readiness"]["status"], "blocked")
+        self.assertIs(payload["click_readiness"]["ready"], False)
+        self.assertEqual(payload["click_readiness"]["risk"], "high")
+        self.assertIn("high-risk target label", payload["click_readiness"]["reasons"])
+
+    def test_app_mismatch_returns_switch_app_hint(self) -> None:
+        payload = run_demo_scenario("app_mismatch")
+
+        action = payload["proposal"]["action"]
+        self.assertEqual(action["type"], "switch_app_hint")
+        self.assertEqual(action["target"], "WeChat")
+        self.assertEqual(action["parameters"]["current_app"], "Chrome")
+        self.assertEqual(payload["action_contract"]["type"], "switch_app")
+        self.assertEqual(payload["click_readiness"]["status"], "not_applicable")
+
+    def test_endpoint_does_not_observe_or_understand(self) -> None:
+        server = create_server("127.0.0.1", 0)
+        host, port = server.server_address
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            with (
+                patch("lain_desk_agent.main.observe", side_effect=AssertionError("observe called")),
+                patch("lain_desk_agent.main.understand", side_effect=AssertionError("understand called")),
+            ):
+                with urlopen(
+                    f"http://{host}:{port}/demo/scenario?name=browser_search&task=Search",
+                    timeout=5,
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+        finally:
+            server.shutdown()
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(payload["scenario"], "browser_search")
+        self.assertEqual(payload["proposal"]["action"]["type"], "target_hint")
+        self.assertEqual(payload["click_readiness"]["status"], "blocked")
+
+
+if __name__ == "__main__":
+    unittest.main()
