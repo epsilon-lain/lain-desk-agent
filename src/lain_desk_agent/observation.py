@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .resource_guard import cleanup_run_snapshots, ensure_min_free_disk
+
 
 DEFAULT_RUN_DIR = Path("runs") / "run_001"
 
@@ -51,6 +53,7 @@ def observe(run_dir: str | Path = DEFAULT_RUN_DIR) -> dict[str, Any]:
     pyautogui = _load_pyautogui()
     run_path = Path(run_dir)
     run_path.mkdir(parents=True, exist_ok=True)
+    ensure_min_free_disk(run_path)
 
     observation_id = _next_observation_id(run_path)
     timestamp = _utc_timestamp()
@@ -89,6 +92,7 @@ def observe(run_dir: str | Path = DEFAULT_RUN_DIR) -> dict[str, Any]:
             "screenshot_path": observation_json["screen"]["screenshot_path"],
         },
     )
+    cleanup_run_snapshots(run_path)
 
     return observation_json
 

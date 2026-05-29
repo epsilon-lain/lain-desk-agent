@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import _path  # noqa: F401
 from lain_desk_agent.main import append_approval_event, approval_event_from_payload
 
 

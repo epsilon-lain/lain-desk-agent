@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+import _path  # noqa: F401
 from lain_desk_agent.planner import propose
 from lain_desk_agent.safety import assess_proposal
 

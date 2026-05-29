@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .observation import DEFAULT_RUN_DIR, observe
 from .planner import propose
+from .resource_guard import ResourceGuardError
 from .safety import assess_proposal
 from .understanding import understand
 
@@ -67,6 +68,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
     def _handle_observation(self) -> None:
         try:
             observation = observe()
+        except ResourceGuardError as exc:
+            self._send_json(exc.to_payload(), status=507)
+            return
         except Exception as exc:
             self._send_json({"error": str(exc)}, status=500)
             return
@@ -77,6 +81,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
         try:
             observation = observe()
             ui_state = understand(observation)
+        except ResourceGuardError as exc:
+            self._send_json(exc.to_payload(), status=507)
+            return
         except Exception as exc:
             self._send_json({"error": str(exc)}, status=500)
             return
@@ -101,6 +108,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             }
             proposal = propose(planner_input)
             safety_decision = assess_proposal(proposal)
+        except ResourceGuardError as exc:
+            self._send_json(exc.to_payload(), status=507)
+            return
         except Exception as exc:
             self._send_json({"error": str(exc)}, status=500)
             return
