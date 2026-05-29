@@ -24,6 +24,8 @@ STATIC_ROUTES = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
 }
+DEFAULT_EVENTS_LIMIT = 20
+MAX_EVENTS_LIMIT = 100
 
 
 class AgentRequestHandler(BaseHTTPRequestHandler):
@@ -40,6 +42,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/proposal":
             self._handle_proposal()
+            return
+
+        if path == "/events":
+            self._handle_events()
             return
 
         if path in STATIC_ROUTES:
@@ -136,6 +142,12 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json({"status": "recorded"})
+
+    def _handle_events(self) -> None:
+        query = parse_qs(urlparse(self.path).query)
+        limit = _event_limit_from_query(query)
+        events = read_recent_events(limit=limit)
+        self._send_json({"events": events})
 
     def _handle_static_file(self, path: str) -> None:
         filename, content_type = STATIC_ROUTES[path]
@@ -271,9 +283,56 @@ def append_approval_event(
         file.write(json.dumps(event, ensure_ascii=False) + "\n")
 
 
+def read_recent_events(
+    run_dir: str | Path = DEFAULT_RUN_DIR,
+    limit: int = DEFAULT_EVENTS_LIMIT,
+) -> list[dict[str, Any]]:
+    events_path = Path(run_dir) / "events.jsonl"
+
+    if not events_path.exists():
+        return []
+
+    safe_limit = _bounded_event_limit(limit)
+    events: list[dict[str, Any]] = []
+
+    try:
+        lines = events_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+
+    for line in reversed(lines):
+        if len(events) >= safe_limit:
+            break
+
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        if isinstance(event, dict):
+            events.append(event)
+
+    return events
+
+
 def _first_query_value(query: dict[str, list[str]], key: str) -> str:
     values = query.get(key) or []
     return values[0] if values else ""
+
+
+def _event_limit_from_query(query: dict[str, list[str]]) -> int:
+    value = _first_query_value(query, "limit")
+
+    try:
+        limit = int(value)
+    except ValueError:
+        return DEFAULT_EVENTS_LIMIT
+
+    return _bounded_event_limit(limit)
+
+
+def _bounded_event_limit(limit: int) -> int:
+    return min(max(limit, 1), MAX_EVENTS_LIMIT)
 
 
 def _utc_timestamp() -> str:

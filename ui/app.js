@@ -21,6 +21,8 @@ const dryRunTargetLabel = document.querySelector("#dryRunTargetLabel");
 const dryRunBbox = document.querySelector("#dryRunBbox");
 const dryRunCenter = document.querySelector("#dryRunCenter");
 const dryRunExecuted = document.querySelector("#dryRunExecuted");
+const refreshEvents = document.querySelector("#refreshEvents");
+const recentEventsList = document.querySelector("#recentEventsList");
 const detailsPanel = document.querySelector(".details-panel");
 const detailUiStateId = document.querySelector("#detailUiStateId");
 const detailObservationId = document.querySelector("#detailObservationId");
@@ -97,6 +99,7 @@ taskInput.addEventListener("keydown", (event) => {
 resizeTaskInput();
 renderSafetyDecision();
 renderDryRunAction();
+fetchRecentEvents({ silent: true });
 
 approveProposal.addEventListener("click", async () => {
   await recordApprovalDecision("approved");
@@ -104,6 +107,10 @@ approveProposal.addEventListener("click", async () => {
 
 rejectProposal.addEventListener("click", async () => {
   await recordApprovalDecision("rejected");
+});
+
+refreshEvents.addEventListener("click", async () => {
+  await fetchRecentEvents();
 });
 
 function setDetailsFromUiState(uiState) {
@@ -399,6 +406,8 @@ async function recordApprovalDecision(decision) {
       safetyBrakeMessage.textContent = "Rejected proposal recorded.";
       statusText.textContent = "rejected recorded";
     }
+
+    await fetchRecentEvents({ silent: true });
   } catch (error) {
     detailError.textContent = `Approval log failed: ${error.message || String(error)}`;
     detailsPanel.open = true;
@@ -410,6 +419,84 @@ async function recordApprovalDecision(decision) {
 function setApprovalButtonsDisabled(disabled) {
   approveProposal.disabled = disabled;
   rejectProposal.disabled = disabled;
+}
+
+async function fetchRecentEvents(options = {}) {
+  const { silent = false } = options;
+
+  refreshEvents.disabled = true;
+
+  try {
+    const response = await fetch("/events?limit=20");
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Events failed with HTTP ${response.status}`);
+    }
+
+    renderRecentEvents(Array.isArray(payload.events) ? payload.events : []);
+
+    if (!silent) {
+      detailError.textContent = "none";
+    }
+  } catch (error) {
+    if (!silent) {
+      detailError.textContent = `Events refresh failed: ${error.message || String(error)}`;
+      detailsPanel.open = true;
+    }
+  } finally {
+    refreshEvents.disabled = false;
+  }
+}
+
+function renderRecentEvents(events) {
+  recentEventsList.replaceChildren();
+
+  if (!events.length) {
+    recentEventsList.appendChild(eventListItem("No events yet."));
+    return;
+  }
+
+  for (const event of events) {
+    recentEventsList.appendChild(eventListItem(formatEvent(event)));
+  }
+}
+
+function eventListItem(text) {
+  const item = document.createElement("li");
+  item.textContent = text;
+  return item;
+}
+
+function formatEvent(event) {
+  const type = event.type || "unknown";
+  const timestamp = event.timestamp ? formatEventTimestamp(event.timestamp) : "no timestamp";
+  return `${type} - ${timestamp} - ${eventSummary(event)}`;
+}
+
+function formatEventTimestamp(timestamp) {
+  if (typeof timestamp !== "string") {
+    return "no timestamp";
+  }
+
+  return timestamp.replace("T", " ").replace("Z", " UTC");
+}
+
+function eventSummary(event) {
+  if (event.type === "observation.created") {
+    return event.observation_id || "observation captured";
+  }
+
+  if (event.type === "proposal.approved" || event.type === "proposal.rejected") {
+    return event.task || event.proposal_id || "proposal decision recorded";
+  }
+
+  if (event.type === "snapshot.deleted") {
+    const reason = event.reason ? ` (${event.reason})` : "";
+    return `${event.observation_id || "snapshot"} deleted${reason}`;
+  }
+
+  return event.proposal_id || event.observation_id || "audit event";
 }
 
 function setDetailsError(error) {
@@ -457,6 +544,7 @@ taskForm.addEventListener("submit", async (event) => {
     currentTask = task;
     statusText.textContent = "waiting for you";
     detailsPanel.open = true;
+    await fetchRecentEvents({ silent: true });
   } catch (error) {
     statusText.textContent = "planning failed";
     setDetailsError(error);

@@ -97,6 +97,7 @@ button {
 .window-button:focus-visible,
 .primary-action:focus-visible,
 .safety-button:focus-visible,
+.events-refresh:focus-visible,
 .task-form textarea:focus-visible,
 .rename-dialog button:focus-visible,
 .rename-dialog input:focus-visible {
@@ -432,6 +433,67 @@ button {
   min-width: 0;
   margin: 0;
   color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.events-panel {
+  margin: 0 0 16px;
+  border: 1px solid rgba(134, 184, 220, 0.26);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(2, 8, 14, 0.24);
+}
+
+.events-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.events-title {
+  margin: 0;
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.events-refresh {
+  min-height: 28px;
+  border: 1px solid var(--panel-line-soft);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: rgba(5, 13, 22, 0.8);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.events-refresh:hover {
+  border-color: var(--panel-line);
+}
+
+.events-refresh:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.events-list {
+  display: grid;
+  gap: 7px;
+  max-height: 132px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  list-style: none;
+}
+
+.events-list li {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
