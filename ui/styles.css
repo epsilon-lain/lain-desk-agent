@@ -528,6 +528,47 @@ button {
   display: none;
 }
 
+.runtime-status-panel {
+  margin: 0 0 16px;
+  border: 1px solid rgba(134, 184, 220, 0.22);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(2, 8, 14, 0.2);
+}
+
+.runtime-status-title {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.runtime-status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.runtime-status-grid div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.runtime-status-grid dt {
+  color: var(--blue);
+}
+
+.runtime-status-grid dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .capabilities-panel {
   margin: 0 0 16px;
   border: 1px solid rgba(134, 184, 220, 0.22);
@@ -1033,6 +1074,10 @@ button {
   }
 
   .execution-self-test-header {
+    grid-template-columns: 1fr;
+  }
+
+  .runtime-status-grid {
     grid-template-columns: 1fr;
   }
 

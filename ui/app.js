@@ -17,6 +17,12 @@ const actionContractFacts = document.querySelector("#actionContractFacts");
 const clickReadinessPanel = document.querySelector("#clickReadinessPanel");
 const clickReadinessSummary = document.querySelector("#clickReadinessSummary");
 const clickReadinessReasons = document.querySelector("#clickReadinessReasons");
+const runtimeProfile = document.querySelector("#runtimeProfile");
+const runtimeDesktopControl = document.querySelector("#runtimeDesktopControl");
+const runtimeActuation = document.querySelector("#runtimeActuation");
+const runtimeVerification = document.querySelector("#runtimeVerification");
+const runtimeClick = document.querySelector("#runtimeClick");
+const runtimeResourceGuard = document.querySelector("#runtimeResourceGuard");
 const permissionProfileStatus = document.querySelector("#permissionProfileStatus");
 const capabilitiesList = document.querySelector("#capabilitiesList");
 const safetyActionArea = document.querySelector("#safetyActionArea");
@@ -130,11 +136,13 @@ resizeTaskInput();
 renderProposalSummary();
 renderActionContract();
 renderClickReadiness();
+renderRuntimeStatus();
 renderSafetyDecision();
 renderDryRunAction();
 renderWaitSelfTestResult();
 renderPermissionProfile();
 renderCapabilities();
+fetchRuntimeStatus({ silent: true });
 fetchPermissionProfile({ silent: true });
 fetchCapabilities({ silent: true });
 fetchRecentEvents({ silent: true });
@@ -489,6 +497,52 @@ async function fetchCapabilities(options = {}) {
   }
 }
 
+async function fetchRuntimeStatus(options = {}) {
+  const { silent = false } = options;
+
+  try {
+    const response = await fetch("/runtime/status");
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Runtime status failed with HTTP ${response.status}`);
+    }
+
+    renderRuntimeStatus(payload);
+  } catch (error) {
+    renderRuntimeStatus();
+
+    if (!silent) {
+      detailError.textContent = `Runtime status refresh failed: ${error.message || String(error)}`;
+      detailsPanel.open = true;
+    }
+  }
+}
+
+function renderRuntimeStatus(payload = null) {
+  const runtime = payload?.runtime ?? {};
+  const resourceGuard = payload?.resource_guard ?? {};
+  const clickReadiness = payload?.click_readiness ?? {};
+
+  runtimeProfile.textContent = payload?.permission_profile || "unknown";
+  runtimeDesktopControl.textContent =
+    typeof runtime.desktop_control === "boolean"
+      ? runtime.desktop_control
+        ? "enabled"
+        : "disabled"
+      : "unknown";
+  runtimeActuation.textContent = runtime.actuation ? displayRuntimeActuation(runtime.actuation) : "unknown";
+  runtimeVerification.textContent =
+    typeof runtime.verification === "boolean" ? (runtime.verification ? "enabled" : "disabled") : "unknown";
+  runtimeClick.textContent = clickReadiness.enabled ? "enabled" : "blocked";
+  runtimeClick.title = clickReadiness.reason || "";
+  runtimeResourceGuard.textContent = resourceGuard.enabled ? "enabled" : "unknown";
+}
+
+function displayRuntimeActuation(value) {
+  return String(value).replaceAll("_", "-");
+}
+
 async function fetchPermissionProfile(options = {}) {
   const { silent = false } = options;
 
@@ -760,6 +814,7 @@ async function runWaitExecutionSelfTest() {
     waitSelfTestStatus.textContent = "Wait self-test complete. No mouse/keyboard action executed.";
     statusText.textContent = "wait self-test complete";
     detailError.textContent = "none";
+    await fetchRuntimeStatus({ silent: true });
     await fetchRecentEvents({ silent: true });
   } catch (error) {
     executionSelfTest.dataset.state = "error";
@@ -1086,6 +1141,7 @@ taskForm.addEventListener("submit", async (event) => {
     currentSafetyDecision = payload.safety_decision ?? null;
     currentTask = task;
     statusText.textContent = "waiting for you";
+    await fetchRuntimeStatus({ silent: true });
     await fetchRecentEvents({ silent: true });
   } catch (error) {
     statusText.textContent = "planning failed";

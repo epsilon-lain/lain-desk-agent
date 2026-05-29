@@ -21,7 +21,7 @@ from .click_policy import (
 from .observation import DEFAULT_RUN_DIR, observe
 from .permission_profile import get_permission_profile_payload
 from .planner import propose
-from .resource_guard import ResourceGuardError
+from .resource_guard import DEFAULT_LIMITS, ResourceGuardError
 from .safety import assess_proposal
 from .understanding import understand
 from .verification import verification_failed_result, verify_execution
@@ -68,6 +68,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/click-readiness":
             self._handle_click_readiness()
+            return
+
+        if path == "/runtime/status":
+            self._handle_runtime_status()
             return
 
         if path in STATIC_ROUTES:
@@ -234,6 +238,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_click_readiness(self) -> None:
         self._send_json(click_readiness_metadata())
+
+    def _handle_runtime_status(self) -> None:
+        self._send_json(runtime_status_payload())
 
     def _handle_static_file(self, path: str) -> None:
         filename, content_type = STATIC_ROUTES[path]
@@ -417,6 +424,32 @@ def click_readiness_for_response(
         get_capability("click"),
         get_permission_profile_payload(),
     )
+
+
+def runtime_status_payload() -> dict[str, Any]:
+    click_readiness = click_readiness_metadata()
+    limits = DEFAULT_LIMITS
+
+    return {
+        "runtime": {
+            "mode": "local",
+            "desktop_control": False,
+            "actuation": "wait_only",
+            "verification": True,
+        },
+        "permission_profile": str(get_permission_profile_payload().get("profile") or "unknown"),
+        "capabilities": get_capabilities(),
+        "click_readiness": {
+            "enabled": bool(click_readiness.get("enabled")),
+            "reason": str(click_readiness.get("reason") or ""),
+        },
+        "resource_guard": {
+            "enabled": True,
+            "max_observations_per_run": limits.max_observations_per_run,
+            "max_run_size_mb": limits.max_run_size_mb,
+            "min_free_disk_mb": limits.min_free_disk_mb,
+        },
+    }
 
 
 def action_execution_requested_event(
