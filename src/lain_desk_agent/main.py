@@ -115,6 +115,13 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             }
             proposal = propose(planner_input)
             action_contract = action_contract_from_proposal(proposal)
+            if action_contract is not None:
+                append_action_contract_event(
+                    action_contract_event_from_contract(
+                        action_contract,
+                        task=planner_input["task"],
+                    )
+                )
             safety_decision = assess_proposal(proposal)
         except ResourceGuardError as exc:
             self._send_json(exc.to_payload(), status=507)
@@ -276,6 +283,40 @@ def approval_event_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def append_approval_event(
+    event: dict[str, Any],
+    run_dir: str | Path = DEFAULT_RUN_DIR,
+) -> None:
+    append_run_event(event, run_dir=run_dir)
+
+
+def action_contract_event_from_contract(
+    action_contract: dict[str, Any],
+    task: str = "",
+) -> dict[str, Any]:
+    event = {
+        "type": "action_contract.created",
+        "timestamp": _utc_timestamp(),
+        "action_id": str(action_contract.get("action_id") or ""),
+        "source_proposal_id": str(action_contract.get("source_proposal_id") or ""),
+        "action_contract_type": str(action_contract.get("type") or ""),
+        "status": str(action_contract.get("status") or ""),
+        "executed": bool(action_contract.get("executed")),
+    }
+
+    if task:
+        event["task"] = task
+
+    return event
+
+
+def append_action_contract_event(
+    event: dict[str, Any],
+    run_dir: str | Path = DEFAULT_RUN_DIR,
+) -> None:
+    append_run_event(event, run_dir=run_dir)
+
+
+def append_run_event(
     event: dict[str, Any],
     run_dir: str | Path = DEFAULT_RUN_DIR,
 ) -> None:

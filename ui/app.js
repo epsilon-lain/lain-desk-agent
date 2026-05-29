@@ -298,22 +298,21 @@ function renderActionContract(actionContract = null, action = null) {
 
   if (!actionContract) {
     actionContractTitle.textContent = "Preview action contract";
-    actionContractSummary.textContent =
-      action?.type === "no_op"
-        ? "No preview contract was created. Mirai is staying read-only."
-        : "No action contract yet.";
+    actionContractSummary.textContent = "No preview action contract.";
     return;
   }
 
+  actionContractTitle.textContent = "Preview action contract";
+
   if (actionContract.type === "click") {
-    actionContractTitle.textContent = "Preview click contract";
-    actionContractSummary.textContent = "Standard preview-only contract. Nothing will be executed.";
+    actionContractSummary.textContent = "Preview-only click contract. Nothing will be executed.";
     setActionContractFacts([
-      ["Type", actionContract.type],
+      ["Contract", actionContract.type],
+      ["Proposal", actionContract.source_proposal_id || "unknown"],
       ["Status", actionContract.status || "unknown"],
       ["Executed", String(actionContract.executed)],
-      ["Element", actionContract.target_element_id || "none"],
       ["Label", actionContract.target_label || "unknown"],
+      ["Element", actionContract.target_element_id || "none"],
       ["Bbox", formatTargetBbox(actionContract.bbox)],
       ["Center", formatPoint(actionContract.center)],
     ]);
@@ -321,10 +320,10 @@ function renderActionContract(actionContract = null, action = null) {
   }
 
   if (actionContract.type === "switch_app") {
-    actionContractTitle.textContent = "Preview switch-app contract";
-    actionContractSummary.textContent = "Standard preview-only contract. Nothing will be executed.";
+    actionContractSummary.textContent = "Preview-only switch-app contract. Nothing will be executed.";
     setActionContractFacts([
-      ["Type", actionContract.type],
+      ["Contract", actionContract.type],
+      ["Proposal", actionContract.source_proposal_id || "unknown"],
       ["Status", actionContract.status || "unknown"],
       ["Executed", String(actionContract.executed)],
       ["Target app", actionContract.target_app || "unknown"],
@@ -333,10 +332,10 @@ function renderActionContract(actionContract = null, action = null) {
     return;
   }
 
-  actionContractTitle.textContent = "Preview action contract";
   actionContractSummary.textContent = "Mirai produced a preview-only contract. Nothing will be executed.";
   setActionContractFacts([
-    ["Type", actionContract.type || "unknown"],
+    ["Contract", actionContract.type || "unknown"],
+    ["Proposal", actionContract.source_proposal_id || "unknown"],
     ["Status", actionContract.status || "unknown"],
     ["Executed", String(actionContract.executed)],
   ]);
@@ -659,6 +658,11 @@ function eventListItem(text) {
 }
 
 function formatEvent(event) {
+  if (event.type === "action_contract.created") {
+    const timestamp = event.timestamp ? formatEventTimestamp(event.timestamp) : "no timestamp";
+    return `${timestamp} - Preview action contract created: ${actionContractEventType(event)}`;
+  }
+
   const type = friendlyEventType(event.type);
   const timestamp = event.timestamp ? formatEventTimestamp(event.timestamp) : "no timestamp";
   return `${type} - ${timestamp} - ${eventSummary(event)}`;
@@ -681,7 +685,15 @@ function friendlyEventType(type) {
     return "Snapshot cleaned";
   }
 
+  if (type === "action_contract.created") {
+    return "Preview action contract";
+  }
+
   return type || "Audit event";
+}
+
+function actionContractEventType(event) {
+  return event.action_contract_type || event.contract_type || "unknown";
 }
 
 function formatEventTimestamp(timestamp) {
@@ -704,6 +716,10 @@ function eventSummary(event) {
   if (event.type === "snapshot.deleted") {
     const reason = event.reason ? ` for ${event.reason}` : "";
     return `${event.observation_id || "Old snapshot"} removed${reason}`;
+  }
+
+  if (event.type === "action_contract.created") {
+    return `Preview action contract created: ${actionContractEventType(event)}`;
   }
 
   return event.proposal_id || event.observation_id || "audit event";
