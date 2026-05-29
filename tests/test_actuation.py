@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import os
 import unittest
+from unittest.mock import patch
 
 import _path  # noqa: F401
 from lain_desk_agent.actuation import ActuationBlockedError, execute_action_contract
+from lain_desk_agent.permission_profile import PERMISSION_PROFILE_ENV
 from lain_desk_agent.main import (
     action_blocked_event,
     action_contract_from_execute_payload,
@@ -15,6 +18,13 @@ from lain_desk_agent.main import (
 
 
 class WaitOnlyActuationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._profile_patch = patch.dict(os.environ, {PERMISSION_PROFILE_ENV: "wait_only"})
+        self._profile_patch.start()
+
+    def tearDown(self) -> None:
+        self._profile_patch.stop()
+
     def test_approved_wait_contract_executes_and_caps_duration(self) -> None:
         slept: list[float] = []
         contract = {
@@ -51,7 +61,10 @@ class WaitOnlyActuationTests(unittest.TestCase):
                 sleep_fn=lambda _: None,
             )
 
-        self.assertEqual(context.exception.reason, "Click execution is disabled in Capability Registry v0.")
+        self.assertEqual(
+            context.exception.reason,
+            "Blocked by Capability Registry: Click execution is disabled in Capability Registry v0.",
+        )
 
     def test_switch_app_contract_is_blocked(self) -> None:
         with self.assertRaises(ActuationBlockedError) as context:
@@ -65,7 +78,10 @@ class WaitOnlyActuationTests(unittest.TestCase):
                 sleep_fn=lambda _: None,
             )
 
-        self.assertEqual(context.exception.reason, "App switching is disabled in Capability Registry v0.")
+        self.assertEqual(
+            context.exception.reason,
+            "Blocked by Capability Registry: App switching is disabled in Capability Registry v0.",
+        )
 
     def test_type_contract_is_blocked_by_capability_registry(self) -> None:
         with self.assertRaises(ActuationBlockedError) as context:
@@ -79,7 +95,28 @@ class WaitOnlyActuationTests(unittest.TestCase):
                 sleep_fn=lambda _: None,
             )
 
-        self.assertEqual(context.exception.reason, "Typing execution is disabled in Capability Registry v0.")
+        self.assertEqual(
+            context.exception.reason,
+            "Blocked by Capability Registry: Typing execution is disabled in Capability Registry v0.",
+        )
+
+    def test_wait_contract_is_blocked_by_safe_readonly_profile(self) -> None:
+        with patch.dict(os.environ, {PERMISSION_PROFILE_ENV: "safe_readonly"}):
+            with self.assertRaises(ActuationBlockedError) as context:
+                execute_action_contract(
+                    {
+                        "action_id": "action_wait_safe_readonly",
+                        "type": "wait",
+                        "status": "approved_for_execution",
+                        "executed": False,
+                    },
+                    sleep_fn=lambda _: None,
+                )
+
+        self.assertEqual(
+            context.exception.reason,
+            "Blocked by permission profile 'safe_readonly': action type 'wait' is not allowed for execution.",
+        )
 
     def test_preview_only_wait_contract_is_blocked(self) -> None:
         with self.assertRaises(ActuationBlockedError) as context:

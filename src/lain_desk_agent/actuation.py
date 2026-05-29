@@ -6,6 +6,7 @@ import time
 from typing import Any, Callable
 
 from .capabilities import get_capability, is_action_executable
+from .permission_profile import is_profile_allowed_for_action, permission_profile_block_reason
 
 
 MAX_WAIT_DURATION_MS = 3000
@@ -29,7 +30,11 @@ def execute_action_contract(
 
     if not is_action_executable(action_type):
         capability = get_capability(action_type)
-        raise ActuationBlockedError(str(capability.get("reason") or "Action is not executable."))
+        reason = str(capability.get("reason") or "Action is not executable.")
+        raise ActuationBlockedError(f"Blocked by Capability Registry: {reason}")
+
+    if not is_profile_allowed_for_action(action_type):
+        raise ActuationBlockedError(permission_profile_block_reason(action_type))
 
     if status != "approved_for_execution":
         raise ActuationBlockedError("Action contract is not approved for execution.")

@@ -14,6 +14,7 @@ const actionContractPanel = document.querySelector("#actionContractPanel");
 const actionContractTitle = document.querySelector("#actionContractTitle");
 const actionContractSummary = document.querySelector("#actionContractSummary");
 const actionContractFacts = document.querySelector("#actionContractFacts");
+const permissionProfileStatus = document.querySelector("#permissionProfileStatus");
 const capabilitiesList = document.querySelector("#capabilitiesList");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
@@ -128,7 +129,9 @@ renderActionContract();
 renderSafetyDecision();
 renderDryRunAction();
 renderWaitSelfTestResult();
+renderPermissionProfile();
 renderCapabilities();
+fetchPermissionProfile({ silent: true });
 fetchCapabilities({ silent: true });
 fetchRecentEvents({ silent: true });
 
@@ -452,6 +455,33 @@ async function fetchCapabilities(options = {}) {
       detailsPanel.open = true;
     }
   }
+}
+
+async function fetchPermissionProfile(options = {}) {
+  const { silent = false } = options;
+
+  try {
+    const response = await fetch("/permission-profile");
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Permission profile failed with HTTP ${response.status}`);
+    }
+
+    renderPermissionProfile(payload);
+  } catch (error) {
+    renderPermissionProfile();
+
+    if (!silent) {
+      detailError.textContent = `Permission profile refresh failed: ${error.message || String(error)}`;
+      detailsPanel.open = true;
+    }
+  }
+}
+
+function renderPermissionProfile(payload = null) {
+  const profile = payload?.profile || "unknown";
+  permissionProfileStatus.textContent = `Permission profile: ${profile}`;
 }
 
 function renderCapabilities(capabilities = null) {

@@ -14,6 +14,7 @@ from .actuation import ActuationBlockedError, execute_action_contract
 from .action_contract import action_contract_from_proposal
 from .capabilities import get_capabilities
 from .observation import DEFAULT_RUN_DIR, observe
+from .permission_profile import get_permission_profile_payload
 from .planner import propose
 from .resource_guard import ResourceGuardError
 from .safety import assess_proposal
@@ -54,6 +55,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/capabilities":
             self._handle_capabilities()
+            return
+
+        if path == "/permission-profile":
+            self._handle_permission_profile()
             return
 
         if path in STATIC_ROUTES:
@@ -212,6 +217,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_capabilities(self) -> None:
         self._send_json({"capabilities": get_capabilities()})
+
+    def _handle_permission_profile(self) -> None:
+        self._send_json(get_permission_profile_payload())
 
     def _handle_static_file(self, path: str) -> None:
         filename, content_type = STATIC_ROUTES[path]

@@ -498,6 +498,13 @@ button {
   line-height: 1.2;
 }
 
+.permission-profile-status {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
 .capabilities-list {
   display: flex;
   flex-wrap: wrap;
