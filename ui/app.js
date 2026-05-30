@@ -25,13 +25,20 @@ const runtimeClick = document.querySelector("#runtimeClick");
 const runtimeResourceGuard = document.querySelector("#runtimeResourceGuard");
 const permissionProfileStatus = document.querySelector("#permissionProfileStatus");
 const capabilitiesList = document.querySelector("#capabilitiesList");
+const demoScenarioPanel = document.querySelector("#demoScenarioPanel");
 const demoScenarioSelect = document.querySelector("#demoScenarioSelect");
 const demoTaskInput = document.querySelector("#demoTaskInput");
 const runDemoScenarioButton = document.querySelector("#runDemoScenario");
+const demoScenarioSelectedName = document.querySelector("#demoScenarioSelectedName");
+const demoScenarioDescription = document.querySelector("#demoScenarioDescription");
+const demoScenarioFakeApp = document.querySelector("#demoScenarioFakeApp");
+const demoScenarioLabels = document.querySelector("#demoScenarioLabels");
 const demoScenarioResult = document.querySelector("#demoScenarioResult");
-const demoScenarioName = document.querySelector("#demoScenarioName");
 const demoScenarioTask = document.querySelector("#demoScenarioTask");
-const demoScenarioApp = document.querySelector("#demoScenarioApp");
+const demoProposalAction = document.querySelector("#demoProposalAction");
+const demoActionContract = document.querySelector("#demoActionContract");
+const demoClickReadiness = document.querySelector("#demoClickReadiness");
+const demoScenarioReasons = document.querySelector("#demoScenarioReasons");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -84,11 +91,31 @@ const detailSafetyReason = document.querySelector("#detailSafetyReason");
 const detailError = document.querySelector("#detailError");
 
 const DEFAULT_AGENT_NAME = "Mirai";
-const DEMO_SCENARIO_DEFAULT_TASKS = {
-  browser_search: "Search",
-  dangerous_send: "Send",
-  dangerous_delete: "Delete",
-  app_mismatch: "Use WeChat to send a message",
+const DEMO_SCENARIOS = {
+  browser_search: {
+    defaultTask: "Search",
+    description: "harmless search-like target",
+    appGuess: "Chrome",
+    labels: ["Search"],
+  },
+  dangerous_send: {
+    defaultTask: "Send",
+    description: "high-risk send target",
+    appGuess: "WeChat",
+    labels: ["Send"],
+  },
+  dangerous_delete: {
+    defaultTask: "Delete",
+    description: "high-risk delete target",
+    appGuess: "File Explorer",
+    labels: ["Delete"],
+  },
+  app_mismatch: {
+    defaultTask: "Use WeChat to send a message",
+    description: "task asks for another app",
+    appGuess: "Chrome",
+    labels: ["Search"],
+  },
 };
 const savedName = window.localStorage.getItem("agent.displayName");
 let currentProposal = null;
@@ -99,7 +126,7 @@ let currentUiState = null;
 let currentActionContract = null;
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
-setDemoScenarioTaskDefault();
+setDemoScenarioSelectionDefaults();
 
 function setAgentName(name) {
   const trimmed = name.trim();
@@ -178,7 +205,7 @@ runWaitSelfTest.addEventListener("click", async () => {
 });
 
 demoScenarioSelect.addEventListener("change", () => {
-  setDemoScenarioTaskDefault();
+  setDemoScenarioSelectionDefaults();
 });
 
 runDemoScenarioButton.addEventListener("click", async () => {
@@ -623,24 +650,40 @@ function displayCapabilityName(actionType) {
   return actionType === "switch_app" ? "switch app" : actionType;
 }
 
-function setDemoScenarioTaskDefault() {
-  const defaultTask = DEMO_SCENARIO_DEFAULT_TASKS[demoScenarioSelect.value] || "";
-  demoTaskInput.value = defaultTask;
-  demoTaskInput.placeholder = defaultTask || "Demo task";
+function setDemoScenarioSelectionDefaults() {
+  const metadata = selectedDemoScenarioMetadata();
+  demoTaskInput.value = metadata.defaultTask;
+  demoTaskInput.placeholder = metadata.defaultTask || "Demo task";
+  renderDemoScenarioSelection();
+  renderDemoScenarioResult();
+}
+
+function selectedDemoScenarioMetadata() {
+  return (
+    DEMO_SCENARIOS[demoScenarioSelect.value] || {
+      defaultTask: "",
+      description: "unknown scenario",
+      appGuess: "unknown",
+      labels: [],
+    }
+  );
+}
+
+function renderDemoScenarioSelection() {
+  const metadata = selectedDemoScenarioMetadata();
+  demoScenarioSelectedName.textContent = demoScenarioSelect.value || "unknown";
+  demoScenarioDescription.textContent = metadata.description;
+  demoScenarioFakeApp.textContent = metadata.appGuess;
+  demoScenarioLabels.textContent = metadata.labels.length ? metadata.labels.join(", ") : "none";
+  demoScenarioResult.hidden = true;
+  demoScenarioReasons.hidden = true;
+  demoScenarioReasons.replaceChildren();
+  demoScenarioPanel.dataset.state = "idle";
 }
 
 async function runSelectedDemoScenario() {
   statusText.textContent = "running demo scenario...";
-  renderSafetyDecision();
-  currentProposal = null;
-  currentSafetyDecision = null;
-  currentUiState = null;
-  currentActionContract = null;
-  renderProposalSummary();
-  renderActionContract();
-  renderClickReadiness();
-  renderDryRunAction();
-  renderDemoScenarioResult();
+  renderDemoScenarioRunning();
   setDemoScenarioControlsDisabled(true);
 
   try {
@@ -659,21 +702,12 @@ async function runSelectedDemoScenario() {
       throw new Error(payload.error || `Demo scenario failed with HTTP ${response.status}`);
     }
 
-    setDetailsFromUiState(payload.ui_state ?? {});
-    setDetailsFromProposal(payload.proposal ?? {});
-    setDetailsFromActionContract(payload.action_contract ?? null, payload.proposal?.action ?? null);
-    renderClickReadiness(payload.click_readiness ?? null, payload.action_contract ?? null);
-    setDetailsFromSafetyDecision(payload.safety_decision ?? {});
     renderDemoScenarioResult(payload);
-    currentProposal = payload.proposal ?? null;
-    currentSafetyDecision = payload.safety_decision ?? null;
-    currentTask = payload.task ?? task;
-    detailError.textContent = "none";
     statusText.textContent = "demo scenario ready";
     await fetchRuntimeStatus({ silent: true });
   } catch (error) {
     statusText.textContent = "demo scenario failed";
-    setDetailsError(error);
+    renderDemoScenarioError(error);
   } finally {
     setDemoScenarioControlsDisabled(false);
   }
@@ -688,16 +722,122 @@ function setDemoScenarioControlsDisabled(disabled) {
 function renderDemoScenarioResult(payload = null) {
   if (!payload) {
     demoScenarioResult.hidden = true;
-    demoScenarioName.textContent = "none";
     demoScenarioTask.textContent = "none";
-    demoScenarioApp.textContent = "unknown";
+    demoProposalAction.textContent = "none";
+    demoActionContract.textContent = "none";
+    demoClickReadiness.textContent = "not run";
+    demoScenarioReasons.hidden = true;
+    demoScenarioReasons.replaceChildren();
     return;
   }
 
+  const action = payload.proposal?.action ?? {};
+  const actionContract = payload.action_contract;
+  const clickReadiness = payload.click_readiness ?? {};
+
+  demoScenarioPanel.dataset.state = demoResultState(payload);
   demoScenarioResult.hidden = false;
-  demoScenarioName.textContent = payload.scenario || "unknown";
   demoScenarioTask.textContent = payload.task || payload.ui_state?.task || "none";
-  demoScenarioApp.textContent = payload.ui_state?.app_guess || "unknown";
+  demoProposalAction.textContent = action.type || "unknown";
+  demoActionContract.textContent = actionContract
+    ? `${actionContract.type || "unknown"} / ${actionContract.status || "unknown"}`
+    : "none";
+  demoClickReadiness.textContent = clickReadiness.status
+    ? readinessDisplayText(clickReadiness)
+    : "not present";
+  renderDemoScenarioReasons(demoReasonsFromPayload(payload));
+}
+
+function renderDemoScenarioRunning() {
+  demoScenarioPanel.dataset.state = "running";
+  demoScenarioResult.hidden = false;
+  demoScenarioTask.textContent = demoTaskInput.value.trim() || selectedDemoScenarioMetadata().defaultTask || "none";
+  demoProposalAction.textContent = "running...";
+  demoActionContract.textContent = "running...";
+  demoClickReadiness.textContent = "running...";
+  renderDemoScenarioReasons([]);
+}
+
+function renderDemoScenarioError(error) {
+  demoScenarioPanel.dataset.state = "error";
+  demoScenarioResult.hidden = false;
+  demoProposalAction.textContent = "failed";
+  demoActionContract.textContent = "none";
+  demoClickReadiness.textContent = "not present";
+  renderDemoScenarioReasons([`Demo failed: ${error.message || String(error)}`]);
+}
+
+function demoResultState(payload) {
+  const action = payload.proposal?.action ?? {};
+  const readinessReasons = payload.click_readiness?.reasons;
+
+  if (Array.isArray(readinessReasons) && readinessReasons.includes("high-risk target label")) {
+    return "high_risk";
+  }
+
+  if (action.type === "switch_app_hint") {
+    return "switch_app";
+  }
+
+  if (payload.click_readiness?.status === "blocked") {
+    return "blocked";
+  }
+
+  return "done";
+}
+
+function readinessDisplayText(clickReadiness) {
+  if (clickReadiness.status === "blocked") {
+    return clickReadiness.ready === false ? "blocked / not ready" : "blocked";
+  }
+
+  return clickReadiness.ready === true
+    ? `${clickReadiness.status} / ready`
+    : clickReadiness.status;
+}
+
+function demoReasonsFromPayload(payload) {
+  const reasons = [];
+  const action = payload.proposal?.action ?? {};
+  const safetyDecision = payload.safety_decision ?? {};
+  const readinessReasons = payload.click_readiness?.reasons;
+
+  if (action.reason) {
+    reasons.push(`Proposal: ${action.reason}`);
+  }
+
+  if (safetyDecision.reason) {
+    reasons.push(`Safety: ${safetyDecision.reason}`);
+  }
+
+  if (Array.isArray(readinessReasons)) {
+    for (const reason of readinessReasons) {
+      reasons.push(`Readiness: ${reason}`);
+    }
+  }
+
+  return reasons;
+}
+
+function renderDemoScenarioReasons(reasons) {
+  demoScenarioReasons.replaceChildren();
+
+  if (!reasons.length) {
+    demoScenarioReasons.hidden = true;
+    return;
+  }
+
+  demoScenarioReasons.hidden = false;
+  for (const reason of reasons) {
+    const item = document.createElement("li");
+    item.textContent = reason;
+
+    if (reason.toLowerCase().includes("high-risk")) {
+      item.dataset.risk = "high";
+    }
+
+    demoScenarioReasons.appendChild(item);
+  }
 }
 
 function formatPoint(point) {
