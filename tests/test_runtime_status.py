@@ -38,6 +38,13 @@ class RuntimeStatusTests(unittest.TestCase):
         self.assertFalse(payload["click_readiness"]["enabled"])
         self.assertEqual(payload["click_readiness"]["reason"], "Real click execution is not enabled.")
         self.assertEqual(
+            payload["ai_planner"],
+            {
+                "status": "test_harness_only",
+                "external_llm_calls": False,
+            },
+        )
+        self.assertEqual(
             payload["resource_guard"],
             {
                 "enabled": True,

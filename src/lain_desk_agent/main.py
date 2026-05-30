@@ -507,6 +507,10 @@ def runtime_status_payload() -> dict[str, Any]:
             "enabled": bool(click_readiness.get("enabled")),
             "reason": str(click_readiness.get("reason") or ""),
         },
+        "ai_planner": {
+            "status": "test_harness_only",
+            "external_llm_calls": False,
+        },
         "resource_guard": {
             "enabled": True,
             "max_observations_per_run": limits.max_observations_per_run,
