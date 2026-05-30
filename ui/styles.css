@@ -22,9 +22,10 @@
 
 html,
 body {
-  min-width: 320px;
+  min-width: 0;
   min-height: 100%;
   margin: 0;
+  overflow-x: hidden;
 }
 
 body {
@@ -49,8 +50,11 @@ button {
 
 .stage {
   display: grid;
+  width: 100%;
+  min-width: 0;
   height: 100dvh;
   min-height: 0;
+  overflow: hidden;
   place-items: center;
   padding: 28px;
 }
@@ -59,6 +63,8 @@ button {
   display: flex;
   flex-direction: column;
   width: min(92vw, 460px);
+  max-width: 100%;
+  min-width: 0;
   max-height: 90vh;
   min-height: 0;
   border: 1px solid var(--panel-line);
@@ -177,10 +183,39 @@ button {
   flex: 1 1 auto;
   display: grid;
   gap: 12px;
+  min-width: 0;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 12px;
+}
+
+.window-body > *,
+.message-card,
+.status-card,
+.proposal-panel,
+.action-contract-panel,
+.click-readiness-panel,
+.runtime-status-panel,
+.execution-policy-panel,
+.capabilities-panel,
+.demo-scenario-panel,
+.planner-context-panel,
+.dry-run-preview,
+.execution-self-test,
+.events-panel,
+.details-panel {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.window-body p,
+.window-body dd,
+.window-body li,
+.window-body summary {
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .message-card,
@@ -613,6 +648,8 @@ button {
 
 .execution-policy-list li,
 .capabilities-list li {
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid rgba(134, 184, 220, 0.28);
   border-radius: 8px;
   padding: 5px 8px;
@@ -620,6 +657,7 @@ button {
   color: var(--text);
   font-size: 12px;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .execution-policy-list li[data-executable="true"],
@@ -657,11 +695,13 @@ button {
   gap: 8px;
   max-height: 260px;
   margin-top: 8px;
+  overflow-x: hidden;
   overflow-y: auto;
   padding-right: 3px;
 }
 
 .execution-policy-profile-card {
+  min-width: 0;
   border: 1px solid rgba(134, 184, 220, 0.2);
   border-radius: 8px;
   padding: 8px;
@@ -677,6 +717,7 @@ button {
   margin: 0;
   color: var(--text);
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .execution-policy-action-grid {
@@ -861,6 +902,11 @@ button {
   line-height: 1.35;
 }
 
+.demo-scenario-reasons li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .demo-scenario-reasons[hidden] {
   display: none;
 }
@@ -959,6 +1005,7 @@ button {
 }
 
 .planner-context-json-panel {
+  min-width: 0;
   margin-top: 10px;
   color: var(--muted);
   font-size: 12px;
@@ -972,7 +1019,8 @@ button {
 .planner-context-json-panel pre {
   max-height: 220px;
   margin: 8px 0 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid rgba(134, 184, 220, 0.2);
   border-radius: 8px;
   padding: 8px;
@@ -980,7 +1028,9 @@ button {
   color: var(--text);
   font-size: 11px;
   line-height: 1.35;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .dry-run-preview {
@@ -1013,7 +1063,7 @@ button {
   position: relative;
   max-height: 260px;
   margin-top: 12px;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid rgba(134, 184, 220, 0.3);
   border-radius: 8px;
   background: rgba(1, 5, 10, 0.72);
@@ -1119,6 +1169,7 @@ button {
 
 .execution-self-test-button {
   min-height: 34px;
+  max-width: 100%;
   border: 1px solid var(--panel-line-soft);
   border-radius: 8px;
   padding: 0 11px;
@@ -1126,7 +1177,8 @@ button {
   color: var(--text);
   cursor: pointer;
   font-size: 13px;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .execution-self-test-button:hover {
@@ -1184,13 +1236,17 @@ button {
 }
 
 .events-title {
+  min-width: 0;
   margin: 0;
   color: var(--accent);
   font-size: 14px;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .events-refresh {
+  flex: 0 1 auto;
+  max-width: 100%;
   min-height: 28px;
   border: 1px solid var(--panel-line-soft);
   border-radius: 8px;
@@ -1216,6 +1272,7 @@ button {
   max-height: 180px;
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   color: var(--text);
   font-size: 13px;
@@ -1263,6 +1320,7 @@ button {
   border-top: 1px solid rgba(134, 184, 220, 0.22);
   font-size: 15px;
   line-height: 1.35;
+  overflow-x: hidden;
   overflow-y: auto;
   padding-right: 6px;
 }
