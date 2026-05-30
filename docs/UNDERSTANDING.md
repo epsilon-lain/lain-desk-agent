@@ -62,7 +62,9 @@ Understanding v1.2 receives the Observation JSON returned by `observe()`:
       "id": "element_0001",
       "source": "ocr",
       "type": "text",
+      "kind": "text",
       "label": "Example",
+      "text": "Example",
       "bbox": {
         "x": 120,
         "y": 240,
@@ -70,7 +72,8 @@ Understanding v1.2 receives the Observation JSON returned by `observe()`:
         "height": 24
       },
       "confidence": 0.86,
-      "source_ref": "ocr_0001"
+      "source_ref": "ocr_0001",
+      "risk_hint": "none"
     }
   ],
   "summary": "The active window appears to be Chrome. OCR detected 1 text line(s). No UI elements are recognized yet.",
@@ -90,7 +93,10 @@ The implementation is intentionally conservative:
 - `visible_text_boxes` comes from OCR word-level data and includes text,
   bounding box, and normalized confidence.
 - `visible_elements` maps OCR boxes into text-only elements with
-  `type: "text"`.
+  `type: "text"` and `kind: "text"`.
+- High-risk labels such as `Send` or `Delete` receive a compact
+  `risk_hint: "high"` marker. This is a hint for downstream safety display and
+  validation only; it does not enable execution.
 - `confidence` remains low because OCR text is not the same as UI element
   detection.
 
@@ -110,7 +116,9 @@ OCR text elements use this shape:
   "id": "element_0001",
   "source": "ocr",
   "type": "text",
+  "kind": "text",
   "label": "Search",
+  "text": "Search",
   "bbox": {
     "x": 120,
     "y": 240,
@@ -118,11 +126,14 @@ OCR text elements use this shape:
     "height": 24
   },
   "confidence": 0.86,
-  "source_ref": "ocr_0001"
+  "source_ref": "ocr_0001",
+  "risk_hint": "none"
 }
 ```
 
 OCR elements are not buttons, inputs, menus, links, or clickable controls.
+They are read-only text grounding. `risk_hint` marks potentially sensitive
+labels but is not a permission grant.
 
 ## OCR Behavior
 

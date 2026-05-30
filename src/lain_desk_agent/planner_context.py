@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .click_policy import click_readiness_metadata
+from .click_policy import HIGH_RISK_LABELS, click_readiness_metadata
 from .execution_policy import ACTION_TYPES, execution_policy_summary
 from .permission_profile import get_permission_profile_payload
 
 
 MAX_VISIBLE_ELEMENTS = 20
+MAX_VISIBLE_ELEMENT_TEXT_LENGTH = 80
 MAX_VISIBLE_TEXT_PREVIEW = 8
 MAX_VISIBLE_TEXT_LENGTH = 120
 MAX_RECENT_EVENTS = 5
@@ -105,24 +106,111 @@ def _compact_visible_elements(value: Any) -> dict[str, Any]:
     elements = value if isinstance(value, list) else []
     compact_items = []
 
-    for element in elements[:MAX_VISIBLE_ELEMENTS]:
+    for index, element in enumerate(elements[:MAX_VISIBLE_ELEMENTS]):
         if not isinstance(element, dict):
             continue
 
-        compact_items.append(
-            {
-                "id": str(element.get("id") or ""),
-                "type": str(element.get("type") or ""),
-                "label": str(element.get("label") or ""),
-                "bbox": _compact_bbox(element.get("bbox")),
-                "confidence": _bounded_float(element.get("confidence")),
-            }
-        )
+        compact_items.append(_compact_visible_element(element, index))
 
     return {
         "count": len(elements),
         "items": compact_items,
         "truncated": len(elements) > MAX_VISIBLE_ELEMENTS,
+        "summary": _visible_elements_summary(compact_items),
+    }
+
+
+def _compact_visible_element(element: dict[str, Any], index: int) -> dict[str, Any]:
+    label = _element_label(element)
+    text = _truncate_element_text(str(element.get("text") or label))
+    raw_type = _short_text(_first_text(element, ["type", "kind", "role"]), 32)
+    kind = _infer_element_kind(raw_type, label)
+    source = _short_text(_first_text(element, ["source", "origin", "source_type"]) or "unknown", 32)
+
+    return {
+        "id": _stable_element_id(element, index),
+        "type": raw_type or kind,
+        "kind": kind,
+        "label": label,
+        "text": text,
+        "bbox": _compact_bbox(element.get("bbox")),
+        "confidence": _bounded_float(element.get("confidence")),
+        "source": source,
+        "risk_hint": _risk_hint_for_label(label),
+    }
+
+
+def _stable_element_id(element: dict[str, Any], index: int) -> str:
+    element_id = _short_text(str(element.get("id") or "").strip(), 64)
+    if element_id:
+        return element_id
+
+    return f"element_{index + 1:04d}"
+
+
+def _element_label(element: dict[str, Any]) -> str:
+    return _truncate_element_text(_first_text(element, ["label", "text", "name", "title", "value"]))
+
+
+def _first_text(element: dict[str, Any], keys: list[str]) -> str:
+    for key in keys:
+        value = element.get(key)
+        if value is None:
+            continue
+
+        text = " ".join(str(value).split())
+        if text:
+            return text
+
+    return ""
+
+
+def _infer_element_kind(raw_type: str, label: str) -> str:
+    normalized_type = _normalized_text(raw_type)
+    normalized_label = _normalized_text(label)
+
+    if normalized_type in {"button", "link", "input", "textbox", "text", "menu", "checkbox"}:
+        return normalized_type
+
+    if normalized_type in {"edit", "textfield"}:
+        return "input"
+
+    if normalized_type in {"statictext", "label"}:
+        return "text"
+
+    if normalized_label in {"search", "find", "ok", "cancel", "done", "continue", "next", "back"}:
+        return "button_like_text"
+
+    return normalized_type or "unknown"
+
+
+def _risk_hint_for_label(label: str) -> str:
+    normalized_label = _normalized_text(label)
+    if not normalized_label:
+        return "none"
+
+    for high_risk_label in HIGH_RISK_LABELS:
+        normalized_risk = _normalized_text(high_risk_label)
+        if normalized_risk and normalized_risk in normalized_label:
+            return "high"
+
+    return "none"
+
+
+def _visible_elements_summary(items: list[dict[str, Any]]) -> dict[str, Any]:
+    sources: dict[str, int] = {}
+    risk_hints: dict[str, int] = {}
+
+    for item in items:
+        source = str(item.get("source") or "unknown")
+        risk_hint = str(item.get("risk_hint") or "none")
+        sources[source] = sources.get(source, 0) + 1
+        risk_hints[risk_hint] = risk_hints.get(risk_hint, 0) + 1
+
+    return {
+        "item_count": len(items),
+        "sources": sources,
+        "risk_hints": risk_hints,
     }
 
 
@@ -209,6 +297,9 @@ def _compact_bbox(value: Any) -> dict[str, int | float] | None:
             return None
         bbox[key] = number
 
+    if bbox["width"] <= 0 or bbox["height"] <= 0:
+        return None
+
     return bbox
 
 
@@ -247,6 +338,22 @@ def _truncate_text(text: str) -> str:
         return normalized
 
     return f"{normalized[: MAX_VISIBLE_TEXT_LENGTH - 3]}..."
+
+
+def _truncate_element_text(text: str) -> str:
+    return _short_text(text, MAX_VISIBLE_ELEMENT_TEXT_LENGTH)
+
+
+def _short_text(text: str, max_length: int) -> str:
+    normalized = " ".join(str(text or "").split())
+    if len(normalized) <= max_length:
+        return normalized
+
+    return f"{normalized[: max(0, max_length - 3)]}..."
+
+
+def _normalized_text(text: str) -> str:
+    return " ".join(str(text or "").casefold().split())
 
 
 def _optional_string(value: Any) -> str | None:

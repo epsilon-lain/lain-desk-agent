@@ -36,6 +36,8 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertEqual(payload["task"], "Search")
         self.assertEqual(payload["visible_elements"]["count"], 2)
         self.assertEqual(len(payload["visible_elements"]["items"]), 2)
+        self.assertEqual(payload["visible_elements"]["items"][0]["source"], "unknown")
+        self.assertEqual(payload["visible_elements"]["items"][0]["risk_hint"], "none")
         self.assertEqual(payload["safety_runtime"]["executable_actions"], ["wait"])
         self.assertNotIn("screenshot_path", encoded)
         self.assertNotIn("image_bytes", encoded)

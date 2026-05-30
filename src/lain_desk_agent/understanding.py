@@ -7,6 +7,8 @@ from pathlib import Path
 from shutil import which
 from typing import Any
 
+from .click_policy import HIGH_RISK_LABELS
+
 
 DEFAULT_WINDOWS_TESSERACT = Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe")
 
@@ -256,14 +258,34 @@ def _visible_elements_from_text_boxes(text_boxes: list[dict[str, Any]]) -> list[
                 "id": f"element_{len(elements) + 1:04d}",
                 "source": "ocr",
                 "type": "text",
+                "kind": "text",
                 "label": str(text_box.get("text") or ""),
+                "text": str(text_box.get("text") or ""),
                 "bbox": text_box.get("bbox") or {},
                 "confidence": text_box.get("confidence", 0.0),
                 "source_ref": text_box.get("id"),
+                "risk_hint": _risk_hint_for_label(text_box.get("text")),
             }
         )
 
     return elements
+
+
+def _risk_hint_for_label(label: Any) -> str:
+    normalized_label = _normalized_text(label)
+    if not normalized_label:
+        return "none"
+
+    for high_risk_label in HIGH_RISK_LABELS:
+        normalized_risk = _normalized_text(high_risk_label)
+        if normalized_risk and normalized_risk in normalized_label:
+            return "high"
+
+    return "none"
+
+
+def _normalized_text(value: Any) -> str:
+    return " ".join(str(value or "").casefold().split())
 
 
 def _configure_tesseract(pytesseract: Any) -> bool:

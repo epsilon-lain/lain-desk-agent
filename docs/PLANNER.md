@@ -79,7 +79,10 @@ Planner Proposal v1.1 does not use:
 
 It does not add executable `click`, `type`, `hotkey`, or `scroll` actions.
 Planner reads `visible_elements` only; it does not care whether an element came
-from OCR, DOM, accessibility, or vision.
+from OCR, DOM, accessibility, or vision. Planner context keeps those elements
+compact and normalized with `id`, `label`/`text`, `type`/`kind`, `bbox`,
+`confidence`, `source`, and `risk_hint` when inferable. These fields improve
+read-only grounding only; they do not enable execution.
 
 ## App mismatch hint
 

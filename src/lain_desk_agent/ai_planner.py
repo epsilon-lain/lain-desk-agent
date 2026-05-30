@@ -468,9 +468,13 @@ def _compact_visible_elements(planner_context: dict[str, Any]) -> dict[str, Any]
         {
             "id": str(element.get("id") or ""),
             "type": str(element.get("type") or ""),
+            "kind": str(element.get("kind") or element.get("type") or ""),
             "label": str(element.get("label") or ""),
+            "text": str(element.get("text") or ""),
             "bbox": element.get("bbox") if isinstance(element.get("bbox"), dict) else None,
             "confidence": _bounded_float(element.get("confidence")),
+            "source": str(element.get("source") or ""),
+            "risk_hint": str(element.get("risk_hint") or "none"),
         }
         for element in _visible_element_items(planner_context)
     ]

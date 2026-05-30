@@ -36,6 +36,92 @@ class PlannerContextBundleTests(unittest.TestCase):
         self.assertNotIn("screenshot_path", encoded)
         self.assertNotIn("runs/run_001/obs_0001.png", encoded)
 
+    def test_visible_elements_have_compact_normalized_shape(self) -> None:
+        context = build_planner_context(
+            "Search",
+            _large_ui_state(),
+            runtime_status=_runtime_status(),
+            recent_events=[],
+        )
+        item = context["visible_elements"]["items"][0]
+
+        self.assertEqual(
+            set(item),
+            {
+                "id",
+                "type",
+                "kind",
+                "label",
+                "text",
+                "bbox",
+                "confidence",
+                "source",
+                "risk_hint",
+            },
+        )
+        self.assertEqual(item["id"], "element_0000")
+        self.assertEqual(item["type"], "text")
+        self.assertEqual(item["kind"], "text")
+        self.assertEqual(item["label"], "Label 0")
+        self.assertEqual(item["text"], "Label 0")
+        self.assertEqual(item["source"], "unknown")
+        self.assertEqual(item["risk_hint"], "none")
+        self.assertEqual(context["visible_elements"]["summary"]["item_count"], 20)
+        self.assertEqual(context["visible_elements"]["summary"]["sources"], {"unknown": 20})
+
+    def test_visible_elements_missing_fields_fallback_safely(self) -> None:
+        ui_state = _large_ui_state()
+        ui_state["visible_elements"] = [
+            {
+                "text": "OK",
+                "bbox": {"x": "bad", "y": 2, "width": 10, "height": 10},
+            }
+        ]
+
+        context = build_planner_context(
+            "OK",
+            ui_state,
+            runtime_status=_runtime_status(),
+            recent_events=[],
+        )
+        item = context["visible_elements"]["items"][0]
+
+        self.assertEqual(item["id"], "element_0001")
+        self.assertEqual(item["label"], "OK")
+        self.assertEqual(item["text"], "OK")
+        self.assertEqual(item["type"], "button_like_text")
+        self.assertEqual(item["kind"], "button_like_text")
+        self.assertIsNone(item["bbox"])
+        self.assertEqual(item["confidence"], 0.0)
+        self.assertEqual(item["source"], "unknown")
+        self.assertEqual(item["risk_hint"], "none")
+
+    def test_visible_elements_mark_high_risk_label_hint(self) -> None:
+        ui_state = _large_ui_state()
+        ui_state["visible_elements"] = [
+            {
+                "id": "danger_delete",
+                "source": "demo",
+                "type": "button",
+                "label": "Delete account",
+                "bbox": {"x": 10, "y": 20, "width": 120, "height": 32},
+                "confidence": 0.97,
+            }
+        ]
+
+        context = build_planner_context(
+            "Delete",
+            ui_state,
+            runtime_status=_runtime_status(),
+            recent_events=[],
+        )
+        item = context["visible_elements"]["items"][0]
+
+        self.assertEqual(item["source"], "demo")
+        self.assertEqual(item["kind"], "button")
+        self.assertEqual(item["risk_hint"], "high")
+        self.assertEqual(context["visible_elements"]["summary"]["risk_hints"], {"high": 1})
+
     def test_context_summarizes_safety_runtime(self) -> None:
         runtime_status = _runtime_status()
         runtime_status["runtime"]["desktop_control"] = True

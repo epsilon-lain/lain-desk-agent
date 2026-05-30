@@ -77,8 +77,16 @@ Goal: evaluate the optional `ai_proposal` planner while keeping it proposal-only
 
 ## Phase 5: Better Read-only Grounding
 
+Status: started with compact visible-element normalization and high-risk label
+hints.
+
 Goal: improve `visible_elements` without adding desktop control.
 
+- Normalize planner-context visible elements into a stable compact shape:
+  `id`, `label`/`text`, `type`/`kind`, `bbox`, `confidence`, `source`, and
+  `risk_hint`.
+- Keep OCR/demo/accessibility-stub sources explicitly marked as read-only
+  grounding.
 - Add an accessibility source, DOM source, or improved OCR source.
 - Keep every grounding source read-only.
 - Improve visible element labels, bounding boxes, confidence scores, and source
