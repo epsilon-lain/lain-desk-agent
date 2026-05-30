@@ -12,6 +12,14 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .actuation import ActuationBlockedError, execute_action_contract
 from .action_contract import action_contract_from_proposal
+from .ai_planner import (
+    AI_PROPOSAL_MODE,
+    AIPlannerError,
+    ai_planner_runtime_status,
+    build_ai_proposal_with_llm,
+    openai_api_key_from_env,
+    planner_mode_from_env,
+)
 from .capabilities import get_capabilities, get_capability
 from .click_policy import (
     click_readiness_metadata,
@@ -152,12 +160,18 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 "screen": screen,
                 "screenshot_path": screen.get("screenshot_path"),
             }
+            task = _first_query_value(query, "task")
             planner_input = {
                 **ui_state,
                 "window_title": (observation.get("active_window") or {}).get("title"),
-                "task": _first_query_value(query, "task"),
+                "task": task,
             }
-            proposal = propose(planner_input)
+            proposal, planner_metadata = proposal_for_current_planner(
+                planner_input,
+                ui_state,
+                screen,
+                task,
+            )
             action_contract = action_contract_from_proposal(proposal)
             if action_contract is not None:
                 append_action_contract_event(
@@ -182,6 +196,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 "action_contract": action_contract,
                 "safety_decision": safety_decision,
                 "click_readiness": click_readiness,
+                "planner": planner_metadata,
             }
         )
 
@@ -489,6 +504,70 @@ def click_readiness_for_response(
     )
 
 
+def proposal_for_current_planner(
+    planner_input: dict[str, Any],
+    ui_state: dict[str, Any],
+    screen: dict[str, Any],
+    task: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    planner_mode = planner_mode_from_env()
+    if planner_mode != AI_PROPOSAL_MODE:
+        return propose(planner_input), _planner_metadata(planner_mode, "rule_based")
+
+    try:
+        api_key = openai_api_key_from_env()
+        if not api_key:
+            raise AIPlannerError("OPENAI_API_KEY is required for ai_proposal mode.")
+
+        planner_context = build_planner_context(
+            task,
+            {
+                **ui_state,
+                "screen": {
+                    "width": screen.get("width"),
+                    "height": screen.get("height"),
+                },
+            },
+            runtime_status=runtime_status_payload(),
+            recent_events=read_recent_events(limit=5),
+        )
+        return (
+            build_ai_proposal_with_llm(planner_context, api_key=api_key),
+            _planner_metadata(planner_mode, "ai_proposal"),
+        )
+    except AIPlannerError as exc:
+        return (
+            propose(planner_input),
+            _planner_metadata(planner_mode, "rule_based", fallback_reason=str(exc)),
+        )
+    except Exception:
+        return (
+            propose(planner_input),
+            _planner_metadata(
+                planner_mode,
+                "rule_based",
+                fallback_reason="AI planner failed; fell back to rule-based planner.",
+            ),
+        )
+
+
+def _planner_metadata(
+    planner_mode: str,
+    source: str,
+    fallback_reason: str = "",
+) -> dict[str, Any]:
+    metadata = {
+        "planner_mode": planner_mode,
+        "source": source,
+        "fallback": bool(fallback_reason),
+    }
+
+    if fallback_reason:
+        metadata["fallback_reason"] = fallback_reason
+
+    return metadata
+
+
 def runtime_status_payload() -> dict[str, Any]:
     click_readiness = click_readiness_metadata()
     limits = DEFAULT_LIMITS
@@ -507,10 +586,7 @@ def runtime_status_payload() -> dict[str, Any]:
             "enabled": bool(click_readiness.get("enabled")),
             "reason": str(click_readiness.get("reason") or ""),
         },
-        "ai_planner": {
-            "status": "test_harness_only",
-            "external_llm_calls": False,
-        },
+        "ai_planner": ai_planner_runtime_status(),
         "resource_guard": {
             "enabled": True,
             "max_observations_per_run": limits.max_observations_per_run,

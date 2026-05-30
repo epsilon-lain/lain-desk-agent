@@ -18,6 +18,7 @@ const clickReadinessPanel = document.querySelector("#clickReadinessPanel");
 const clickReadinessSummary = document.querySelector("#clickReadinessSummary");
 const clickReadinessReasons = document.querySelector("#clickReadinessReasons");
 const runtimeProfile = document.querySelector("#runtimeProfile");
+const runtimePlanner = document.querySelector("#runtimePlanner");
 const runtimeDesktopControl = document.querySelector("#runtimeDesktopControl");
 const runtimeActuation = document.querySelector("#runtimeActuation");
 const runtimeVerification = document.querySelector("#runtimeVerification");
@@ -591,8 +592,13 @@ function renderRuntimeStatus(payload = null) {
   const runtime = payload?.runtime ?? {};
   const resourceGuard = payload?.resource_guard ?? {};
   const clickReadiness = payload?.click_readiness ?? {};
+  const aiPlanner = payload?.ai_planner ?? {};
 
   runtimeProfile.textContent = payload?.permission_profile || "unknown";
+  runtimePlanner.textContent = formatPlannerMode(aiPlanner);
+  runtimePlanner.title = aiPlanner.external_llm_calls
+    ? "External LLM calls may be used for proposal-only planning."
+    : "No external planner call is active.";
   runtimeDesktopControl.textContent =
     typeof runtime.desktop_control === "boolean"
       ? runtime.desktop_control
@@ -605,6 +611,12 @@ function renderRuntimeStatus(payload = null) {
   runtimeClick.textContent = clickReadiness.enabled ? "enabled" : "blocked";
   runtimeClick.title = clickReadiness.reason || "";
   runtimeResourceGuard.textContent = resourceGuard.enabled ? "enabled" : "unknown";
+}
+
+function formatPlannerMode(aiPlanner) {
+  const mode = aiPlanner.planner_mode || "unknown";
+  const source = aiPlanner.external_llm_calls ? "LLM ready" : "local";
+  return `${displayRuntimeActuation(mode)}; ${source}`;
 }
 
 function displayRuntimeActuation(value) {

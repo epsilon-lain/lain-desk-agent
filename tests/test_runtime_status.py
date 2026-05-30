@@ -40,7 +40,9 @@ class RuntimeStatusTests(unittest.TestCase):
         self.assertEqual(
             payload["ai_planner"],
             {
-                "status": "test_harness_only",
+                "status": "inactive",
+                "planner_mode": "rule_based",
+                "ai_planner_available": False,
                 "external_llm_calls": False,
             },
         )
@@ -64,6 +66,30 @@ class RuntimeStatusTests(unittest.TestCase):
         self.assertEqual(payload["execution_policy"]["current_profile"], "safe_readonly")
         self.assertEqual(payload["execution_policy"]["executable_actions"], [])
         self.assertEqual(payload["execution_policy"]["blocked_actions_count"], 6)
+
+    def test_runtime_status_reports_ai_proposal_availability(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "LAIN_AGENT_PLANNER_MODE": "ai_proposal",
+                "OPENAI_API_KEY": "test-key",
+            },
+        ):
+            payload = runtime_status_payload()
+
+        self.assertEqual(payload["ai_planner"]["status"], "available")
+        self.assertEqual(payload["ai_planner"]["planner_mode"], "ai_proposal")
+        self.assertIs(payload["ai_planner"]["ai_planner_available"], True)
+        self.assertIs(payload["ai_planner"]["external_llm_calls"], True)
+
+    def test_runtime_status_reports_missing_ai_key(self) -> None:
+        with patch.dict(os.environ, {"LAIN_AGENT_PLANNER_MODE": "ai_proposal"}, clear=True):
+            payload = runtime_status_payload()
+
+        self.assertEqual(payload["ai_planner"]["status"], "missing_api_key")
+        self.assertEqual(payload["ai_planner"]["planner_mode"], "ai_proposal")
+        self.assertIs(payload["ai_planner"]["ai_planner_available"], False)
+        self.assertIs(payload["ai_planner"]["external_llm_calls"], False)
 
 
 if __name__ == "__main__":

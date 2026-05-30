@@ -1,10 +1,13 @@
-"""AI Planner test harness v0 using local mock outputs only."""
+"""Proposal-only AI Planner integration with strict local validation."""
 
 from __future__ import annotations
 
 import json
 import math
+import os
 from typing import Any
+from urllib import request
+from urllib.error import HTTPError, URLError
 
 
 ALLOWED_PROPOSAL_ACTION_TYPES = ["no_op", "target_hint", "switch_app_hint"]
@@ -23,6 +26,58 @@ BLOCKED_EXECUTABLE_ACTION_TYPES = {
     "switch_app",
 }
 MAX_REASON_LENGTH = 240
+PLANNER_MODE_ENV = "LAIN_AGENT_PLANNER_MODE"
+OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
+RULE_BASED_MODE = "rule_based"
+AI_PROPOSAL_MODE = "ai_proposal"
+DEFAULT_PLANNER_MODE = RULE_BASED_MODE
+DEFAULT_AI_PLANNER_MODEL = "gpt-4.1-mini"
+OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
+
+
+class AIPlannerError(RuntimeError):
+    """Raised when the optional external planner cannot produce a proposal."""
+
+
+def planner_mode_from_env(environ: dict[str, str] | None = None) -> str:
+    env = os.environ if environ is None else environ
+    mode = str(env.get(PLANNER_MODE_ENV, DEFAULT_PLANNER_MODE) or "").strip().lower()
+    if mode in {RULE_BASED_MODE, AI_PROPOSAL_MODE}:
+        return mode
+
+    return DEFAULT_PLANNER_MODE
+
+
+def ai_planner_runtime_status(environ: dict[str, str] | None = None) -> dict[str, Any]:
+    env = os.environ if environ is None else environ
+    planner_mode = planner_mode_from_env(env)
+    key_available = _api_key_available(env) if planner_mode == AI_PROPOSAL_MODE else False
+
+    return {
+        "status": _ai_planner_status(planner_mode, key_available),
+        "planner_mode": planner_mode,
+        "ai_planner_available": key_available,
+        "external_llm_calls": planner_mode == AI_PROPOSAL_MODE and key_available,
+    }
+
+
+def openai_api_key_from_env(environ: dict[str, str] | None = None) -> str:
+    env = os.environ if environ is None else environ
+    return str(env.get(OPENAI_API_KEY_ENV) or "").strip()
+
+
+def _api_key_available(environ: dict[str, str]) -> bool:
+    return bool(str(environ.get(OPENAI_API_KEY_ENV) or "").strip())
+
+
+def _ai_planner_status(planner_mode: str, key_available: bool) -> str:
+    if planner_mode == RULE_BASED_MODE:
+        return "inactive"
+
+    if key_available:
+        return "available"
+
+    return "missing_api_key"
 
 
 def build_ai_planner_prompt_or_payload(planner_context: dict[str, Any]) -> dict[str, Any]:
@@ -31,7 +86,7 @@ def build_ai_planner_prompt_or_payload(planner_context: dict[str, Any]) -> dict[
     context = planner_context if isinstance(planner_context, dict) else {}
     return {
         "planner": {
-            "mode": "test_harness_only",
+            "mode": "proposal_only",
             "external_llm_calls": False,
         },
         "task": str(context.get("task") or ""),
@@ -95,6 +150,73 @@ def build_ai_proposal_from_context(
     }
 
 
+def build_ai_proposal_with_llm(
+    planner_context: dict[str, Any],
+    api_key: str,
+    http_post_json: Any | None = None,
+) -> dict[str, Any]:
+    """Call the optional external LLM and validate the proposal-only output."""
+
+    raw_output = request_ai_proposal_from_openai(
+        planner_context,
+        api_key=api_key,
+        http_post_json=http_post_json,
+    )
+    return build_ai_proposal_from_context(planner_context, mock_output=raw_output)
+
+
+def request_ai_proposal_from_openai(
+    planner_context: dict[str, Any],
+    api_key: str,
+    http_post_json: Any | None = None,
+    timeout_seconds: int = 20,
+) -> Any:
+    """Request structured proposal JSON from OpenAI without sending screenshots."""
+
+    clean_api_key = str(api_key or "").strip()
+    if not clean_api_key:
+        raise AIPlannerError("OPENAI_API_KEY is required for ai_proposal mode.")
+
+    payload = build_openai_responses_payload(planner_context)
+    post_json = _http_post_json if http_post_json is None else http_post_json
+    response_payload = post_json(
+        OPENAI_RESPONSES_URL,
+        payload,
+        {
+            "Authorization": f"Bearer {clean_api_key}",
+            "Content-Type": "application/json",
+        },
+        timeout_seconds,
+    )
+    response_text = _extract_response_text(response_payload)
+    if not response_text:
+        raise AIPlannerError("OpenAI response did not include output text.")
+
+    return response_text
+
+
+def build_openai_responses_payload(planner_context: dict[str, Any]) -> dict[str, Any]:
+    """Build the sanitized Responses API payload for proposal-only planning."""
+
+    planner_payload = build_ai_planner_prompt_or_payload(planner_context)
+    return {
+        "model": DEFAULT_AI_PLANNER_MODEL,
+        "store": False,
+        "temperature": 0,
+        "max_output_tokens": 300,
+        "instructions": _ai_planner_instructions(),
+        "input": json.dumps(planner_payload, ensure_ascii=False, sort_keys=True),
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "lain_ai_planner_proposal",
+                "strict": True,
+                "schema": _ai_planner_output_schema(),
+            }
+        },
+    }
+
+
 def _parse_raw_output(raw_output: Any) -> tuple[dict[str, Any] | None, str | None]:
     if isinstance(raw_output, dict):
         return raw_output, None
@@ -111,6 +233,104 @@ def _parse_raw_output(raw_output: Any) -> tuple[dict[str, Any] | None, str | Non
         return None, "Mock output JSON must decode to an object."
 
     return None, "Mock output must be a JSON object or dict."
+
+
+def _http_post_json(
+    url: str,
+    payload: dict[str, Any],
+    headers: dict[str, str],
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    http_request = request.Request(
+        url,
+        data=body,
+        headers=headers,
+        method="POST",
+    )
+
+    try:
+        with request.urlopen(http_request, timeout=timeout_seconds) as response:
+            response_body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        raise AIPlannerError(f"OpenAI planner request failed with HTTP {exc.code}.") from exc
+    except URLError as exc:
+        raise AIPlannerError("OpenAI planner request failed.") from exc
+
+    try:
+        decoded = json.loads(response_body)
+    except json.JSONDecodeError as exc:
+        raise AIPlannerError("OpenAI planner response was not valid JSON.") from exc
+
+    if not isinstance(decoded, dict):
+        raise AIPlannerError("OpenAI planner response was not a JSON object.")
+
+    return decoded
+
+
+def _extract_response_text(response_payload: dict[str, Any]) -> str:
+    output_text = response_payload.get("output_text")
+    if isinstance(output_text, str) and output_text.strip():
+        return output_text
+
+    output = response_payload.get("output")
+    if not isinstance(output, list):
+        return ""
+
+    text_parts = []
+    for item in output:
+        if not isinstance(item, dict):
+            continue
+
+        content = item.get("content")
+        if not isinstance(content, list):
+            continue
+
+        for content_item in content:
+            if not isinstance(content_item, dict):
+                continue
+
+            text = content_item.get("text")
+            if isinstance(text, str) and text:
+                text_parts.append(text)
+
+    return "\n".join(text_parts).strip()
+
+
+def _ai_planner_instructions() -> str:
+    return (
+        "You are the proposal-only planner for lain-desk-agent. "
+        "Use only the provided compact JSON context. Do not request screenshots, "
+        "do not infer hidden UI, and do not produce executable desktop actions. "
+        "Return structured JSON only. Allowed action.type values are no_op, "
+        "target_hint, and switch_app_hint. For target_hint, choose only a "
+        "target_element_id present in visible_elements.items. For switch_app_hint, "
+        "set target to the app name. If uncertain, return no_op."
+    )
+
+
+def _ai_planner_output_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["action"],
+        "properties": {
+            "action": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["type", "target_element_id", "target", "reason"],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": ALLOWED_PROPOSAL_ACTION_TYPES,
+                    },
+                    "target_element_id": {"type": "string"},
+                    "target": {"type": "string"},
+                    "reason": {"type": "string"},
+                },
+            }
+        },
+    }
 
 
 def _extract_action(parsed_output: dict[str, Any]) -> dict[str, Any] | None:
