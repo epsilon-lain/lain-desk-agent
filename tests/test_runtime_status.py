@@ -43,6 +43,8 @@ class RuntimeStatusTests(unittest.TestCase):
                 "status": "inactive",
                 "planner_mode": "rule_based",
                 "ai_planner_available": False,
+                "openai_api_key_configured": False,
+                "ai_planner_usable": False,
                 "external_llm_calls": False,
             },
         )
@@ -80,6 +82,8 @@ class RuntimeStatusTests(unittest.TestCase):
         self.assertEqual(payload["ai_planner"]["status"], "available")
         self.assertEqual(payload["ai_planner"]["planner_mode"], "ai_proposal")
         self.assertIs(payload["ai_planner"]["ai_planner_available"], True)
+        self.assertIs(payload["ai_planner"]["openai_api_key_configured"], True)
+        self.assertIs(payload["ai_planner"]["ai_planner_usable"], True)
         self.assertIs(payload["ai_planner"]["external_llm_calls"], True)
 
     def test_runtime_status_reports_missing_ai_key(self) -> None:
@@ -89,6 +93,19 @@ class RuntimeStatusTests(unittest.TestCase):
         self.assertEqual(payload["ai_planner"]["status"], "missing_api_key")
         self.assertEqual(payload["ai_planner"]["planner_mode"], "ai_proposal")
         self.assertIs(payload["ai_planner"]["ai_planner_available"], False)
+        self.assertIs(payload["ai_planner"]["openai_api_key_configured"], False)
+        self.assertIs(payload["ai_planner"]["ai_planner_usable"], False)
+        self.assertIs(payload["ai_planner"]["external_llm_calls"], False)
+
+    def test_runtime_status_reports_configured_key_without_using_ai_in_rule_mode(self) -> None:
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True):
+            payload = runtime_status_payload()
+
+        self.assertEqual(payload["ai_planner"]["status"], "inactive")
+        self.assertEqual(payload["ai_planner"]["planner_mode"], "rule_based")
+        self.assertIs(payload["ai_planner"]["ai_planner_available"], False)
+        self.assertIs(payload["ai_planner"]["openai_api_key_configured"], True)
+        self.assertIs(payload["ai_planner"]["ai_planner_usable"], False)
         self.assertIs(payload["ai_planner"]["external_llm_calls"], False)
 
 

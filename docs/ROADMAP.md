@@ -9,6 +9,11 @@ planning, previewing, and safely testing a narrow execution path. The project
 does not provide real mouse or keyboard desktop control. `wait` is the only
 executable action.
 
+Phase 4 AI Planner integration is now wired end to end for proposal generation:
+`planner_context` can feed optional `ai_proposal` mode, every AI output is
+validated, `/proposal` returns compact `planner_trace`, and unsafe or invalid
+AI output remains a safe `no_op`.
+
 ## Completed
 
 - Observation / Understanding
@@ -16,6 +21,8 @@ executable action.
 - Rule-based Planner
 - Proposal-only AI Planner
 - AI Planner test harness
+- AI Planner runtime status fields
+- Planner Trace
 - Safety Gate
 - Action Contract
 - Click Readiness Policy
@@ -40,11 +47,22 @@ executable action.
 - AI Planner output is proposal-only.
 - LLM output must be validated before it can become a proposal.
 - Unsafe or invalid AI output becomes safe `no_op`.
+- `/proposal` is inspectable but never executes desktop input.
+- `/execute` remains wait-only.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
+Status: integration path complete; evaluation and reliability work continues.
+
 Goal: evaluate the optional `ai_proposal` planner while keeping it proposal-only.
 
+- Preserve the end-to-end path:
+  `planner_context -> ai_proposal -> validate_ai_proposal -> proposal response`.
+- Keep `/proposal` responses inspectable with compact `planner_trace`.
+- Report `planner_mode`, API key configuration, and AI planner usability in
+  Runtime Status.
+- Fallback safely on missing API key, API call failure, malformed AI output,
+  unknown action types, and unsafe executable action proposals.
 - Compare rule-based output against `ai_proposal` output.
 - Validate AI output quality across demo scenarios and live read-only
   observations.

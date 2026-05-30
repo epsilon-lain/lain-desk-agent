@@ -604,9 +604,7 @@ function renderRuntimeStatus(payload = null) {
 
   runtimeProfile.textContent = payload?.permission_profile || "unknown";
   runtimePlanner.textContent = formatPlannerMode(aiPlanner);
-  runtimePlanner.title = aiPlanner.external_llm_calls
-    ? "External LLM calls may be used for proposal-only planning."
-    : "No external planner call is active.";
+  runtimePlanner.title = formatPlannerTitle(aiPlanner);
   runtimeDesktopControl.textContent =
     typeof runtime.desktop_control === "boolean"
       ? runtime.desktop_control
@@ -623,8 +621,29 @@ function renderRuntimeStatus(payload = null) {
 
 function formatPlannerMode(aiPlanner) {
   const mode = aiPlanner.planner_mode || "unknown";
-  const source = aiPlanner.external_llm_calls ? "LLM ready" : "local";
+  let source = "local";
+
+  if (mode === "ai_proposal") {
+    source = aiPlanner.ai_planner_usable ? "LLM ready" : "key missing";
+  } else if (aiPlanner.openai_api_key_configured) {
+    source = "local; key configured";
+  }
+
   return `${displayRuntimeActuation(mode)}; ${source}`;
+}
+
+function formatPlannerTitle(aiPlanner) {
+  if (aiPlanner.ai_planner_usable) {
+    return "AI proposal mode is active and the OpenAI API key is configured.";
+  }
+
+  if (aiPlanner.planner_mode === "ai_proposal") {
+    return "AI proposal mode is selected, but the OpenAI API key is not configured.";
+  }
+
+  return aiPlanner.openai_api_key_configured
+    ? "Rule-based planner is active. The OpenAI API key is configured but unused."
+    : "Rule-based planner is active. No external planner call is active.";
 }
 
 function displayRuntimeActuation(value) {

@@ -51,13 +51,16 @@ def planner_mode_from_env(environ: dict[str, str] | None = None) -> str:
 def ai_planner_runtime_status(environ: dict[str, str] | None = None) -> dict[str, Any]:
     env = os.environ if environ is None else environ
     planner_mode = planner_mode_from_env(env)
-    key_available = _api_key_available(env) if planner_mode == AI_PROPOSAL_MODE else False
+    key_configured = _api_key_available(env)
+    ai_planner_usable = planner_mode == AI_PROPOSAL_MODE and key_configured
 
     return {
-        "status": _ai_planner_status(planner_mode, key_available),
+        "status": _ai_planner_status(planner_mode, key_configured),
         "planner_mode": planner_mode,
-        "ai_planner_available": key_available,
-        "external_llm_calls": planner_mode == AI_PROPOSAL_MODE and key_available,
+        "ai_planner_available": ai_planner_usable,
+        "openai_api_key_configured": key_configured,
+        "ai_planner_usable": ai_planner_usable,
+        "external_llm_calls": ai_planner_usable,
     }
 
 

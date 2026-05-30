@@ -18,6 +18,17 @@ It must not execute actions. Every AI proposal still goes through:
 - Permission Profile
 - Execution Policy
 
+The end-to-end path is:
+
+```text
+planner_context -> ai_proposal -> validate_ai_proposal -> proposal response -> planner_trace
+```
+
+The `planner_trace` is compact. It reports planner mode, planner source,
+validation status, fallback status, output action type, and context counts. It
+must not contain API keys, screenshot paths, screenshot bytes, or full OCR
+arrays.
+
 ## Safety Boundaries
 
 - Do not commit API keys.
@@ -58,6 +69,14 @@ Check Runtime status:
 Planner: ai-proposal; LLM ready
 ```
 
+The `/runtime/status` response should also show:
+
+- `planner_mode`
+- `ai_planner_available`
+- `openai_api_key_configured`
+- `ai_planner_usable`
+- `external_llm_calls`
+
 Then:
 
 1. Enter `Search`.
@@ -68,6 +87,8 @@ Expected:
 - AI may produce `target_hint`.
 - `action_contract` may be a preview-only `click`.
 - `click_readiness` remains blocked.
+- The Planner trace panel shows source, validation, fallback, output action,
+  and compact context counts.
 - No desktop action executes.
 
 ## API Test Commands
@@ -84,14 +105,19 @@ Invoke-RestMethod "http://127.0.0.1:8000/proposal?task=Search"
 - `planner_context` contains no `screenshot_path`.
 - `planner_context` contains no `image_bytes`.
 - LLM output is validated before use.
-- Invalid or unsafe output returns `no_op`.
+- Unknown, malformed, or unsafe AI output returns `no_op`.
+- Missing API key falls back safely.
+- OpenAI API failure falls back safely.
 - Wait self-test remains the only executable path.
+- `/execute` still rejects non-wait actions.
 
 ## Troubleshooting
 
 - If PowerShell shows `>>`, press `Ctrl+C` and re-enter commands line by line.
 - If Planner stays `rule_based`, check `LAIN_AGENT_PLANNER_MODE` and `OPENAI_API_KEY`.
 - If the API call fails, the app should fallback safely.
+- If Planner trace shows `rejected`, inspect the validation reason. The
+  proposal should be a safe `no_op`.
 - If an API key was exposed, revoke or rotate it.
 
 ## Verification Checklist
@@ -105,4 +131,7 @@ node --check ui/app.js
 Also verify:
 
 - `/runtime/status` reports the expected planner mode.
+- `/runtime/status` reports whether the OpenAI API key is configured and
+  whether the AI planner is usable.
 - `/proposal` still does not execute desktop input.
+- `/proposal` includes compact `planner_trace`.

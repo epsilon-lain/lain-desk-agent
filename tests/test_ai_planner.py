@@ -101,6 +101,15 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertEqual(action["type"], "no_op")
         self.assertIn("Executable action type 'click'", action["reason"])
 
+    def test_unknown_action_type_is_rejected_as_no_op(self) -> None:
+        proposal = build_ai_proposal_from_context(
+            _planner_context(),
+            {"type": "drag", "reason": "Try an unsupported action."},
+        )
+
+        self.assertEqual(proposal["action"]["type"], "no_op")
+        self.assertIn("Unsupported proposal action type 'drag'", proposal["action"]["reason"])
+
     def test_mock_executable_outputs_are_rejected_as_no_op(self) -> None:
         executable_action_types = [
             "type",
@@ -251,6 +260,40 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertEqual(payload["action_contract"]["type"], "click")
         self.assertEqual(payload["click_readiness"]["status"], "blocked")
         self.assertNotIn("screenshot_path", json.dumps(payload["planner_trace"]))
+
+    def test_proposal_endpoint_trace_shape_is_compact(self) -> None:
+        payload = _proposal_endpoint_payload(
+            env={},
+            ai_side_effect=AssertionError("AI planner should not be called"),
+        )
+        trace = payload["planner_trace"]
+        context_summary = trace["context_summary"]
+
+        self.assertEqual(
+            set(trace),
+            {
+                "planner_mode",
+                "planner_source",
+                "ai_planner_available",
+                "external_llm_call_attempted",
+                "external_llm_call_succeeded",
+                "validation_status",
+                "fallback_used",
+                "context_summary",
+                "output_action_type",
+            },
+        )
+        self.assertEqual(
+            set(context_summary),
+            {
+                "visible_element_count",
+                "recent_event_count",
+                "desktop_control",
+                "executable_actions",
+            },
+        )
+        self.assertNotIn("image_bytes", json.dumps(trace))
+        self.assertNotIn("runs/run_001/obs_0042.png", json.dumps(trace))
 
     def test_proposal_endpoint_uses_ai_mode_when_key_is_available(self) -> None:
         seen_contexts = []
