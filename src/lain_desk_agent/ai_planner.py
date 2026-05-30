@@ -138,15 +138,31 @@ def build_ai_proposal_from_context(
 ) -> dict[str, Any]:
     """Build a normal proposal from planner context and a validated mock output."""
 
+    return build_ai_proposal_result_from_context(planner_context, mock_output=mock_output)[
+        "proposal"
+    ]
+
+
+def build_ai_proposal_result_from_context(
+    planner_context: dict[str, Any],
+    mock_output: Any | None = None,
+) -> dict[str, Any]:
+    """Build a proposal plus compact validation metadata for tracing."""
+
     context = planner_context if isinstance(planner_context, dict) else {}
     raw_output = mock_output if mock_output is not None else _deterministic_mock_output(context)
     validation = validate_ai_proposal(raw_output, context)
     action = validation["action"] if validation["valid"] else _no_op_action(validation["reason"])
 
-    return {
+    proposal = {
         "proposal_id": _proposal_id_from_context(context),
         "source_ui_state_id": _source_ui_state_id_from_context(context),
         "action": action,
+    }
+
+    return {
+        "proposal": proposal,
+        "validation": _compact_validation(validation),
     }
 
 
@@ -163,6 +179,21 @@ def build_ai_proposal_with_llm(
         http_post_json=http_post_json,
     )
     return build_ai_proposal_from_context(planner_context, mock_output=raw_output)
+
+
+def build_ai_proposal_result_with_llm(
+    planner_context: dict[str, Any],
+    api_key: str,
+    http_post_json: Any | None = None,
+) -> dict[str, Any]:
+    """Call the optional external LLM and return proposal plus validation metadata."""
+
+    raw_output = request_ai_proposal_from_openai(
+        planner_context,
+        api_key=api_key,
+        http_post_json=http_post_json,
+    )
+    return build_ai_proposal_result_from_context(planner_context, mock_output=raw_output)
 
 
 def request_ai_proposal_from_openai(
@@ -582,6 +613,17 @@ def _invalid(reason: str) -> dict[str, Any]:
         "valid": False,
         "reason": reason,
         "action": _no_op_action(reason),
+    }
+
+
+def _compact_validation(validation: dict[str, Any]) -> dict[str, Any]:
+    action = validation.get("action") if isinstance(validation, dict) else None
+    return {
+        "valid": bool(validation.get("valid")) if isinstance(validation, dict) else False,
+        "reason": _truncate_reason(str(validation.get("reason") or "Validation failed."))
+        if isinstance(validation, dict)
+        else "Validation failed.",
+        "action_type": str(action.get("type") or "") if isinstance(action, dict) else "",
     }
 
 

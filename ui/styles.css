@@ -202,6 +202,7 @@ button {
 .capabilities-panel,
 .demo-scenario-panel,
 .planner-context-panel,
+.planner-trace-panel,
 .dry-run-preview,
 .execution-self-test,
 .events-panel,
@@ -1033,6 +1034,60 @@ button {
   word-break: break-word;
 }
 
+.planner-trace-panel {
+  margin: 0 0 16px;
+  border: 1px solid rgba(134, 184, 220, 0.22);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(2, 8, 14, 0.2);
+}
+
+.planner-trace-panel[data-state="ready"] {
+  border-color: rgba(135, 244, 255, 0.42);
+}
+
+.planner-trace-panel[data-state="fallback"] {
+  border-color: rgba(255, 198, 109, 0.58);
+}
+
+.planner-trace-panel[data-state="rejected"] {
+  border-color: rgba(255, 115, 95, 0.76);
+  background: var(--danger-soft);
+}
+
+.planner-trace-title {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.planner-trace-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.planner-trace-facts div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.planner-trace-facts dt {
+  color: var(--blue);
+}
+
+.planner-trace-facts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .dry-run-preview {
   margin: 0 0 16px;
   border: 1px solid rgba(134, 184, 220, 0.3);
@@ -1504,7 +1559,8 @@ button {
   .demo-scenario-preview div,
   .demo-scenario-result div,
   .planner-context-header,
-  .planner-context-facts div {
+  .planner-context-facts div,
+  .planner-trace-facts {
     grid-template-columns: 1fr;
   }
 

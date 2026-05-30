@@ -13,6 +13,7 @@ from lain_desk_agent.ai_planner import (
     ALLOWED_PROPOSAL_ACTION_TYPES,
     build_ai_planner_prompt_or_payload,
     build_ai_proposal_from_context,
+    build_ai_proposal_result_from_context,
     build_ai_proposal_with_llm,
     build_openai_responses_payload,
     request_ai_proposal_from_openai,
@@ -240,15 +241,18 @@ class AIPlannerHarnessTests(unittest.TestCase):
 
         self.assertEqual(payload["planner"]["planner_mode"], "rule_based")
         self.assertEqual(payload["planner"]["source"], "rule_based")
+        self.assertEqual(payload["planner_trace"]["planner_mode"], "rule_based")
+        self.assertEqual(payload["planner_trace"]["planner_source"], "rule_based")
+        self.assertEqual(payload["planner_trace"]["validation_status"], "not_applicable")
+        self.assertIs(payload["planner_trace"]["fallback_used"], False)
+        self.assertEqual(payload["planner_trace"]["context_summary"]["visible_element_count"], 1)
+        self.assertEqual(payload["planner_trace"]["context_summary"]["executable_actions"], ["wait"])
         self.assertEqual(payload["proposal"]["action"]["type"], "target_hint")
         self.assertEqual(payload["action_contract"]["type"], "click")
         self.assertEqual(payload["click_readiness"]["status"], "blocked")
+        self.assertNotIn("screenshot_path", json.dumps(payload["planner_trace"]))
 
     def test_proposal_endpoint_uses_ai_mode_when_key_is_available(self) -> None:
-        ai_proposal = build_ai_proposal_from_context(
-            _planner_context(),
-            {"type": "target_hint", "target_element_id": "element_search"},
-        )
         seen_contexts = []
 
         def fake_ai_planner(planner_context, api_key):
@@ -257,7 +261,10 @@ class AIPlannerHarnessTests(unittest.TestCase):
             self.assertEqual(api_key, "test-secret")
             self.assertNotIn("screenshot_path", encoded_context)
             self.assertNotIn("runs/run_001/obs_0042.png", encoded_context)
-            return ai_proposal
+            return build_ai_proposal_result_from_context(
+                planner_context,
+                {"type": "target_hint", "target_element_id": "element_search"},
+            )
 
         payload = _proposal_endpoint_payload(
             env={
@@ -271,9 +278,39 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertEqual(payload["planner"]["planner_mode"], "ai_proposal")
         self.assertEqual(payload["planner"]["source"], "ai_proposal")
         self.assertEqual(payload["planner"]["fallback"], False)
+        self.assertEqual(payload["planner_trace"]["planner_mode"], "ai_proposal")
+        self.assertEqual(payload["planner_trace"]["planner_source"], "ai")
+        self.assertIs(payload["planner_trace"]["ai_planner_available"], True)
+        self.assertIs(payload["planner_trace"]["external_llm_call_attempted"], True)
+        self.assertIs(payload["planner_trace"]["external_llm_call_succeeded"], True)
+        self.assertEqual(payload["planner_trace"]["validation_status"], "accepted")
+        self.assertIs(payload["planner_trace"]["fallback_used"], False)
+        self.assertEqual(payload["planner_trace"]["output_action_type"], "target_hint")
         self.assertEqual(payload["proposal"]["action"]["type"], "target_hint")
         self.assertEqual(payload["safety_decision"]["decision"], "allowed")
         self.assertEqual(payload["action_contract"]["status"], "preview_only")
+
+    def test_proposal_endpoint_traces_rejected_ai_output(self) -> None:
+        def fake_ai_planner(planner_context, api_key):
+            self.assertEqual(api_key, "test-secret")
+            return build_ai_proposal_result_from_context(planner_context, {"type": "click"})
+
+        payload = _proposal_endpoint_payload(
+            env={
+                "LAIN_AGENT_PLANNER_MODE": "ai_proposal",
+                "OPENAI_API_KEY": "test-secret",
+            },
+            ai_side_effect=fake_ai_planner,
+        )
+
+        self.assertEqual(payload["proposal"]["action"]["type"], "no_op")
+        self.assertIsNone(payload["action_contract"])
+        self.assertEqual(payload["click_readiness"]["status"], "not_applicable")
+        self.assertEqual(payload["planner_trace"]["planner_source"], "ai")
+        self.assertEqual(payload["planner_trace"]["validation_status"], "rejected")
+        self.assertIn("Executable action type 'click'", payload["planner_trace"]["validation_reason"])
+        self.assertIs(payload["planner_trace"]["fallback_used"], False)
+        self.assertEqual(payload["planner_trace"]["output_action_type"], "no_op")
 
     def test_proposal_endpoint_falls_back_when_ai_key_is_missing(self) -> None:
         payload = _proposal_endpoint_payload(
@@ -285,6 +322,12 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertEqual(payload["planner"]["source"], "rule_based")
         self.assertEqual(payload["planner"]["fallback"], True)
         self.assertIn("OPENAI_API_KEY", payload["planner"]["fallback_reason"])
+        self.assertEqual(payload["planner_trace"]["planner_source"], "fallback")
+        self.assertIs(payload["planner_trace"]["ai_planner_available"], False)
+        self.assertIs(payload["planner_trace"]["external_llm_call_attempted"], False)
+        self.assertIs(payload["planner_trace"]["external_llm_call_succeeded"], False)
+        self.assertIs(payload["planner_trace"]["fallback_used"], True)
+        self.assertIn("OPENAI_API_KEY", payload["planner_trace"]["fallback_reason"])
         self.assertEqual(payload["proposal"]["action"]["type"], "target_hint")
 
     def test_proposal_endpoint_falls_back_when_ai_planner_errors(self) -> None:
@@ -301,6 +344,14 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertEqual(payload["planner"]["fallback"], True)
         self.assertEqual(
             payload["planner"]["fallback_reason"],
+            "AI planner failed; fell back to rule-based planner.",
+        )
+        self.assertEqual(payload["planner_trace"]["planner_source"], "fallback")
+        self.assertIs(payload["planner_trace"]["external_llm_call_attempted"], True)
+        self.assertIs(payload["planner_trace"]["external_llm_call_succeeded"], False)
+        self.assertIs(payload["planner_trace"]["fallback_used"], True)
+        self.assertEqual(
+            payload["planner_trace"]["fallback_reason"],
             "AI planner failed; fell back to rule-based planner.",
         )
         self.assertEqual(payload["proposal"]["action"]["type"], "target_hint")
@@ -369,7 +420,7 @@ def _planner_context(task: str = "Search", app_guess: str = "Chrome") -> dict[st
 def _proposal_endpoint_payload(
     env: dict[str, str],
     ai_return_value: dict[str, object] | None = None,
-    ai_side_effect: Exception | None = None,
+    ai_side_effect: object | None = None,
 ) -> dict[str, object]:
     server = create_server("127.0.0.1", 0)
     host, port = server.server_address
@@ -382,7 +433,7 @@ def _proposal_endpoint_payload(
             patch("lain_desk_agent.main.observe", return_value=_observation()),
             patch("lain_desk_agent.main.understand", return_value=_ui_state()),
             patch(
-                "lain_desk_agent.main.build_ai_proposal_with_llm",
+                "lain_desk_agent.main.build_ai_proposal_result_with_llm",
                 return_value=ai_return_value,
                 side_effect=ai_side_effect,
             ),

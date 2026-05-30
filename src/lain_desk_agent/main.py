@@ -16,7 +16,7 @@ from .ai_planner import (
     AI_PROPOSAL_MODE,
     AIPlannerError,
     ai_planner_runtime_status,
-    build_ai_proposal_with_llm,
+    build_ai_proposal_result_with_llm,
     openai_api_key_from_env,
     planner_mode_from_env,
 )
@@ -166,7 +166,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 "window_title": (observation.get("active_window") or {}).get("title"),
                 "task": task,
             }
-            proposal, planner_metadata = proposal_for_current_planner(
+            proposal, planner_metadata, planner_trace = proposal_for_current_planner(
                 planner_input,
                 ui_state,
                 screen,
@@ -197,6 +197,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 "safety_decision": safety_decision,
                 "click_readiness": click_readiness,
                 "planner": planner_metadata,
+                "planner_trace": planner_trace,
             }
         )
 
@@ -509,11 +510,29 @@ def proposal_for_current_planner(
     ui_state: dict[str, Any],
     screen: dict[str, Any],
     task: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     planner_mode = planner_mode_from_env()
     if planner_mode != AI_PROPOSAL_MODE:
-        return propose(planner_input), _planner_metadata(planner_mode, "rule_based")
+        proposal = propose(planner_input)
+        return (
+            proposal,
+            _planner_metadata(planner_mode, "rule_based"),
+            _planner_trace(
+                planner_mode=planner_mode,
+                planner_source="rule_based",
+                ai_planner_available=False,
+                external_llm_call_attempted=False,
+                external_llm_call_succeeded=False,
+                validation_status="not_applicable",
+                fallback_used=False,
+                context_summary=_planner_trace_context_from_ui_state(ui_state),
+                output_action_type=_proposal_action_type(proposal),
+            ),
+        )
 
+    planner_context: dict[str, Any] | None = None
+    external_llm_call_attempted = False
+    ai_status = ai_planner_runtime_status()
     try:
         api_key = openai_api_key_from_env()
         if not api_key:
@@ -531,22 +550,66 @@ def proposal_for_current_planner(
             runtime_status=runtime_status_payload(),
             recent_events=read_recent_events(limit=5),
         )
+        external_llm_call_attempted = True
+        ai_result = build_ai_proposal_result_with_llm(planner_context, api_key=api_key)
+        proposal = ai_result["proposal"]
+        validation = ai_result.get("validation") if isinstance(ai_result, dict) else {}
         return (
-            build_ai_proposal_with_llm(planner_context, api_key=api_key),
+            proposal,
             _planner_metadata(planner_mode, "ai_proposal"),
+            _planner_trace(
+                planner_mode=planner_mode,
+                planner_source="ai",
+                ai_planner_available=bool(ai_status.get("ai_planner_available")),
+                external_llm_call_attempted=True,
+                external_llm_call_succeeded=True,
+                validation_status=_validation_status(validation),
+                fallback_used=False,
+                context_summary=_planner_trace_context_from_context(planner_context),
+                output_action_type=_proposal_action_type(proposal),
+                validation_reason=_validation_reason(validation),
+            ),
         )
     except AIPlannerError as exc:
+        proposal = propose(planner_input)
+        fallback_reason = str(exc)
         return (
-            propose(planner_input),
-            _planner_metadata(planner_mode, "rule_based", fallback_reason=str(exc)),
+            proposal,
+            _planner_metadata(planner_mode, "rule_based", fallback_reason=fallback_reason),
+            _planner_trace(
+                planner_mode=planner_mode,
+                planner_source="fallback",
+                ai_planner_available=bool(ai_status.get("ai_planner_available")),
+                external_llm_call_attempted=external_llm_call_attempted,
+                external_llm_call_succeeded=False,
+                validation_status="not_applicable",
+                fallback_used=True,
+                fallback_reason=fallback_reason,
+                context_summary=_planner_trace_context(planner_context, ui_state),
+                output_action_type=_proposal_action_type(proposal),
+            ),
         )
     except Exception:
+        proposal = propose(planner_input)
+        fallback_reason = "AI planner failed; fell back to rule-based planner."
         return (
-            propose(planner_input),
+            proposal,
             _planner_metadata(
                 planner_mode,
                 "rule_based",
-                fallback_reason="AI planner failed; fell back to rule-based planner.",
+                fallback_reason=fallback_reason,
+            ),
+            _planner_trace(
+                planner_mode=planner_mode,
+                planner_source="fallback",
+                ai_planner_available=bool(ai_status.get("ai_planner_available")),
+                external_llm_call_attempted=external_llm_call_attempted,
+                external_llm_call_succeeded=False,
+                validation_status="not_applicable",
+                fallback_used=True,
+                fallback_reason=fallback_reason,
+                context_summary=_planner_trace_context(planner_context, ui_state),
+                output_action_type=_proposal_action_type(proposal),
             ),
         )
 
@@ -566,6 +629,120 @@ def _planner_metadata(
         metadata["fallback_reason"] = fallback_reason
 
     return metadata
+
+
+def _planner_trace(
+    *,
+    planner_mode: str,
+    planner_source: str,
+    ai_planner_available: bool,
+    external_llm_call_attempted: bool,
+    external_llm_call_succeeded: bool,
+    validation_status: str,
+    fallback_used: bool,
+    context_summary: dict[str, Any],
+    output_action_type: str,
+    fallback_reason: str = "",
+    validation_reason: str = "",
+) -> dict[str, Any]:
+    trace = {
+        "planner_mode": planner_mode,
+        "planner_source": planner_source,
+        "ai_planner_available": ai_planner_available,
+        "external_llm_call_attempted": external_llm_call_attempted,
+        "external_llm_call_succeeded": external_llm_call_succeeded,
+        "validation_status": validation_status,
+        "fallback_used": fallback_used,
+        "context_summary": context_summary,
+        "output_action_type": output_action_type,
+    }
+
+    if fallback_reason:
+        trace["fallback_reason"] = fallback_reason
+
+    if validation_reason and validation_status == "rejected":
+        trace["validation_reason"] = validation_reason
+
+    return trace
+
+
+def _planner_trace_context(
+    planner_context: dict[str, Any] | None,
+    ui_state: dict[str, Any],
+) -> dict[str, Any]:
+    if isinstance(planner_context, dict):
+        return _planner_trace_context_from_context(planner_context)
+
+    return _planner_trace_context_from_ui_state(ui_state)
+
+
+def _planner_trace_context_from_context(planner_context: dict[str, Any]) -> dict[str, Any]:
+    visible_elements = planner_context.get("visible_elements")
+    recent_events = planner_context.get("recent_events")
+    safety_runtime = planner_context.get("safety_runtime")
+
+    if not isinstance(visible_elements, dict):
+        visible_elements = {}
+    if not isinstance(recent_events, dict):
+        recent_events = {}
+    if not isinstance(safety_runtime, dict):
+        safety_runtime = {}
+
+    return {
+        "visible_element_count": _safe_trace_int(visible_elements.get("count"), 0),
+        "recent_event_count": _safe_trace_int(recent_events.get("count"), 0),
+        "desktop_control": bool(safety_runtime.get("desktop_control", False)),
+        "executable_actions": _trace_string_list(safety_runtime.get("executable_actions")),
+    }
+
+
+def _planner_trace_context_from_ui_state(ui_state: dict[str, Any]) -> dict[str, Any]:
+    visible_elements = ui_state.get("visible_elements")
+    visible_element_count = len(visible_elements) if isinstance(visible_elements, list) else 0
+    policy_summary = execution_policy_summary()
+
+    return {
+        "visible_element_count": visible_element_count,
+        "recent_event_count": len(read_recent_events(limit=5)),
+        "desktop_control": False,
+        "executable_actions": _trace_string_list(policy_summary.get("executable_actions")),
+    }
+
+
+def _validation_status(validation: Any) -> str:
+    if not isinstance(validation, dict):
+        return "not_applicable"
+
+    return "accepted" if validation.get("valid") else "rejected"
+
+
+def _validation_reason(validation: Any) -> str:
+    if not isinstance(validation, dict):
+        return ""
+
+    return str(validation.get("reason") or "")
+
+
+def _proposal_action_type(proposal: dict[str, Any]) -> str:
+    action = proposal.get("action")
+    if not isinstance(action, dict):
+        return ""
+
+    return str(action.get("type") or "")
+
+
+def _safe_trace_int(value: Any, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _trace_string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+
+    return [str(item) for item in value]
 
 
 def runtime_status_payload() -> dict[str, Any]:

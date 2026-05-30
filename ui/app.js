@@ -51,6 +51,13 @@ const plannerContextElements = document.querySelector("#plannerContextElements")
 const plannerContextEvents = document.querySelector("#plannerContextEvents");
 const plannerContextSafety = document.querySelector("#plannerContextSafety");
 const plannerContextJson = document.querySelector("#plannerContextJson");
+const plannerTracePanel = document.querySelector("#plannerTracePanel");
+const plannerTraceMode = document.querySelector("#plannerTraceMode");
+const plannerTraceSource = document.querySelector("#plannerTraceSource");
+const plannerTraceValidation = document.querySelector("#plannerTraceValidation");
+const plannerTraceFallback = document.querySelector("#plannerTraceFallback");
+const plannerTraceOutput = document.querySelector("#plannerTraceOutput");
+const plannerTraceContext = document.querySelector("#plannerTraceContext");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -196,6 +203,7 @@ renderDryRunAction();
 renderWaitSelfTestResult();
 renderExecutionPolicy();
 renderPlannerContext();
+renderPlannerTrace();
 renderPermissionProfile();
 renderCapabilities();
 fetchRuntimeStatus({ silent: true });
@@ -1068,6 +1076,46 @@ function renderPlannerContext(context = null) {
   plannerContextJson.textContent = JSON.stringify(context, null, 2);
 }
 
+function renderPlannerTrace(trace = null) {
+  if (!trace) {
+    plannerTracePanel.dataset.state = "empty";
+    plannerTraceMode.textContent = "not run";
+    plannerTraceSource.textContent = "unknown";
+    plannerTraceValidation.textContent = "not applicable";
+    plannerTraceFallback.textContent = "none";
+    plannerTraceOutput.textContent = "unknown";
+    plannerTraceContext.textContent = "0 elements; 0 events; desktop off";
+    return;
+  }
+
+  const contextSummary = trace.context_summary ?? {};
+  const executableActions = Array.isArray(contextSummary.executable_actions)
+    ? contextSummary.executable_actions
+    : [];
+  const validation = trace.validation_reason
+    ? `${displayRuntimeActuation(trace.validation_status)}: ${compactText(trace.validation_reason, 96)}`
+    : displayRuntimeActuation(trace.validation_status || "not_applicable");
+  const fallback = trace.fallback_used
+    ? `yes: ${compactText(trace.fallback_reason || "fallback used", 96)}`
+    : "no";
+
+  plannerTracePanel.dataset.state = trace.fallback_used
+    ? "fallback"
+    : trace.validation_status === "rejected"
+      ? "rejected"
+      : "ready";
+  plannerTraceMode.textContent = displayRuntimeActuation(trace.planner_mode || "unknown");
+  plannerTraceSource.textContent = displayRuntimeActuation(trace.planner_source || "unknown");
+  plannerTraceValidation.textContent = validation;
+  plannerTraceFallback.textContent = fallback;
+  plannerTraceOutput.textContent = displayRuntimeActuation(trace.output_action_type || "unknown");
+  plannerTraceContext.textContent = `${contextSummary.visible_element_count ?? 0} elements; ${
+    contextSummary.recent_event_count ?? 0
+  } events; desktop ${contextSummary.desktop_control ? "on" : "off"}; exec ${
+    executableActions.length ? executableActions.join(", ") : "none"
+  }`;
+}
+
 function compactCountWithTruncation(section) {
   const count = Number(section?.count ?? 0);
   const safeCount = Number.isFinite(count) ? count : 0;
@@ -1586,6 +1634,7 @@ taskForm.addEventListener("submit", async (event) => {
   renderActionContract();
   renderClickReadiness();
   renderDryRunAction();
+  renderPlannerTrace();
   primaryAction.disabled = true;
   taskInput.disabled = true;
 
@@ -1609,6 +1658,7 @@ taskForm.addEventListener("submit", async (event) => {
     setDetailsFromProposal(payload.proposal ?? {});
     setDetailsFromActionContract(payload.action_contract ?? null, payload.proposal?.action ?? null);
     renderClickReadiness(payload.click_readiness ?? null, payload.action_contract ?? null);
+    renderPlannerTrace(payload.planner_trace ?? null);
     setDetailsFromSafetyDecision(payload.safety_decision ?? {});
     currentProposal = payload.proposal ?? null;
     currentSafetyDecision = payload.safety_decision ?? null;
