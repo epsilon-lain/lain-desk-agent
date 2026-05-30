@@ -25,6 +25,7 @@ const runtimeClick = document.querySelector("#runtimeClick");
 const runtimeResourceGuard = document.querySelector("#runtimeResourceGuard");
 const executionPolicyProfile = document.querySelector("#executionPolicyProfile");
 const executionPolicyList = document.querySelector("#executionPolicyList");
+const executionPolicyProfiles = document.querySelector("#executionPolicyProfiles");
 const permissionProfileStatus = document.querySelector("#permissionProfileStatus");
 const capabilitiesList = document.querySelector("#capabilitiesList");
 const demoScenarioPanel = document.querySelector("#demoScenarioPanel");
@@ -621,21 +622,28 @@ async function fetchExecutionPolicy(options = {}) {
 
 function renderExecutionPolicy(payload = null) {
   executionPolicyList.replaceChildren();
+  executionPolicyProfiles.replaceChildren();
 
   if (!payload) {
     executionPolicyProfile.textContent = "Profile: unknown";
     for (const actionType of EXECUTION_POLICY_ACTIONS) {
       executionPolicyList.appendChild(executionPolicyListItem(actionType, null));
     }
+    executionPolicyProfiles.appendChild(executionPolicyEmptyState());
     return;
   }
 
   const profile = payload.current_profile || payload.summary?.current_profile || "unknown";
   const profilePolicy = payload.matrix?.[profile] ?? {};
+  const profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
   executionPolicyProfile.textContent = `Profile: ${profile}`;
 
   for (const actionType of EXECUTION_POLICY_ACTIONS) {
     executionPolicyList.appendChild(executionPolicyListItem(actionType, profilePolicy[actionType] ?? null));
+  }
+
+  for (const profileName of profiles) {
+    executionPolicyProfiles.appendChild(executionPolicyProfileCard(profileName, payload.matrix?.[profileName] ?? {}, profile));
   }
 }
 
@@ -647,6 +655,62 @@ function executionPolicyListItem(actionType, entry) {
   item.textContent = `${actionType}: ${state}`;
   item.dataset.executable = String(executable);
   item.title = entry?.reason || "";
+  return item;
+}
+
+function executionPolicyProfileCard(profileName, profilePolicy, currentProfile) {
+  const card = document.createElement("article");
+  const title = document.createElement("p");
+  const grid = document.createElement("ul");
+
+  card.className = "execution-policy-profile-card";
+  card.dataset.current = String(profileName === currentProfile);
+  title.className = "execution-policy-profile-name";
+  title.textContent = profileName === currentProfile ? `${profileName} (current)` : profileName;
+  grid.className = "execution-policy-action-grid";
+
+  for (const actionType of EXECUTION_POLICY_ACTIONS) {
+    grid.appendChild(executionPolicyActionCell(actionType, profilePolicy[actionType] ?? null));
+  }
+
+  card.append(title, grid);
+  return card;
+}
+
+function executionPolicyActionCell(actionType, entry) {
+  const item = document.createElement("li");
+  const action = document.createElement("span");
+  const state = document.createElement("span");
+  const stateText = executionPolicyStateText(entry);
+
+  action.textContent = actionType;
+  state.textContent = stateText;
+  item.dataset.state = stateText.replaceAll(" ", "_").replace(/[()]/g, "");
+  item.title = entry?.reason || "";
+  item.append(action, state);
+  return item;
+}
+
+function executionPolicyStateText(entry) {
+  if (!entry) {
+    return "unknown";
+  }
+
+  if (entry.executable) {
+    return "executable";
+  }
+
+  if (entry.mode === "future_experimental") {
+    return "future (blocked)";
+  }
+
+  return "blocked";
+}
+
+function executionPolicyEmptyState() {
+  const item = document.createElement("p");
+  item.className = "execution-policy-empty";
+  item.textContent = "Execution policy unavailable.";
   return item;
 }
 
