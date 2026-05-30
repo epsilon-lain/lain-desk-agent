@@ -26,6 +26,15 @@ class RuntimeStatusTests(unittest.TestCase):
         self.assertEqual(payload["permission_profile"], "wait_only")
         self.assertTrue(payload["capabilities"]["wait"]["enabled"])
         self.assertFalse(payload["capabilities"]["click"]["enabled"])
+        self.assertEqual(
+            payload["execution_policy"],
+            {
+                "current_profile": "wait_only",
+                "desktop_control": False,
+                "executable_actions": ["wait"],
+                "blocked_actions_count": 5,
+            },
+        )
         self.assertFalse(payload["click_readiness"]["enabled"])
         self.assertEqual(payload["click_readiness"]["reason"], "Real click execution is not enabled.")
         self.assertEqual(
@@ -45,6 +54,9 @@ class RuntimeStatusTests(unittest.TestCase):
         self.assertEqual(payload["permission_profile"], "safe_readonly")
         self.assertEqual(payload["runtime"]["actuation"], "wait_only")
         self.assertFalse(payload["runtime"]["desktop_control"])
+        self.assertEqual(payload["execution_policy"]["current_profile"], "safe_readonly")
+        self.assertEqual(payload["execution_policy"]["executable_actions"], [])
+        self.assertEqual(payload["execution_policy"]["blocked_actions_count"], 6)
 
 
 if __name__ == "__main__":

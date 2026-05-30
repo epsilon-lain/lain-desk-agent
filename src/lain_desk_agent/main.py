@@ -19,6 +19,7 @@ from .click_policy import (
     evaluate_click_readiness,
 )
 from .demo_scenarios import UnknownDemoScenarioError, run_demo_scenario
+from .execution_policy import execution_policy_payload, execution_policy_summary
 from .observation import DEFAULT_RUN_DIR, observe
 from .permission_profile import get_permission_profile_payload
 from .planner import propose
@@ -69,6 +70,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/permission-profile":
             self._handle_permission_profile()
+            return
+
+        if path == "/execution-policy":
+            self._handle_execution_policy()
             return
 
         if path == "/click-readiness":
@@ -256,6 +261,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_permission_profile(self) -> None:
         self._send_json(get_permission_profile_payload())
+
+    def _handle_execution_policy(self) -> None:
+        self._send_json(execution_policy_payload())
 
     def _handle_click_readiness(self) -> None:
         self._send_json(click_readiness_metadata())
@@ -460,6 +468,7 @@ def runtime_status_payload() -> dict[str, Any]:
         },
         "permission_profile": str(get_permission_profile_payload().get("profile") or "unknown"),
         "capabilities": get_capabilities(),
+        "execution_policy": execution_policy_summary(),
         "click_readiness": {
             "enabled": bool(click_readiness.get("enabled")),
             "reason": str(click_readiness.get("reason") or ""),

@@ -23,6 +23,8 @@ const runtimeActuation = document.querySelector("#runtimeActuation");
 const runtimeVerification = document.querySelector("#runtimeVerification");
 const runtimeClick = document.querySelector("#runtimeClick");
 const runtimeResourceGuard = document.querySelector("#runtimeResourceGuard");
+const executionPolicyProfile = document.querySelector("#executionPolicyProfile");
+const executionPolicyList = document.querySelector("#executionPolicyList");
 const permissionProfileStatus = document.querySelector("#permissionProfileStatus");
 const capabilitiesList = document.querySelector("#capabilitiesList");
 const demoScenarioPanel = document.querySelector("#demoScenarioPanel");
@@ -91,6 +93,7 @@ const detailSafetyReason = document.querySelector("#detailSafetyReason");
 const detailError = document.querySelector("#detailError");
 
 const DEFAULT_AGENT_NAME = "Mirai";
+const EXECUTION_POLICY_ACTIONS = ["wait", "click", "type", "hotkey", "scroll", "switch_app"];
 const DEMO_SCENARIOS = {
   browser_search: {
     defaultTask: "Search",
@@ -181,9 +184,11 @@ renderRuntimeStatus();
 renderSafetyDecision();
 renderDryRunAction();
 renderWaitSelfTestResult();
+renderExecutionPolicy();
 renderPermissionProfile();
 renderCapabilities();
 fetchRuntimeStatus({ silent: true });
+fetchExecutionPolicy({ silent: true });
 fetchPermissionProfile({ silent: true });
 fetchCapabilities({ silent: true });
 fetchRecentEvents({ silent: true });
@@ -590,6 +595,59 @@ function renderRuntimeStatus(payload = null) {
 
 function displayRuntimeActuation(value) {
   return String(value).replaceAll("_", "-");
+}
+
+async function fetchExecutionPolicy(options = {}) {
+  const { silent = false } = options;
+
+  try {
+    const response = await fetch("/execution-policy");
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Execution policy failed with HTTP ${response.status}`);
+    }
+
+    renderExecutionPolicy(payload);
+  } catch (error) {
+    renderExecutionPolicy();
+
+    if (!silent) {
+      detailError.textContent = `Execution policy refresh failed: ${error.message || String(error)}`;
+      detailsPanel.open = true;
+    }
+  }
+}
+
+function renderExecutionPolicy(payload = null) {
+  executionPolicyList.replaceChildren();
+
+  if (!payload) {
+    executionPolicyProfile.textContent = "Profile: unknown";
+    for (const actionType of EXECUTION_POLICY_ACTIONS) {
+      executionPolicyList.appendChild(executionPolicyListItem(actionType, null));
+    }
+    return;
+  }
+
+  const profile = payload.current_profile || payload.summary?.current_profile || "unknown";
+  const profilePolicy = payload.matrix?.[profile] ?? {};
+  executionPolicyProfile.textContent = `Profile: ${profile}`;
+
+  for (const actionType of EXECUTION_POLICY_ACTIONS) {
+    executionPolicyList.appendChild(executionPolicyListItem(actionType, profilePolicy[actionType] ?? null));
+  }
+}
+
+function executionPolicyListItem(actionType, entry) {
+  const item = document.createElement("li");
+  const executable = Boolean(entry?.executable);
+  const state = executable ? "executable" : "blocked";
+
+  item.textContent = `${actionType}: ${state}`;
+  item.dataset.executable = String(executable);
+  item.title = entry?.reason || "";
+  return item;
 }
 
 async function fetchPermissionProfile(options = {}) {
