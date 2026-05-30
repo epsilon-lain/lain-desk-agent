@@ -74,10 +74,11 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 60px;
-  padding: 0 22px;
+  min-height: 76px;
+  padding: 10px 22px;
   border-bottom: 1px solid var(--panel-line-soft);
   background: rgba(3, 8, 13, 0.7);
+  overflow: visible;
 }
 
 .agent-name {
@@ -91,7 +92,7 @@ button {
   font-size: clamp(26px, 5vw, 33px);
   font-weight: 700;
   letter-spacing: 0;
-  line-height: 1;
+  line-height: 1.2;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
@@ -118,6 +119,8 @@ button {
 .window-actions {
   display: flex;
   align-items: center;
+  align-self: center;
+  flex: 0 0 auto;
   gap: 18px;
 }
 
@@ -1206,8 +1209,8 @@ button {
   }
 
   .titlebar {
-    height: 64px;
-    padding: 0 18px;
+    min-height: 76px;
+    padding: 10px 18px;
   }
 
   .window-body {
