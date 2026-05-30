@@ -23,6 +23,7 @@ from .execution_policy import execution_policy_payload, execution_policy_summary
 from .observation import DEFAULT_RUN_DIR, observe
 from .permission_profile import get_permission_profile_payload
 from .planner import propose
+from .planner_context import build_planner_context
 from .resource_guard import DEFAULT_LIMITS, ResourceGuardError
 from .safety import assess_proposal
 from .understanding import understand
@@ -54,6 +55,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/proposal":
             self._handle_proposal()
+            return
+
+        if path == "/planner-context":
+            self._handle_planner_context()
             return
 
         if path == "/demo/scenario":
@@ -179,6 +184,35 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 "click_readiness": click_readiness,
             }
         )
+
+    def _handle_planner_context(self) -> None:
+        try:
+            query = parse_qs(urlparse(self.path).query)
+            task = _first_query_value(query, "task")
+            observation = observe()
+            ui_state = understand(observation)
+            screen = observation.get("screen") or {}
+            ui_state = {
+                **ui_state,
+                "screen": {
+                    "width": screen.get("width"),
+                    "height": screen.get("height"),
+                },
+            }
+            planner_context = build_planner_context(
+                task,
+                ui_state,
+                runtime_status=runtime_status_payload(),
+                recent_events=read_recent_events(limit=5),
+            )
+        except ResourceGuardError as exc:
+            self._send_json(exc.to_payload(), status=507)
+            return
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+
+        self._send_json({"planner_context": planner_context})
 
     def _handle_demo_scenario(self) -> None:
         try:

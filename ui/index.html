@@ -179,6 +179,43 @@
               </dl>
               <ul class="demo-scenario-reasons" id="demoScenarioReasons" hidden></ul>
             </section>
+            <section class="planner-context-panel" id="plannerContextPanel" aria-label="Planner context">
+              <div class="planner-context-header">
+                <div>
+                  <p class="planner-context-title">Planner context</p>
+                  <p class="planner-context-helper">Compact read-only bundle for a future AI planner.</p>
+                </div>
+                <button class="planner-context-button" id="buildPlannerContext" type="button">
+                  Build context
+                </button>
+              </div>
+              <dl class="planner-context-facts">
+                <div>
+                  <dt>Task</dt>
+                  <dd id="plannerContextTask">none</dd>
+                </div>
+                <div>
+                  <dt>App/state</dt>
+                  <dd id="plannerContextAppState">unknown</dd>
+                </div>
+                <div>
+                  <dt>Elements</dt>
+                  <dd id="plannerContextElements">0</dd>
+                </div>
+                <div>
+                  <dt>Events</dt>
+                  <dd id="plannerContextEvents">0</dd>
+                </div>
+                <div>
+                  <dt>Safety</dt>
+                  <dd id="plannerContextSafety">unknown</dd>
+                </div>
+              </dl>
+              <details class="planner-context-json-panel">
+                <summary>compact JSON</summary>
+                <pre id="plannerContextJson">{}</pre>
+              </details>
+            </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
               <p id="safetyBrakeMessage">No safety decision yet.</p>
               <div class="safety-buttons" id="safetyButtons" hidden>

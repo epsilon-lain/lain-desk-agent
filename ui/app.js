@@ -42,6 +42,14 @@ const demoProposalAction = document.querySelector("#demoProposalAction");
 const demoActionContract = document.querySelector("#demoActionContract");
 const demoClickReadiness = document.querySelector("#demoClickReadiness");
 const demoScenarioReasons = document.querySelector("#demoScenarioReasons");
+const plannerContextPanel = document.querySelector("#plannerContextPanel");
+const buildPlannerContextButton = document.querySelector("#buildPlannerContext");
+const plannerContextTask = document.querySelector("#plannerContextTask");
+const plannerContextAppState = document.querySelector("#plannerContextAppState");
+const plannerContextElements = document.querySelector("#plannerContextElements");
+const plannerContextEvents = document.querySelector("#plannerContextEvents");
+const plannerContextSafety = document.querySelector("#plannerContextSafety");
+const plannerContextJson = document.querySelector("#plannerContextJson");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -186,6 +194,7 @@ renderSafetyDecision();
 renderDryRunAction();
 renderWaitSelfTestResult();
 renderExecutionPolicy();
+renderPlannerContext();
 renderPermissionProfile();
 renderCapabilities();
 fetchRuntimeStatus({ silent: true });
@@ -216,6 +225,10 @@ demoScenarioSelect.addEventListener("change", () => {
 
 runDemoScenarioButton.addEventListener("click", async () => {
   await runSelectedDemoScenario();
+});
+
+buildPlannerContextButton.addEventListener("click", async () => {
+  await buildCurrentPlannerContext();
 });
 
 function setDetailsFromUiState(uiState) {
@@ -960,6 +973,93 @@ function renderDemoScenarioReasons(reasons) {
 
     demoScenarioReasons.appendChild(item);
   }
+}
+
+async function buildCurrentPlannerContext() {
+  const task = taskInput.value.trim();
+  const params = new URLSearchParams();
+
+  if (task) {
+    params.set("task", task);
+  }
+
+  plannerContextPanel.dataset.state = "running";
+  buildPlannerContextButton.disabled = true;
+  plannerContextTask.textContent = task || "none";
+  plannerContextAppState.textContent = "building...";
+  plannerContextElements.textContent = "building...";
+  plannerContextEvents.textContent = "building...";
+  plannerContextSafety.textContent = "building...";
+  plannerContextJson.textContent = "{}";
+  statusText.textContent = "building planner context...";
+
+  try {
+    const endpoint = params.toString() ? `/planner-context?${params.toString()}` : "/planner-context";
+    const response = await fetch(endpoint);
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Planner context failed with HTTP ${response.status}`);
+    }
+
+    renderPlannerContext(payload.planner_context ?? null);
+    plannerContextPanel.dataset.state = "ready";
+    detailError.textContent = "none";
+    statusText.textContent = "planner context ready";
+    await fetchRecentEvents({ silent: true });
+  } catch (error) {
+    plannerContextPanel.dataset.state = "error";
+    plannerContextSafety.textContent = "failed";
+    plannerContextJson.textContent = JSON.stringify(
+      { error: error.message || String(error) },
+      null,
+      2
+    );
+    detailError.textContent = `Planner context failed: ${error.message || String(error)}`;
+    detailsPanel.open = true;
+    statusText.textContent = "planner context failed";
+  } finally {
+    buildPlannerContextButton.disabled = false;
+  }
+}
+
+function renderPlannerContext(context = null) {
+  if (!context) {
+    plannerContextPanel.dataset.state = "empty";
+    plannerContextTask.textContent = "none";
+    plannerContextAppState.textContent = "unknown";
+    plannerContextElements.textContent = "0";
+    plannerContextEvents.textContent = "0";
+    plannerContextSafety.textContent = "unknown";
+    plannerContextJson.textContent = "{}";
+    return;
+  }
+
+  const visibleElements = context.visible_elements ?? {};
+  const recentEvents = context.recent_events ?? {};
+  const safetyRuntime = context.safety_runtime ?? {};
+  const executableActions = Array.isArray(safetyRuntime.executable_actions)
+    ? safetyRuntime.executable_actions
+    : [];
+
+  plannerContextTask.textContent = context.task || "none";
+  plannerContextAppState.textContent = `${context.app_guess || "unknown"} / ${
+    context.state_guess || "unknown"
+  }`;
+  plannerContextElements.textContent = compactCountWithTruncation(visibleElements);
+  plannerContextEvents.textContent = compactCountWithTruncation(recentEvents);
+  plannerContextSafety.textContent = `desktop ${
+    safetyRuntime.desktop_control ? "enabled" : "off"
+  }; ${safetyRuntime.permission_profile || "unknown"}; exec ${
+    executableActions.length ? executableActions.join(", ") : "none"
+  }; blocked ${safetyRuntime.blocked_actions_count ?? "?"}`;
+  plannerContextJson.textContent = JSON.stringify(context, null, 2);
+}
+
+function compactCountWithTruncation(section) {
+  const count = Number(section?.count ?? 0);
+  const safeCount = Number.isFinite(count) ? count : 0;
+  return section?.truncated ? `${safeCount} (truncated)` : String(safeCount);
 }
 
 function formatPoint(point) {
