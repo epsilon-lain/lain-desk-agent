@@ -58,6 +58,11 @@ const plannerTraceValidation = document.querySelector("#plannerTraceValidation")
 const plannerTraceFallback = document.querySelector("#plannerTraceFallback");
 const plannerTraceOutput = document.querySelector("#plannerTraceOutput");
 const plannerTraceContext = document.querySelector("#plannerTraceContext");
+const plannerEvaluationPanel = document.querySelector("#plannerEvaluationPanel");
+const loadPlannerEvaluationButton = document.querySelector("#loadPlannerEvaluation");
+const plannerEvaluationStatus = document.querySelector("#plannerEvaluationStatus");
+const plannerEvaluationSummary = document.querySelector("#plannerEvaluationSummary");
+const plannerEvaluationResults = document.querySelector("#plannerEvaluationResults");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -204,6 +209,7 @@ renderWaitSelfTestResult();
 renderExecutionPolicy();
 renderPlannerContext();
 renderPlannerTrace();
+renderPlannerEvaluation();
 renderPermissionProfile();
 renderCapabilities();
 fetchRuntimeStatus({ silent: true });
@@ -238,6 +244,10 @@ runDemoScenarioButton.addEventListener("click", async () => {
 
 buildPlannerContextButton.addEventListener("click", async () => {
   await buildCurrentPlannerContext();
+});
+
+loadPlannerEvaluationButton.addEventListener("click", async () => {
+  await loadDemoPlannerEvaluation();
 });
 
 function setDetailsFromUiState(uiState) {
@@ -1133,6 +1143,223 @@ function renderPlannerTrace(trace = null) {
   } events; desktop ${contextSummary.desktop_control ? "on" : "off"}; exec ${
     executableActions.length ? executableActions.join(", ") : "none"
   }`;
+}
+
+async function loadDemoPlannerEvaluation() {
+  plannerEvaluationPanel.dataset.state = "running";
+  loadPlannerEvaluationButton.disabled = true;
+  plannerEvaluationStatus.textContent = "Loading demo planner evaluation...";
+  plannerEvaluationSummary.hidden = true;
+  plannerEvaluationResults.replaceChildren();
+  statusText.textContent = "loading planner evaluation...";
+
+  try {
+    const response = await fetch("/planner-evaluation/demo");
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Planner evaluation failed with HTTP ${response.status}`);
+    }
+
+    renderPlannerEvaluation(payload);
+    detailError.textContent = "none";
+    statusText.textContent = "planner evaluation ready";
+  } catch (error) {
+    renderPlannerEvaluationError(error);
+    detailError.textContent = `Planner evaluation failed: ${error.message || String(error)}`;
+    detailsPanel.open = true;
+    statusText.textContent = "planner evaluation failed";
+  } finally {
+    loadPlannerEvaluationButton.disabled = false;
+  }
+}
+
+function renderPlannerEvaluation(report = null) {
+  plannerEvaluationSummary.replaceChildren();
+  plannerEvaluationResults.replaceChildren();
+
+  if (!report) {
+    plannerEvaluationPanel.dataset.state = "empty";
+    plannerEvaluationStatus.textContent = "Not loaded yet.";
+    plannerEvaluationSummary.hidden = true;
+    plannerEvaluationResults.appendChild(plannerEvaluationEmptyState());
+    return;
+  }
+
+  const summary = report.summary ?? {};
+  const scenarios = Array.isArray(report.scenarios) ? report.scenarios : [];
+  const allSafe = summary.all_safe_read_only === true;
+
+  plannerEvaluationPanel.dataset.state = allSafe ? "ready" : "warning";
+  plannerEvaluationStatus.textContent =
+    "Demo-only comparison loaded. No live observation, LLM call, or desktop action.";
+  plannerEvaluationSummary.hidden = false;
+  setPlannerEvaluationSummary([
+    ["Scenarios", String(report.scenario_count ?? scenarios.length)],
+    ["Consistent", String(summary.consistent_count ?? "unknown")],
+    ["Differences", String(summary.differences_count ?? "unknown")],
+    ["AI rejections", String(summary.ai_rejections ?? "unknown")],
+    ["Unsafe AI outputs", String(summary.unsafe_ai_outputs ?? "unknown")],
+    ["External LLM calls", report.external_llm_calls ? "yes" : "no"],
+    ["Safe read-only", allSafe ? "yes" : "check report"],
+  ]);
+
+  if (!scenarios.length) {
+    plannerEvaluationResults.appendChild(plannerEvaluationEmptyState("No demo scenarios returned."));
+    return;
+  }
+
+  for (const scenario of scenarios) {
+    plannerEvaluationResults.appendChild(plannerEvaluationScenarioCard(scenario));
+  }
+}
+
+function renderPlannerEvaluationError(error) {
+  plannerEvaluationPanel.dataset.state = "error";
+  plannerEvaluationStatus.textContent = "Planner evaluation could not be loaded.";
+  plannerEvaluationSummary.hidden = true;
+  plannerEvaluationSummary.replaceChildren();
+  plannerEvaluationResults.replaceChildren(
+    plannerEvaluationEmptyState(error.message || String(error))
+  );
+}
+
+function setPlannerEvaluationSummary(rows) {
+  plannerEvaluationSummary.replaceChildren();
+
+  for (const [label, value] of rows) {
+    plannerEvaluationSummary.appendChild(plannerEvaluationFact(label, value));
+  }
+}
+
+function plannerEvaluationScenarioCard(scenario) {
+  const card = document.createElement("article");
+  const title = document.createElement("p");
+  const facts = document.createElement("dl");
+  const differences = scenario.differences ?? {};
+
+  card.className = "planner-evaluation-card";
+  card.dataset.different = String(
+    differences.same_proposal_type === false || differences.same_target === false
+  );
+  title.className = "planner-evaluation-card-title";
+  title.textContent = scenario.scenario || "unknown scenario";
+  facts.className = "planner-evaluation-facts";
+
+  for (const [label, value] of plannerEvaluationRows(scenario)) {
+    facts.appendChild(plannerEvaluationFact(label, value));
+  }
+
+  card.append(title, facts);
+  return card;
+}
+
+function plannerEvaluationRows(scenario) {
+  const inputs = scenario.inputs ?? {};
+  const visibleElements = inputs.visible_elements ?? {};
+
+  return [
+    ["Task", inputs.task || "none"],
+    ["Elements", compactCountWithTruncation(visibleElements)],
+    ["Risk hints", formatEvaluationRiskHints(scenario)],
+    ["Rule-based", formatEvaluationProposal(scenario.rule_based)],
+    ["AI proposal", formatEvaluationProposal(scenario.ai_proposal)],
+    ["Safety", formatEvaluationPair(scenario, formatEvaluationSafety)],
+    ["Contract", formatEvaluationPair(scenario, formatEvaluationContract)],
+    ["Readiness", formatEvaluationPair(scenario, formatEvaluationReadiness)],
+    ["Differences", formatEvaluationNotes(scenario.differences?.notes)],
+    ["Notes", formatEvaluationNotes(scenario.notes)],
+  ];
+}
+
+function plannerEvaluationFact(label, value) {
+  const row = document.createElement("div");
+  const term = document.createElement("dt");
+  const detail = document.createElement("dd");
+
+  term.textContent = label;
+  detail.textContent = value;
+  row.append(term, detail);
+  return row;
+}
+
+function plannerEvaluationEmptyState(text = "Load the demo report to compare planner outputs.") {
+  const empty = document.createElement("p");
+  empty.className = "planner-evaluation-empty";
+  empty.textContent = text;
+  return empty;
+}
+
+function formatEvaluationPair(scenario, formatter) {
+  return `rule ${formatter(scenario.rule_based)}; ai ${formatter(scenario.ai_proposal)}`;
+}
+
+function formatEvaluationProposal(result = {}) {
+  const action = result.proposal?.action ?? {};
+  const proposalType = result.proposal_type || action.type || "unknown";
+  const target = action.target_label || action.target || action.target_element_id;
+  const validation = result.validation?.valid === false ? "; validation rejected" : "";
+
+  return target
+    ? `${proposalType}: ${compactText(target, 64)}${validation}`
+    : `${proposalType}${validation}`;
+}
+
+function formatEvaluationSafety(result = {}) {
+  const safetyDecision = result.safety_decision ?? {};
+  const decision = safetyDecision.decision || "unknown";
+  const reason = safetyDecision.reason ? `: ${compactText(safetyDecision.reason, 72)}` : "";
+  return `${decision}${reason}`;
+}
+
+function formatEvaluationContract(result = {}) {
+  const actionContract = result.action_contract;
+
+  if (!actionContract) {
+    return "none";
+  }
+
+  return `${actionContract.type || "unknown"} / ${actionContract.status || "unknown"} / executed ${
+    actionContract.executed ? "yes" : "no"
+  }`;
+}
+
+function formatEvaluationReadiness(result = {}) {
+  const clickReadiness = result.click_readiness ?? {};
+
+  if (!clickReadiness.status) {
+    return "not present";
+  }
+
+  const readiness = readinessDisplayText(clickReadiness);
+  const reasons = Array.isArray(clickReadiness.reasons) && clickReadiness.reasons.length
+    ? `: ${clickReadiness.reasons.map((reason) => compactText(reason, 48)).join("; ")}`
+    : "";
+
+  return `${readiness}${reasons}`;
+}
+
+function formatEvaluationRiskHints(scenario) {
+  const hints = Array.isArray(scenario.inputs?.grounding_hints)
+    ? scenario.inputs.grounding_hints
+    : [];
+  const riskyHints = hints.filter((hint) => hint.risk_hint && hint.risk_hint !== "none");
+
+  if (!riskyHints.length) {
+    return "none";
+  }
+
+  return riskyHints
+    .map((hint) => `${hint.label || hint.id || "element"}: ${hint.risk_hint}`)
+    .join("; ");
+}
+
+function formatEvaluationNotes(notes) {
+  if (!Array.isArray(notes) || !notes.length) {
+    return "none";
+  }
+
+  return notes.map((note) => compactText(note, 92)).join("; ");
 }
 
 function compactCountWithTruncation(section) {

@@ -249,6 +249,22 @@
                 </div>
               </dl>
             </section>
+            <section class="planner-evaluation-panel" id="plannerEvaluationPanel" aria-label="Planner evaluation">
+              <div class="planner-evaluation-header">
+                <div>
+                  <p class="planner-evaluation-title">Planner evaluation</p>
+                  <p class="planner-evaluation-helper">
+                    Compares rule-based and proposal-only AI planner on demo scenarios. No observation or execution.
+                  </p>
+                </div>
+                <button class="planner-evaluation-button" id="loadPlannerEvaluation" type="button">
+                  Load demo report
+                </button>
+              </div>
+              <p class="planner-evaluation-status" id="plannerEvaluationStatus">Not loaded yet.</p>
+              <dl class="planner-evaluation-summary" id="plannerEvaluationSummary" hidden></dl>
+              <div class="planner-evaluation-results" id="plannerEvaluationResults" aria-live="polite"></div>
+            </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
               <p id="safetyBrakeMessage">No safety decision yet.</p>
               <div class="safety-buttons" id="safetyButtons" hidden>
