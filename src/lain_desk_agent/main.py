@@ -186,7 +186,12 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                     )
                 )
             safety_decision = assess_proposal(proposal)
-            click_readiness = click_readiness_for_response(action_contract, safety_decision)
+            click_readiness = click_readiness_for_response(
+                action_contract,
+                safety_decision,
+                screen=screen,
+                observation_timestamp=observation.get("timestamp"),
+            )
         except ResourceGuardError as exc:
             self._send_json(exc.to_payload(), status=507)
             return
@@ -516,6 +521,8 @@ def action_contract_from_execute_payload(payload: dict[str, Any]) -> dict[str, A
 def click_readiness_for_response(
     action_contract: dict[str, Any] | None,
     safety_decision: dict[str, Any] | None,
+    screen: dict[str, Any] | None = None,
+    observation_timestamp: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(action_contract, dict) or action_contract.get("type") != "click":
         return click_readiness_not_applicable()
@@ -525,6 +532,8 @@ def click_readiness_for_response(
         safety_decision,
         get_capability("click"),
         get_permission_profile_payload(),
+        screen=screen,
+        observation_timestamp=observation_timestamp,
     )
 
 

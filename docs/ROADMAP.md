@@ -104,6 +104,9 @@ Goal: improve `visible_elements` without adding desktop control.
 
 ## Phase 6: Click Readiness Hardening
 
+Status: started with structured readiness checks for preview-only click
+contracts.
+
 Goal: make preview-only click contracts safer before any real click experiment.
 
 - Strengthen high-risk label policy.

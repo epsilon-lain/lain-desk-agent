@@ -175,4 +175,6 @@ def _click_readiness_for_contract(
         safety_decision,
         get_capability("click"),
         get_permission_profile_payload(),
+        screen=action_contract.get("screen"),
+        observation_timestamp=action_contract.get("observation_timestamp"),
     )
