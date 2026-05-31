@@ -32,6 +32,7 @@ from .observation import DEFAULT_RUN_DIR, observe
 from .permission_profile import get_permission_profile_payload
 from .planner import propose
 from .planner_context import build_planner_context
+from .planner_evaluation import evaluate_demo_scenarios
 from .resource_guard import DEFAULT_LIMITS, ResourceGuardError
 from .safety import assess_proposal
 from .understanding import understand
@@ -67,6 +68,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/planner-context":
             self._handle_planner_context()
+            return
+
+        if path == "/planner-evaluation/demo":
+            self._handle_planner_evaluation_demo()
             return
 
         if path == "/demo/scenario":
@@ -236,6 +241,24 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             payload = run_demo_scenario(
                 name=_first_query_value(query, "name") or "browser_search",
                 task=_first_query_value(query, "task"),
+            )
+        except UnknownDemoScenarioError as exc:
+            self._send_json({"error": str(exc)}, status=404)
+            return
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+
+        self._send_json(payload)
+
+    def _handle_planner_evaluation_demo(self) -> None:
+        try:
+            query = parse_qs(urlparse(self.path).query)
+            scenario_name = _first_query_value(query, "name")
+            task = _first_query_value(query, "task")
+            payload = evaluate_demo_scenarios(
+                names=[scenario_name] if scenario_name else None,
+                task_overrides={scenario_name: task} if scenario_name and task else None,
             )
         except UnknownDemoScenarioError as exc:
             self._send_json({"error": str(exc)}, status=404)

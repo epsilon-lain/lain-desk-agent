@@ -23,6 +23,7 @@ AI output remains a safe `no_op`.
 - AI Planner test harness
 - AI Planner runtime status fields
 - Planner Trace
+- Planner Evaluation Harness
 - Safety Gate
 - Action Contract
 - Click Readiness Policy
@@ -64,6 +65,8 @@ Goal: evaluate the optional `ai_proposal` planner while keeping it proposal-only
 - Fallback safely on missing API key, API call failure, malformed AI output,
   unknown action types, and unsafe executable action proposals.
 - Compare rule-based output against `ai_proposal` output.
+- Use the Planner Evaluation Harness to compare both planners on demo/read-only
+  scenarios without external LLM calls or desktop control.
 - Validate AI output quality across demo scenarios and live read-only
   observations.
 - Improve the planner prompt and payload shape.

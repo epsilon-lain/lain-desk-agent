@@ -116,7 +116,15 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
 }
 
 
-def run_demo_scenario(name: str = DEFAULT_DEMO_SCENARIO, task: str = "") -> dict[str, Any]:
+def demo_scenario_names() -> list[str]:
+    """Return built-in demo scenario names in deterministic order."""
+
+    return list(_SCENARIOS)
+
+
+def demo_scenario_input(name: str = DEFAULT_DEMO_SCENARIO, task: str = "") -> dict[str, Any]:
+    """Return a fake UI state and task without observing or planning."""
+
     scenario_name = str(name or DEFAULT_DEMO_SCENARIO)
     scenario = _SCENARIOS.get(scenario_name)
     if scenario is None:
@@ -125,6 +133,19 @@ def run_demo_scenario(name: str = DEFAULT_DEMO_SCENARIO, task: str = "") -> dict
     effective_task = str(task or scenario["default_task"])
     ui_state = deepcopy(scenario["ui_state"])
     ui_state["task"] = effective_task
+
+    return {
+        "scenario": scenario_name,
+        "task": effective_task,
+        "ui_state": ui_state,
+    }
+
+
+def run_demo_scenario(name: str = DEFAULT_DEMO_SCENARIO, task: str = "") -> dict[str, Any]:
+    scenario_input = demo_scenario_input(name, task=task)
+    scenario_name = scenario_input["scenario"]
+    effective_task = scenario_input["task"]
+    ui_state = scenario_input["ui_state"]
 
     proposal = propose(ui_state)
     safety_decision = assess_proposal(proposal)
