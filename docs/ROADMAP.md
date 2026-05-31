@@ -69,6 +69,9 @@ Goal: evaluate the optional `ai_proposal` planner while keeping it proposal-only
 - Use the Planner Evaluation Harness to compare both planners on demo/read-only
   scenarios without external LLM calls or desktop control.
 - Show demo evaluation reports in the cockpit as a read-only panel.
+- Summarize planner evaluation observations for strategy tuning, including
+  agreement, preview-only contracts, blocked click readiness, and read-only
+  risk hints.
 - Validate AI output quality across demo scenarios and live read-only
   observations.
 - Improve the planner prompt and payload shape.

@@ -37,6 +37,11 @@ def evaluate_demo_scenarios(
         "external_llm_calls": False,
         "scenario_count": len(scenarios),
         "summary": _report_summary(scenarios),
+        "report_notes": [
+            "risk_hint is a read-only label-level hint; it does not replace Safety Gate or Click Readiness.",
+            "preview-only click contracts do not make click executable.",
+            "switch_app preview contracts do not make app switching executable.",
+        ],
         "scenarios": scenarios,
     }
 
@@ -61,6 +66,15 @@ def evaluate_demo_scenario(name: str, task: str = "") -> dict[str, Any]:
     }
     differences = _compare_results(rule_based_result, ai_result_payload)
     notes = _scenario_notes(rule_based_result, ai_result_payload, planner_context, differences)
+    observation = _scenario_observation_record(
+        scenario_input["scenario"],
+        scenario_input["task"],
+        planner_context,
+        rule_based_result,
+        ai_result_payload,
+        differences,
+        notes,
+    )
 
     return {
         "scenario": scenario_input["scenario"],
@@ -75,6 +89,7 @@ def evaluate_demo_scenario(name: str, task: str = "") -> dict[str, Any]:
         "rule_based": rule_based_result,
         "ai_proposal": ai_result_payload,
         "differences": differences,
+        "observation": observation,
         "notes": notes,
     }
 
@@ -151,9 +166,11 @@ def _compact_action_contract(action_contract: dict[str, Any] | None) -> dict[str
     if not isinstance(action_contract, dict):
         return None
 
+    status = str(action_contract.get("status") or "")
     return {
         "type": str(action_contract.get("type") or ""),
-        "status": str(action_contract.get("status") or ""),
+        "status": status,
+        "preview_only": status == "preview_only",
         "executed": bool(action_contract.get("executed")),
         "target_label": str(action_contract.get("target_label") or ""),
         "target_app": str(action_contract.get("target_app") or ""),
@@ -242,8 +259,37 @@ def _report_summary(scenarios: list[dict[str, Any]]) -> dict[str, Any]:
         scenario["rule_based"]["safe_read_only"] and scenario["ai_proposal"]["safe_read_only"]
         for scenario in scenarios
     )
+    scenarios_with_risk_hints = [
+        scenario["scenario"]
+        for scenario in scenarios
+        if _scenario_observation(scenario).get("risk_hints")
+    ]
+    scenarios_with_preview_clicks = [
+        scenario["scenario"]
+        for scenario in scenarios
+        if _scenario_has_preview_contract(scenario, "click")
+    ]
+    scenarios_with_switch_app_previews = [
+        scenario["scenario"]
+        for scenario in scenarios
+        if _scenario_has_preview_contract(scenario, "switch_app")
+    ]
+    scenarios_with_blocked_click_readiness = [
+        scenario["scenario"]
+        for scenario in scenarios
+        if _scenario_has_blocked_click_readiness(scenario)
+    ]
 
     return {
+        "total_scenario_count": len(scenarios),
+        "consistent_scenario_count": len(scenarios) - differences_count,
+        "difference_count": differences_count,
+        "unsafe_ai_output_count": unsafe_ai_outputs,
+        "ai_rejection_count": ai_rejections,
+        "scenarios_with_risk_hints": scenarios_with_risk_hints,
+        "scenarios_with_preview_only_click_contracts": scenarios_with_preview_clicks,
+        "scenarios_with_switch_app_preview_contracts": scenarios_with_switch_app_previews,
+        "scenarios_with_blocked_click_readiness": scenarios_with_blocked_click_readiness,
         "consistent_count": len(scenarios) - differences_count,
         "differences_count": differences_count,
         "ai_rejections": ai_rejections,
@@ -317,6 +363,149 @@ def _proposal_action_type(proposal: dict[str, Any]) -> str:
 
 def _action_target(action: dict[str, Any]) -> str:
     return str(action.get("target_element_id") or action.get("target") or "")
+
+
+def _scenario_observation_record(
+    scenario_name: str,
+    task: str,
+    planner_context: dict[str, Any],
+    rule_based: dict[str, Any],
+    ai_proposal: dict[str, Any],
+    differences: dict[str, Any],
+    notes: list[str],
+) -> dict[str, Any]:
+    """Return a compact strategy-tuning observation for one scenario."""
+
+    risk_hints = [
+        hint
+        for hint in _grounding_hints(planner_context)
+        if hint.get("risk_hint") and hint.get("risk_hint") != "none"
+    ]
+
+    return {
+        "scenario": scenario_name,
+        "task": task,
+        "element_count": _visible_element_count(planner_context),
+        "risk_hints": risk_hints,
+        "rule_based": _observation_proposal_summary(rule_based),
+        "ai_proposal": _observation_proposal_summary(ai_proposal),
+        "agreement": {
+            "proposal_type": bool(differences.get("same_proposal_type")),
+            "target": bool(differences.get("same_target")),
+            "overall": bool(differences.get("same_proposal_type"))
+            and bool(differences.get("same_target")),
+        },
+        "safety_status": {
+            "rule_based": _observation_safety_summary(rule_based),
+            "ai_proposal": _observation_safety_summary(ai_proposal),
+        },
+        "action_contract": {
+            "rule_based": _observation_contract_summary(rule_based),
+            "ai_proposal": _observation_contract_summary(ai_proposal),
+        },
+        "click_readiness": {
+            "rule_based": _observation_click_readiness_summary(rule_based),
+            "ai_proposal": _observation_click_readiness_summary(ai_proposal),
+        },
+        "strategy_notes": notes,
+    }
+
+
+def _visible_element_count(planner_context: dict[str, Any]) -> int:
+    visible_elements = planner_context.get("visible_elements")
+    if not isinstance(visible_elements, dict):
+        return 0
+
+    count = visible_elements.get("count")
+    return count if isinstance(count, int) else 0
+
+
+def _observation_proposal_summary(result: dict[str, Any]) -> dict[str, Any]:
+    action = _result_action(result)
+    return {
+        "proposal_type": str(result.get("proposal_type") or action.get("type") or ""),
+        "target": _action_target(action),
+        "target_label": str(action.get("target_label") or ""),
+    }
+
+
+def _observation_safety_summary(result: dict[str, Any]) -> dict[str, Any]:
+    safety_decision = result.get("safety_decision")
+    if not isinstance(safety_decision, dict):
+        return {"decision": "unknown", "reason": ""}
+
+    return {
+        "decision": str(safety_decision.get("decision") or "unknown"),
+        "reason": str(safety_decision.get("reason") or ""),
+    }
+
+
+def _observation_contract_summary(result: dict[str, Any]) -> dict[str, Any]:
+    action_contract = result.get("action_contract")
+    if not isinstance(action_contract, dict):
+        return {
+            "type": "",
+            "status": "none",
+            "preview_only": False,
+            "executed": False,
+        }
+
+    status = str(action_contract.get("status") or "")
+    return {
+        "type": str(action_contract.get("type") or ""),
+        "status": status,
+        "preview_only": bool(action_contract.get("preview_only")) or status == "preview_only",
+        "executed": bool(action_contract.get("executed")),
+    }
+
+
+def _observation_click_readiness_summary(result: dict[str, Any]) -> dict[str, Any]:
+    click_readiness = result.get("click_readiness")
+    if not isinstance(click_readiness, dict):
+        return {
+            "status": "not_present",
+            "ready": False,
+            "reasons": [],
+        }
+
+    reasons = click_readiness.get("reasons")
+    return {
+        "status": str(click_readiness.get("status") or "unknown"),
+        "ready": bool(click_readiness.get("ready")),
+        "reasons": [str(reason) for reason in reasons] if isinstance(reasons, list) else [],
+    }
+
+
+def _scenario_observation(scenario: dict[str, Any]) -> dict[str, Any]:
+    observation = scenario.get("observation")
+    return observation if isinstance(observation, dict) else {}
+
+
+def _scenario_has_preview_contract(scenario: dict[str, Any], contract_type: str) -> bool:
+    observation = _scenario_observation(scenario)
+    contracts = observation.get("action_contract")
+    if not isinstance(contracts, dict):
+        return False
+
+    return any(
+        isinstance(contract, dict)
+        and contract.get("type") == contract_type
+        and contract.get("preview_only") is True
+        and contract.get("executed") is False
+        for contract in contracts.values()
+    )
+
+
+def _scenario_has_blocked_click_readiness(scenario: dict[str, Any]) -> bool:
+    observation = _scenario_observation(scenario)
+    readiness_by_planner = observation.get("click_readiness")
+    if not isinstance(readiness_by_planner, dict):
+        return False
+
+    return any(
+        isinstance(readiness, dict) and readiness.get("status") == "blocked"
+        for readiness in readiness_by_planner.values()
+    )
 
 
 def _ai_validation_accepted(result: dict[str, Any]) -> bool:

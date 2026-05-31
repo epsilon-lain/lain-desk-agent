@@ -1229,6 +1229,15 @@ button {
   border-color: rgba(255, 198, 109, 0.58);
 }
 
+.planner-evaluation-card[data-risk="true"] {
+  border-color: rgba(255, 115, 95, 0.78);
+  background: var(--danger-soft);
+}
+
+.planner-evaluation-card[data-risk="true"] .planner-evaluation-card-title {
+  color: #ffd6d0;
+}
+
 .planner-evaluation-card-title {
   margin: 0;
   color: var(--text);

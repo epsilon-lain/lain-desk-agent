@@ -1189,19 +1189,29 @@ function renderPlannerEvaluation(report = null) {
   const summary = report.summary ?? {};
   const scenarios = Array.isArray(report.scenarios) ? report.scenarios : [];
   const allSafe = summary.all_safe_read_only === true;
+  const totalScenarioCount = summary.total_scenario_count ?? report.scenario_count ?? scenarios.length;
+  const consistentScenarioCount = summary.consistent_scenario_count ?? summary.consistent_count ?? 0;
 
   plannerEvaluationPanel.dataset.state = allSafe ? "ready" : "warning";
   plannerEvaluationStatus.textContent =
-    "Demo-only comparison loaded. No live observation, LLM call, or desktop action.";
+    "Demo-only comparison loaded. risk_hint is label-level only; preview contracts are not executable.";
   plannerEvaluationSummary.hidden = false;
   setPlannerEvaluationSummary([
-    ["Scenarios", String(report.scenario_count ?? scenarios.length)],
-    ["Consistent", String(summary.consistent_count ?? "unknown")],
-    ["Differences", String(summary.differences_count ?? "unknown")],
-    ["AI rejections", String(summary.ai_rejections ?? "unknown")],
-    ["Unsafe AI outputs", String(summary.unsafe_ai_outputs ?? "unknown")],
+    ["Scenarios", String(totalScenarioCount)],
+    ["Agreement", `${consistentScenarioCount}/${totalScenarioCount} scenarios`],
+    ["Differences", String(summary.difference_count ?? summary.differences_count ?? "unknown")],
+    ["AI rejections", String(summary.ai_rejection_count ?? summary.ai_rejections ?? "unknown")],
+    ["Unsafe AI outputs", String(summary.unsafe_ai_output_count ?? summary.unsafe_ai_outputs ?? "unknown")],
+    ["Risk hints", formatEvaluationScenarioList(summary.scenarios_with_risk_hints)],
+    ["Preview clicks", formatEvaluationScenarioList(summary.scenarios_with_preview_only_click_contracts)],
+    ["Switch previews", formatEvaluationScenarioList(summary.scenarios_with_switch_app_preview_contracts)],
+    ["Blocked readiness", formatEvaluationScenarioList(summary.scenarios_with_blocked_click_readiness)],
     ["External LLM calls", report.external_llm_calls ? "yes" : "no"],
     ["Safe read-only", allSafe ? "yes" : "check report"],
+    [
+      "Boundary",
+      "risk_hint does not replace Safety Gate or Click Readiness; click/switch_app previews are not executable",
+    ],
   ]);
 
   if (!scenarios.length) {
@@ -1237,13 +1247,17 @@ function plannerEvaluationScenarioCard(scenario) {
   const title = document.createElement("p");
   const facts = document.createElement("dl");
   const differences = scenario.differences ?? {};
+  const hasRiskHint = hasEvaluationRiskHint(scenario);
 
   card.className = "planner-evaluation-card";
   card.dataset.different = String(
     differences.same_proposal_type === false || differences.same_target === false
   );
+  card.dataset.risk = String(hasRiskHint);
   title.className = "planner-evaluation-card-title";
-  title.textContent = scenario.scenario || "unknown scenario";
+  title.textContent = hasRiskHint
+    ? `${scenario.scenario || "unknown scenario"} - high-risk grounding hint`
+    : scenario.scenario || "unknown scenario";
   facts.className = "planner-evaluation-facts";
 
   for (const [label, value] of plannerEvaluationRows(scenario)) {
@@ -1256,19 +1270,24 @@ function plannerEvaluationScenarioCard(scenario) {
 
 function plannerEvaluationRows(scenario) {
   const inputs = scenario.inputs ?? {};
+  const observation = scenario.observation ?? {};
   const visibleElements = inputs.visible_elements ?? {};
+  const elementCount = Number.isFinite(observation.element_count)
+    ? String(observation.element_count)
+    : compactCountWithTruncation(visibleElements);
 
   return [
-    ["Task", inputs.task || "none"],
-    ["Elements", compactCountWithTruncation(visibleElements)],
+    ["Task", observation.task || inputs.task || "none"],
+    ["Elements", elementCount],
     ["Risk hints", formatEvaluationRiskHints(scenario)],
+    ["Agreement", formatEvaluationAgreement(scenario)],
     ["Rule-based", formatEvaluationProposal(scenario.rule_based)],
     ["AI proposal", formatEvaluationProposal(scenario.ai_proposal)],
     ["Safety", formatEvaluationPair(scenario, formatEvaluationSafety)],
     ["Contract", formatEvaluationPair(scenario, formatEvaluationContract)],
     ["Readiness", formatEvaluationPair(scenario, formatEvaluationReadiness)],
     ["Differences", formatEvaluationNotes(scenario.differences?.notes)],
-    ["Notes", formatEvaluationNotes(scenario.notes)],
+    ["Strategy notes", formatEvaluationNotes(observation.strategy_notes ?? scenario.notes)],
   ];
 }
 
@@ -1290,8 +1309,37 @@ function plannerEvaluationEmptyState(text = "Load the demo report to compare pla
   return empty;
 }
 
+function formatEvaluationScenarioList(names) {
+  if (!Array.isArray(names) || !names.length) {
+    return "none";
+  }
+
+  return names.join(", ");
+}
+
 function formatEvaluationPair(scenario, formatter) {
   return `rule ${formatter(scenario.rule_based)}; ai ${formatter(scenario.ai_proposal)}`;
+}
+
+function formatEvaluationAgreement(scenario) {
+  const agreement = scenario.observation?.agreement;
+  if (agreement?.overall === true) {
+    return "rule-based and ai_proposal agree";
+  }
+
+  if (agreement?.overall === false) {
+    const mismatches = [];
+    if (agreement.proposal_type === false) {
+      mismatches.push("proposal type");
+    }
+    if (agreement.target === false) {
+      mismatches.push("target");
+    }
+    return `differs on ${mismatches.length ? mismatches.join(", ") : "output"}`;
+  }
+
+  const differences = scenario.differences ?? {};
+  return differences.same_proposal_type && differences.same_target ? "agree" : "differs";
 }
 
 function formatEvaluationProposal(result = {}) {
@@ -1319,7 +1367,11 @@ function formatEvaluationContract(result = {}) {
     return "none";
   }
 
-  return `${actionContract.type || "unknown"} / ${actionContract.status || "unknown"} / executed ${
+  const preview = actionContract.preview_only || actionContract.status === "preview_only"
+    ? "preview-only, not executable"
+    : actionContract.status || "unknown";
+
+  return `${actionContract.type || "unknown"} / ${preview} / executed ${
     actionContract.executed ? "yes" : "no"
   }`;
 }
@@ -1340,9 +1392,11 @@ function formatEvaluationReadiness(result = {}) {
 }
 
 function formatEvaluationRiskHints(scenario) {
-  const hints = Array.isArray(scenario.inputs?.grounding_hints)
-    ? scenario.inputs.grounding_hints
-    : [];
+  const hints = Array.isArray(scenario.observation?.risk_hints)
+    ? scenario.observation.risk_hints
+    : Array.isArray(scenario.inputs?.grounding_hints)
+      ? scenario.inputs.grounding_hints
+      : [];
   const riskyHints = hints.filter((hint) => hint.risk_hint && hint.risk_hint !== "none");
 
   if (!riskyHints.length) {
@@ -1350,8 +1404,16 @@ function formatEvaluationRiskHints(scenario) {
   }
 
   return riskyHints
-    .map((hint) => `${hint.label || hint.id || "element"}: ${hint.risk_hint}`)
+    .map((hint) => `${hint.label || hint.id || "element"}: ${hint.risk_hint} read-only label hint`)
     .join("; ");
+}
+
+function hasEvaluationRiskHint(scenario) {
+  const hints = Array.isArray(scenario.observation?.risk_hints)
+    ? scenario.observation.risk_hints
+    : [];
+
+  return hints.some((hint) => hint.risk_hint && hint.risk_hint !== "none");
 }
 
 function formatEvaluationNotes(notes) {

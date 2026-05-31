@@ -20,6 +20,11 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         self.assertEqual(report["source"], "demo_scenarios")
         self.assertIs(report["external_llm_calls"], False)
         self.assertEqual(report["scenario_count"], 4)
+        self.assertEqual(report["summary"]["total_scenario_count"], 4)
+        self.assertEqual(report["summary"]["consistent_scenario_count"], 4)
+        self.assertEqual(report["summary"]["difference_count"], 0)
+        self.assertEqual(report["summary"]["unsafe_ai_output_count"], 0)
+        self.assertEqual(report["summary"]["ai_rejection_count"], 0)
         self.assertEqual(report["summary"]["unsafe_ai_outputs"], 0)
         self.assertEqual(report["summary"]["ai_rejections"], 0)
         self.assertIs(report["summary"]["all_safe_read_only"], True)
@@ -33,19 +38,73 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         self.assertEqual(scenarios["app_mismatch"]["rule_based"]["proposal_type"], "switch_app_hint")
         self.assertEqual(scenarios["app_mismatch"]["ai_proposal"]["proposal_type"], "switch_app_hint")
 
+    def test_summary_records_risk_and_preview_groups(self) -> None:
+        report = evaluate_demo_scenarios()
+        summary = report["summary"]
+
+        self.assertEqual(
+            summary["scenarios_with_risk_hints"],
+            ["dangerous_send", "dangerous_delete"],
+        )
+        self.assertEqual(
+            summary["scenarios_with_preview_only_click_contracts"],
+            ["browser_search", "dangerous_send", "dangerous_delete"],
+        )
+        self.assertEqual(
+            summary["scenarios_with_switch_app_preview_contracts"],
+            ["app_mismatch"],
+        )
+        self.assertEqual(
+            summary["scenarios_with_blocked_click_readiness"],
+            ["browser_search", "dangerous_send", "dangerous_delete"],
+        )
+
     def test_report_captures_visible_elements_and_risk_hints(self) -> None:
         scenario = evaluate_demo_scenario("dangerous_delete")
         visible_elements = scenario["inputs"]["visible_elements"]
         grounding_hints = scenario["inputs"]["grounding_hints"]
+        observation = scenario["observation"]
 
         self.assertEqual(visible_elements["count"], 1)
         self.assertEqual(visible_elements["items"][0]["label"], "Delete")
         self.assertEqual(visible_elements["items"][0]["source"], "demo")
         self.assertEqual(visible_elements["items"][0]["risk_hint"], "high")
         self.assertEqual(grounding_hints[0]["risk_hint"], "high")
+        self.assertEqual(observation["element_count"], 1)
+        self.assertEqual(observation["risk_hints"][0]["label"], "Delete")
+        self.assertEqual(observation["risk_hints"][0]["risk_hint"], "high")
         self.assertIn("visible_elements include high-risk grounding hints", scenario["notes"])
         self.assertIn("high-risk target label", scenario["rule_based"]["click_readiness"]["reasons"])
         self.assertIn("high-risk target label", scenario["ai_proposal"]["click_readiness"]["reasons"])
+
+    def test_browser_search_has_no_risk_hint(self) -> None:
+        scenario = evaluate_demo_scenario("browser_search")
+
+        self.assertEqual(scenario["observation"]["risk_hints"], [])
+        self.assertEqual(scenario["inputs"]["grounding_hints"][0]["risk_hint"], "none")
+
+    def test_app_mismatch_records_switch_app_preview_contract(self) -> None:
+        scenario = evaluate_demo_scenario("app_mismatch")
+        observation = scenario["observation"]
+
+        self.assertEqual(observation["rule_based"]["proposal_type"], "switch_app_hint")
+        self.assertEqual(observation["ai_proposal"]["proposal_type"], "switch_app_hint")
+        self.assertEqual(observation["action_contract"]["rule_based"]["type"], "switch_app")
+        self.assertEqual(observation["action_contract"]["ai_proposal"]["type"], "switch_app")
+        self.assertIs(observation["action_contract"]["rule_based"]["preview_only"], True)
+        self.assertIs(observation["action_contract"]["ai_proposal"]["preview_only"], True)
+        self.assertIs(observation["action_contract"]["rule_based"]["executed"], False)
+        self.assertIs(observation["action_contract"]["ai_proposal"]["executed"], False)
+
+    def test_rule_based_and_ai_agreement_is_recorded(self) -> None:
+        report = evaluate_demo_scenarios()
+
+        for scenario in report["scenarios"]:
+            with self.subTest(scenario=scenario["scenario"]):
+                agreement = scenario["observation"]["agreement"]
+                self.assertIs(agreement["proposal_type"], True)
+                self.assertIs(agreement["target"], True)
+                self.assertIs(agreement["overall"], True)
 
     def test_all_outputs_pass_existing_safety_surfaces_without_execution(self) -> None:
         report = evaluate_demo_scenarios()
@@ -76,6 +135,15 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
 
         self.assertEqual(first, second)
 
+    def test_evaluation_does_not_trigger_execution(self) -> None:
+        with patch(
+            "lain_desk_agent.actuation.execute_action_contract",
+            side_effect=AssertionError("execution called"),
+        ):
+            report = evaluate_demo_scenarios()
+
+        self.assertIs(report["summary"]["all_safe_read_only"], True)
+
     def test_demo_endpoint_returns_report_without_observing(self) -> None:
         server = create_server("127.0.0.1", 0)
         host, port = server.server_address
@@ -99,8 +167,10 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
 
         self.assertEqual(payload["scenario_count"], 4)
         self.assertIs(payload["summary"]["all_safe_read_only"], True)
+        self.assertEqual(payload["summary"]["scenarios_with_risk_hints"], ["dangerous_send", "dangerous_delete"])
         self.assertEqual(payload["scenarios"][0]["rule_based"]["proposal_type"], "target_hint")
         self.assertEqual(payload["scenarios"][0]["ai_proposal"]["proposal_type"], "target_hint")
+        self.assertIn("observation", payload["scenarios"][0])
 
 
 if __name__ == "__main__":
