@@ -593,6 +593,43 @@ button {
   display: none;
 }
 
+.click-readiness-debug {
+  min-width: 0;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.click-readiness-debug[hidden] {
+  display: none;
+}
+
+.click-readiness-debug summary,
+.planner-evaluation-readiness-debug summary {
+  cursor: pointer;
+  color: var(--blue);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.click-readiness-debug pre,
+.planner-evaluation-readiness-debug pre {
+  max-height: 220px;
+  margin: 8px 0 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid rgba(134, 184, 220, 0.2);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(1, 5, 10, 0.62);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .click-readiness-checks-title,
 .planner-evaluation-readiness-title {
   margin: 0 0 8px;
@@ -1362,6 +1399,13 @@ button {
 
 .planner-evaluation-readiness-group + .planner-evaluation-readiness-group {
   margin-top: 8px;
+}
+
+.planner-evaluation-readiness-debug {
+  min-width: 0;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .dry-run-preview {

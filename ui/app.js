@@ -18,6 +18,8 @@ const clickReadinessPanel = document.querySelector("#clickReadinessPanel");
 const clickReadinessSummary = document.querySelector("#clickReadinessSummary");
 const clickReadinessReasons = document.querySelector("#clickReadinessReasons");
 const clickReadinessChecks = document.querySelector("#clickReadinessChecks");
+const clickReadinessDebug = document.querySelector("#clickReadinessDebug");
+const clickReadinessDebugJson = document.querySelector("#clickReadinessDebugJson");
 const runtimeProfile = document.querySelector("#runtimeProfile");
 const runtimePlanner = document.querySelector("#runtimePlanner");
 const runtimeDesktopControl = document.querySelector("#runtimeDesktopControl");
@@ -509,10 +511,11 @@ function renderActionContract(actionContract = null, action = null) {
   ]);
 }
 
-function renderClickReadiness(clickReadiness = null, actionContract = null) {
+function renderClickReadiness(clickReadiness = null, actionContract = null, proposal = null) {
   clickReadinessReasons.replaceChildren();
   clickReadinessReasons.hidden = true;
   renderReadinessChecks(clickReadinessChecks, null);
+  renderReadinessDebugSummary(clickReadinessDebug, clickReadinessDebugJson, null);
   const isClickContract = actionContract?.type === "click";
   const status = clickReadiness?.status || "not_applicable";
 
@@ -540,6 +543,11 @@ function renderClickReadiness(clickReadiness = null, actionContract = null) {
   }
 
   renderReadinessChecks(clickReadinessChecks, clickReadiness, "Read-only diagnostics");
+  renderReadinessDebugSummary(
+    clickReadinessDebug,
+    clickReadinessDebugJson,
+    buildReadinessDebugSummary({ proposal, actionContract, clickReadiness })
+  );
 }
 
 function renderReadinessChecks(container, clickReadiness, title = "Readiness checks") {
@@ -564,6 +572,66 @@ function renderReadinessChecks(container, clickReadiness, title = "Readiness che
 
   container.hidden = false;
   container.append(heading, list);
+}
+
+function renderReadinessDebugSummary(details, pre, summary) {
+  details.hidden = true;
+  pre.textContent = "{}";
+
+  if (!summary) {
+    return;
+  }
+
+  details.hidden = false;
+  pre.textContent = JSON.stringify(summary, null, 2);
+}
+
+function buildReadinessDebugSummary({
+  planner = "",
+  proposal = null,
+  actionContract = null,
+  clickReadiness = null,
+} = {}) {
+  if (!clickReadiness || typeof clickReadiness !== "object") {
+    return null;
+  }
+
+  const action = proposal?.action ?? {};
+  const reasons = Array.isArray(clickReadiness.reasons)
+    ? clickReadiness.reasons.map((reason) => String(reason))
+    : [];
+  const checks = Array.isArray(clickReadiness.checks)
+    ? clickReadiness.checks.map((check) => readinessDebugCheck(check, clickReadiness))
+    : [];
+  const summary = {
+    proposal_id: String(proposal?.proposal_id || actionContract?.source_proposal_id || ""),
+    contract_type: String(actionContract?.type || ""),
+    target_label: String(actionContract?.target_label || action.target_label || ""),
+    status: String(clickReadiness.status || "not_applicable"),
+    ready: Boolean(clickReadiness.ready),
+    risk: String(clickReadiness.risk || "unknown"),
+    reasons,
+    checks,
+    note: "Read-only diagnostics. Blocked readiness means click is not executable.",
+  };
+
+  if (planner) {
+    summary.planner = planner;
+  }
+
+  return summary;
+}
+
+function readinessDebugCheck(check, clickReadiness = {}) {
+  const status = normalizeReadinessCheckStatus(check?.status);
+  const reason = check?.reason ? displayReadinessReason(check.reason) : readinessCheckFallbackReason(status);
+
+  return {
+    name: String(check?.name || "unknown_check"),
+    status,
+    reason,
+    severity: readinessCheckSeverity(check, clickReadiness),
+  };
 }
 
 function readinessCheckItem(check, clickReadiness = {}) {
@@ -1518,8 +1586,28 @@ function plannerEvaluationReadinessDiagnostics(scenario) {
 
   for (const [plannerName, clickReadiness] of groups) {
     const group = document.createElement("div");
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    const pre = document.createElement("pre");
+    const resultKey = plannerName === "rule-based" ? "rule_based" : plannerName;
+    const result = scenario[resultKey] ?? {};
+
     group.className = "planner-evaluation-readiness-group";
     renderReadinessChecks(group, clickReadiness, `${plannerName} checks`);
+    details.className = "planner-evaluation-readiness-debug";
+    summary.textContent = `${plannerName} debug JSON`;
+    pre.textContent = JSON.stringify(
+      buildReadinessDebugSummary({
+        planner: plannerName,
+        proposal: result.proposal ?? null,
+        actionContract: result.action_contract ?? null,
+        clickReadiness,
+      }),
+      null,
+      2
+    );
+    details.append(summary, pre);
+    group.appendChild(details);
     container.appendChild(group);
   }
 
@@ -2189,7 +2277,11 @@ taskForm.addEventListener("submit", async (event) => {
     setDetailsFromUiState(payload.ui_state ?? {});
     setDetailsFromProposal(payload.proposal ?? {});
     setDetailsFromActionContract(payload.action_contract ?? null, payload.proposal?.action ?? null);
-    renderClickReadiness(payload.click_readiness ?? null, payload.action_contract ?? null);
+    renderClickReadiness(
+      payload.click_readiness ?? null,
+      payload.action_contract ?? null,
+      payload.proposal ?? null
+    );
     renderPlannerTrace(payload.planner_trace ?? null);
     setDetailsFromSafetyDecision(payload.safety_decision ?? {});
     currentProposal = payload.proposal ?? null;

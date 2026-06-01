@@ -37,6 +37,10 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         self.assertEqual(scenarios["browser_search"]["ai_proposal"]["proposal_type"], "target_hint")
         self.assertTrue(scenarios["browser_search"]["rule_based"]["click_readiness"]["checks"])
         self.assertTrue(scenarios["browser_search"]["ai_proposal"]["click_readiness"]["checks"])
+        self.assertIn(
+            "preview-only contract",
+            scenarios["browser_search"]["rule_based"]["click_readiness"]["reasons"],
+        )
         self.assertEqual(scenarios["app_mismatch"]["rule_based"]["proposal_type"], "switch_app_hint")
         self.assertEqual(scenarios["app_mismatch"]["ai_proposal"]["proposal_type"], "switch_app_hint")
 
