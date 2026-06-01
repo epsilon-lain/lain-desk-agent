@@ -569,8 +569,106 @@ button {
   line-height: 1.35;
 }
 
+.click-readiness-reasons li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.click-readiness-reasons li[data-severity="high"] {
+  color: #ffd6d0;
+}
+
 .click-readiness-reasons[hidden] {
   display: none;
+}
+
+.click-readiness-checks {
+  min-width: 0;
+  margin-top: 12px;
+  border-top: 1px solid rgba(134, 184, 220, 0.18);
+  padding-top: 10px;
+}
+
+.click-readiness-checks[hidden] {
+  display: none;
+}
+
+.click-readiness-checks-title,
+.planner-evaluation-readiness-title {
+  margin: 0 0 8px;
+  color: var(--blue);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.click-readiness-check-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.click-readiness-check {
+  display: grid;
+  grid-template-columns: minmax(74px, 0.9fr) auto auto minmax(0, 1.4fr);
+  gap: 6px;
+  align-items: start;
+  min-width: 0;
+  border: 1px solid rgba(134, 184, 220, 0.18);
+  border-radius: 8px;
+  padding: 6px;
+  background: rgba(5, 13, 22, 0.42);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.click-readiness-check[data-status="blocked"] {
+  border-color: rgba(255, 115, 95, 0.58);
+}
+
+.click-readiness-check[data-status="passed"] {
+  border-color: rgba(135, 244, 255, 0.26);
+}
+
+.click-readiness-check[data-severity="high"] {
+  background: rgba(255, 115, 95, 0.14);
+}
+
+.click-readiness-check-name,
+.click-readiness-check-reason {
+  min-width: 0;
+}
+
+.click-readiness-check-name {
+  color: var(--text);
+}
+
+.click-readiness-check-status,
+.click-readiness-check-severity {
+  min-width: 0;
+  border: 1px solid rgba(134, 184, 220, 0.24);
+  border-radius: 999px;
+  padding: 1px 6px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.click-readiness-check[data-status="blocked"] .click-readiness-check-status,
+.click-readiness-check[data-severity="high"] .click-readiness-check-severity {
+  border-color: rgba(255, 115, 95, 0.64);
+  color: #ffd6d0;
+}
+
+.click-readiness-check[data-status="passed"] .click-readiness-check-status {
+  border-color: rgba(135, 244, 255, 0.34);
+  color: var(--accent);
+}
+
+.click-readiness-check-reason {
+  color: var(--muted);
 }
 
 .runtime-status-panel {
@@ -1251,6 +1349,21 @@ button {
   gap: 8px;
 }
 
+.planner-evaluation-readiness-diagnostics {
+  min-width: 0;
+  margin-top: 10px;
+  border-top: 1px solid rgba(134, 184, 220, 0.18);
+  padding-top: 10px;
+}
+
+.planner-evaluation-readiness-group {
+  min-width: 0;
+}
+
+.planner-evaluation-readiness-group + .planner-evaluation-readiness-group {
+  margin-top: 8px;
+}
+
 .dry-run-preview {
   margin: 0 0 16px;
   border: 1px solid rgba(134, 184, 220, 0.3);
@@ -1726,7 +1839,8 @@ button {
   .planner-trace-facts,
   .planner-evaluation-header,
   .planner-evaluation-summary,
-  .planner-evaluation-facts div {
+  .planner-evaluation-facts div,
+  .click-readiness-check {
     grid-template-columns: 1fr;
   }
 

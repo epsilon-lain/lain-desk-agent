@@ -105,7 +105,7 @@ Goal: improve `visible_elements` without adding desktop control.
 ## Phase 6: Click Readiness Hardening
 
 Status: started with structured readiness checks for preview-only click
-contracts.
+contracts and Cockpit visibility for readiness diagnostics.
 
 Goal: make preview-only click contracts safer before any real click experiment.
 
@@ -113,6 +113,8 @@ Goal: make preview-only click contracts safer before any real click experiment.
 - Add stale observation checks.
 - Add coordinate and DPI checks.
 - Improve bbox and center validation.
+- Show structured readiness diagnostics in the Cockpit for live proposals and
+  planner evaluation reports.
 - Keep real click disabled by default.
 - Keep click readiness as a blocker, not a permission grant.
 

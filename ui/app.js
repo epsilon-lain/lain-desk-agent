@@ -17,6 +17,7 @@ const actionContractFacts = document.querySelector("#actionContractFacts");
 const clickReadinessPanel = document.querySelector("#clickReadinessPanel");
 const clickReadinessSummary = document.querySelector("#clickReadinessSummary");
 const clickReadinessReasons = document.querySelector("#clickReadinessReasons");
+const clickReadinessChecks = document.querySelector("#clickReadinessChecks");
 const runtimeProfile = document.querySelector("#runtimeProfile");
 const runtimePlanner = document.querySelector("#runtimePlanner");
 const runtimeDesktopControl = document.querySelector("#runtimeDesktopControl");
@@ -511,6 +512,7 @@ function renderActionContract(actionContract = null, action = null) {
 function renderClickReadiness(clickReadiness = null, actionContract = null) {
   clickReadinessReasons.replaceChildren();
   clickReadinessReasons.hidden = true;
+  renderReadinessChecks(clickReadinessChecks, null);
   const isClickContract = actionContract?.type === "click";
   const status = clickReadiness?.status || "not_applicable";
 
@@ -521,19 +523,209 @@ function renderClickReadiness(clickReadiness = null, actionContract = null) {
   }
 
   clickReadinessPanel.dataset.state = status;
-  clickReadinessSummary.textContent = `Click readiness: ${status}`;
+  clickReadinessSummary.textContent =
+    status === "blocked"
+      ? "Click readiness: blocked; click is not executable."
+      : `Click readiness: ${status}. Diagnostics are read-only.`;
 
   const reasons = Array.isArray(clickReadiness.reasons) ? clickReadiness.reasons : [];
-  if (!reasons.length) {
+  if (reasons.length) {
+    clickReadinessReasons.hidden = false;
+    for (const reason of reasons) {
+      const item = document.createElement("li");
+      item.dataset.severity = readinessReasonSeverity(reason, clickReadiness);
+      item.textContent = displayReadinessReason(reason);
+      clickReadinessReasons.appendChild(item);
+    }
+  }
+
+  renderReadinessChecks(clickReadinessChecks, clickReadiness, "Read-only diagnostics");
+}
+
+function renderReadinessChecks(container, clickReadiness, title = "Readiness checks") {
+  container.replaceChildren();
+  container.hidden = true;
+
+  const checks = Array.isArray(clickReadiness?.checks) ? clickReadiness.checks : [];
+  if (!checks.length) {
     return;
   }
 
-  clickReadinessReasons.hidden = false;
-  for (const reason of reasons) {
-    const item = document.createElement("li");
-    item.textContent = reason;
-    clickReadinessReasons.appendChild(item);
+  const heading = document.createElement("p");
+  const list = document.createElement("ul");
+
+  heading.className = "click-readiness-checks-title";
+  heading.textContent = title;
+  list.className = "click-readiness-check-list";
+
+  for (const check of checks) {
+    list.appendChild(readinessCheckItem(check, clickReadiness));
   }
+
+  container.hidden = false;
+  container.append(heading, list);
+}
+
+function readinessCheckItem(check, clickReadiness = {}) {
+  const item = document.createElement("li");
+  const checkName = document.createElement("span");
+  const checkStatus = document.createElement("span");
+  const checkSeverity = document.createElement("span");
+  const checkReason = document.createElement("span");
+  const status = normalizeReadinessCheckStatus(check?.status);
+  const severity = readinessCheckSeverity(check, clickReadiness);
+  const reason = check?.reason ? displayReadinessReason(check.reason) : readinessCheckFallbackReason(status);
+
+  item.className = "click-readiness-check";
+  item.dataset.status = status;
+  item.dataset.severity = severity;
+  checkName.className = "click-readiness-check-name";
+  checkStatus.className = "click-readiness-check-status";
+  checkSeverity.className = "click-readiness-check-severity";
+  checkReason.className = "click-readiness-check-reason";
+
+  checkName.textContent = displayReadinessCheckName(check?.name);
+  checkStatus.textContent = displayReadinessCheckStatus(status);
+  checkSeverity.textContent = severity === "none" ? "" : severity;
+  checkReason.textContent = reason;
+
+  item.append(checkName, checkStatus);
+  if (severity !== "none") {
+    item.appendChild(checkSeverity);
+  }
+  item.appendChild(checkReason);
+  return item;
+}
+
+function displayReadinessCheckName(name) {
+  const labels = {
+    action_contract_present: "action contract",
+    click_contract: "click contract",
+    contract_status: "contract status",
+    not_executed: "not executed",
+    bbox_present: "bbox present",
+    bbox_shape: "bbox shape",
+    bbox_screen_bounds: "screen bounds",
+    center_shape: "center",
+    observation_freshness: "observation freshness",
+    click_capability: "click capability",
+    permission_profile: "permission profile",
+    safety_decision: "safety decision",
+    target_label_risk: "target label risk",
+  };
+
+  return labels[name] || String(name || "unknown check").replaceAll("_", " ");
+}
+
+function normalizeReadinessCheckStatus(status) {
+  const normalized = String(status || "unknown").replace("-", "_");
+
+  if (normalized === "passed" || normalized === "pass") {
+    return "passed";
+  }
+
+  if (normalized === "blocked" || normalized === "failed") {
+    return "blocked";
+  }
+
+  if (normalized === "not_applicable") {
+    return "not_applicable";
+  }
+
+  return normalized || "unknown";
+}
+
+function displayReadinessCheckStatus(status) {
+  if (status === "passed") {
+    return "pass";
+  }
+
+  if (status === "not_applicable") {
+    return "not applicable";
+  }
+
+  return displayRuntimeActuation(status);
+}
+
+function readinessCheckSeverity(check, clickReadiness = {}) {
+  const reason = String(check?.reason || "").toLowerCase();
+  const name = String(check?.name || "");
+  const status = normalizeReadinessCheckStatus(check?.status);
+
+  if (status !== "blocked") {
+    return "none";
+  }
+
+  if (reason.includes("high-risk") || name === "target_label_risk" || clickReadiness.risk === "high") {
+    return "high";
+  }
+
+  if (
+    reason.includes("preview-only") ||
+    reason.includes("capability") ||
+    reason.includes("permission profile") ||
+    reason.includes("bbox") ||
+    reason.includes("stale")
+  ) {
+    return "medium";
+  }
+
+  return clickReadiness.risk === "medium" ? "medium" : "low";
+}
+
+function readinessReasonSeverity(reason, clickReadiness = {}) {
+  return readinessCheckSeverity({ status: "blocked", reason }, clickReadiness);
+}
+
+function displayReadinessReason(reason) {
+  const text = String(reason || "");
+  const lower = text.toLowerCase();
+
+  if (lower.includes("high-risk target label")) {
+    return "high-risk target label; read-only blocker";
+  }
+
+  if (lower.includes("preview-only contract")) {
+    return "preview-only contract; never executable";
+  }
+
+  if (lower.includes("click capability disabled")) {
+    return "click capability disabled; click is not executable";
+  }
+
+  if (lower.includes("permission profile does not allow click")) {
+    return "permission profile does not allow click execution";
+  }
+
+  if (lower.includes("missing bbox")) {
+    return "missing bbox; no target geometry";
+  }
+
+  if (lower.includes("malformed bbox")) {
+    return "malformed bbox; target geometry is invalid";
+  }
+
+  if (lower.includes("bbox outside screen bounds")) {
+    return "bbox outside screen bounds";
+  }
+
+  if (lower.includes("stale observation")) {
+    return "stale observation; target may have moved";
+  }
+
+  return text || "No reason provided.";
+}
+
+function readinessCheckFallbackReason(status) {
+  if (status === "passed") {
+    return "passed";
+  }
+
+  if (status === "not_applicable") {
+    return "not applicable";
+  }
+
+  return "no reason provided";
 }
 
 function waitDurationMs(actionContract) {
@@ -1265,6 +1457,10 @@ function plannerEvaluationScenarioCard(scenario) {
   }
 
   card.append(title, facts);
+  const diagnostics = plannerEvaluationReadinessDiagnostics(scenario);
+  if (diagnostics) {
+    card.appendChild(diagnostics);
+  }
   return card;
 }
 
@@ -1300,6 +1496,34 @@ function plannerEvaluationFact(label, value) {
   detail.textContent = value;
   row.append(term, detail);
   return row;
+}
+
+function plannerEvaluationReadinessDiagnostics(scenario) {
+  const groups = [
+    ["rule-based", scenario.rule_based?.click_readiness],
+    ["ai_proposal", scenario.ai_proposal?.click_readiness],
+  ].filter(([, clickReadiness]) => Array.isArray(clickReadiness?.checks) && clickReadiness.checks.length);
+
+  if (!groups.length) {
+    return null;
+  }
+
+  const container = document.createElement("div");
+  const title = document.createElement("p");
+
+  container.className = "planner-evaluation-readiness-diagnostics";
+  title.className = "planner-evaluation-readiness-title";
+  title.textContent = "Readiness diagnostics";
+  container.appendChild(title);
+
+  for (const [plannerName, clickReadiness] of groups) {
+    const group = document.createElement("div");
+    group.className = "planner-evaluation-readiness-group";
+    renderReadinessChecks(group, clickReadiness, `${plannerName} checks`);
+    container.appendChild(group);
+  }
+
+  return container;
 }
 
 function plannerEvaluationEmptyState(text = "Load the demo report to compare planner outputs.") {
