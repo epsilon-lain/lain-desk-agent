@@ -70,14 +70,25 @@ python -m lain_desk_agent.main --port 8010
 
 ## Run Tests
 
+Run the local verification script:
+
+```powershell
+.\scripts\verify.ps1
+```
+
+Manual equivalent:
+
 ```powershell
 python -m compileall src tests
 python -m unittest discover -s tests
 node --check ui/app.js
+python scripts/safety_scan.py
 git diff --check
 ```
 
-The GitHub Actions CI runs the same core checks on push and pull request.
+The safety scan checks runtime code under `src/` for obvious real desktop
+actuation calls. The GitHub Actions CI runs the same core compile, test, and
+JavaScript parse checks on push and pull request.
 
 ## Verify Proposal-only / Wait-only Behavior
 

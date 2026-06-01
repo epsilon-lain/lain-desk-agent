@@ -171,6 +171,7 @@ Before committing safety-sensitive changes, run:
 python -m compileall src tests
 python -m unittest discover -s tests
 node --check ui/app.js
+python scripts/safety_scan.py
 git diff --check
 ```
 
@@ -179,7 +180,8 @@ Verify `/execute` still rejects click contracts with HTTP `403`.
 Search for accidental desktop actuation additions:
 
 ```powershell
-rg -n "pyautogui\.(click|move|write|press|hotkey|scroll)|moveTo\(|typewrite\(|hotkey\(|press\(|scroll\(" src tests ui
+python scripts/safety_scan.py
 ```
 
-No matches should appear for real mouse or keyboard actuation calls.
+The scan should report no forbidden runtime desktop actuation calls under
+`src/`.

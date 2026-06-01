@@ -12,12 +12,19 @@ Use this checklist before committing or pushing changes.
 git diff -- src tests ui docs
 ```
 
-4. Run the standard verification commands:
+4. Run the standard verification command:
+
+```powershell
+.\scripts\verify.ps1
+```
+
+The script runs:
 
 ```powershell
 python -m compileall src tests
 python -m unittest discover -s tests
 node --check ui/app.js
+python scripts/safety_scan.py
 git diff --check
 ```
 
@@ -26,6 +33,7 @@ Success means:
 - Python sources and tests compile.
 - Unit tests pass.
 - UI JavaScript parses.
+- Safety scan finds no runtime desktop actuation calls.
 - Git reports no whitespace errors.
 
 ## Safety Boundary Checks
@@ -44,10 +52,11 @@ The current hard boundary must remain true:
 Search for accidental real desktop actuation:
 
 ```powershell
-rg -n "pyautogui\.(click|move|write|press|hotkey|scroll)|moveTo\(|typewrite\(|hotkey\(|press\(|scroll\(" src tests ui
+python scripts/safety_scan.py
 ```
 
-Expected result: no real mouse/keyboard actuation calls.
+Expected result: no forbidden real mouse/keyboard actuation calls under
+`src/`. Docs and tests may mention forbidden calls as examples or assertions.
 
 Search for accidental secret-looking text before committing docs or logs:
 
