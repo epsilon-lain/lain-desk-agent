@@ -82,8 +82,54 @@ class DemoScenarioTests(unittest.TestCase):
         self.assertEqual(payload["proposal"]["action"]["type"], "no_op")
         self.assertIsNone(payload["action_contract"])
         self.assertEqual(payload["click_readiness"]["status"], "not_applicable")
+        self.assertEqual(payload["expected"]["action_type"], "no_op")
         self.assertEqual(payload["ui_state"]["visible_elements"][0]["source"], "ui_tree")
         self.assertEqual(payload["ui_state"]["visible_elements"][0]["confidence"], 0.0)
+
+    def test_conservative_no_op_demo_scenarios_do_not_create_contracts(self) -> None:
+        for scenario_name in [
+            "ui_tree_hidden_save",
+            "low_confidence_search",
+            "ambiguous_search",
+            "invalid_bbox_search",
+            "missing_bbox_search",
+            "no_visible_target",
+        ]:
+            with self.subTest(scenario=scenario_name):
+                payload = run_demo_scenario(scenario_name)
+
+                self.assertEqual(payload["expected"]["action_type"], "no_op")
+                self.assertEqual(payload["proposal"]["action"]["type"], "no_op")
+                self.assertIsNone(payload["action_contract"])
+                self.assertEqual(payload["click_readiness"]["status"], "not_applicable")
+
+    def test_ui_tree_high_risk_delete_is_preview_only_and_approval_gated(self) -> None:
+        payload = run_demo_scenario("ui_tree_high_risk_delete")
+        action = payload["proposal"]["action"]
+
+        self.assertEqual(payload["expected"]["action_type"], "target_hint")
+        self.assertEqual(action["type"], "target_hint")
+        self.assertEqual(action["target_source"], "ui_tree")
+        self.assertEqual(action["target_risk_hint"], "high_risk")
+        self.assertEqual(action["risk"], "high")
+        self.assertIs(action["requires_approval"], True)
+        self.assertEqual(payload["safety_decision"]["decision"], "needs_approval")
+        self.assertEqual(payload["action_contract"]["type"], "click")
+        self.assertEqual(payload["action_contract"]["status"], "preview_only")
+        self.assertIs(payload["action_contract"]["executed"], False)
+        self.assertEqual(payload["click_readiness"]["status"], "blocked")
+        self.assertIn("high-risk target label", payload["click_readiness"]["reasons"])
+
+    def test_mixed_manual_and_ui_tree_sources_selects_matching_ui_tree_target(self) -> None:
+        payload = run_demo_scenario("mixed_manual_ui_tree_save")
+        action = payload["proposal"]["action"]
+
+        self.assertEqual(payload["expected"]["target_source"], "ui_tree")
+        self.assertEqual(action["type"], "target_hint")
+        self.assertEqual(action["target_label"], "save")
+        self.assertEqual(action["target_source"], "ui_tree")
+        self.assertEqual(payload["action_contract"]["target_source"], "ui_tree")
+        self.assertEqual(payload["action_contract"]["status"], "preview_only")
 
     def test_endpoint_does_not_observe_or_understand(self) -> None:
         server = create_server("127.0.0.1", 0)

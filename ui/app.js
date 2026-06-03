@@ -1448,9 +1448,12 @@ function renderPlannerEvaluation(report = null) {
 
   const summary = report.summary ?? {};
   const scenarios = Array.isArray(report.scenarios) ? report.scenarios : [];
-  const allSafe = summary.all_safe_read_only === true;
+  const allSafe =
+    summary.all_safe_read_only === true && summary.all_expected_behaviors_passed !== false;
   const totalScenarioCount = summary.total_scenario_count ?? report.scenario_count ?? scenarios.length;
   const consistentScenarioCount = summary.consistent_scenario_count ?? summary.consistent_count ?? 0;
+  const expectationCheckCount = summary.expectation_check_count ?? 0;
+  const expectationPassCount = summary.expectation_pass_count ?? 0;
 
   plannerEvaluationPanel.dataset.state = allSafe ? "ready" : "warning";
   plannerEvaluationStatus.textContent =
@@ -1462,6 +1465,8 @@ function renderPlannerEvaluation(report = null) {
     ["Differences", String(summary.difference_count ?? summary.differences_count ?? "unknown")],
     ["AI rejections", String(summary.ai_rejection_count ?? summary.ai_rejections ?? "unknown")],
     ["Unsafe AI outputs", String(summary.unsafe_ai_output_count ?? summary.unsafe_ai_outputs ?? "unknown")],
+    ["Expected checks", `${expectationPassCount}/${expectationCheckCount} passed`],
+    ["Expectation failures", formatEvaluationScenarioList(summary.scenarios_with_expectation_failures)],
     ["Risk hints", formatEvaluationScenarioList(summary.scenarios_with_risk_hints)],
     ["Preview clicks", formatEvaluationScenarioList(summary.scenarios_with_preview_only_click_contracts)],
     ["Switch previews", formatEvaluationScenarioList(summary.scenarios_with_switch_app_preview_contracts)],
@@ -1543,13 +1548,17 @@ function plannerEvaluationRows(scenario) {
   return [
     ["Task", observation.task || inputs.task || "none"],
     ["Elements", elementCount],
+    ["Expected", formatEvaluationExpected(scenario)],
+    ["Pass/fail", formatEvaluationExpectation(scenario)],
     ["Risk hints", formatEvaluationRiskHints(scenario)],
+    ["Risk label", formatEvaluationRiskLabel(scenario)],
     ["Agreement", formatEvaluationAgreement(scenario)],
     ["Rule-based", formatEvaluationProposal(scenario.rule_based)],
     ["AI proposal", formatEvaluationProposal(scenario.ai_proposal)],
     ["Safety", formatEvaluationPair(scenario, formatEvaluationSafety)],
     ["Contract", formatEvaluationPair(scenario, formatEvaluationContract)],
     ["Readiness", formatEvaluationPair(scenario, formatEvaluationReadiness)],
+    ["Blocker", formatEvaluationBlocker(scenario)],
     ["Differences", formatEvaluationNotes(scenario.differences?.notes)],
     ["Strategy notes", formatEvaluationNotes(observation.strategy_notes ?? scenario.notes)],
   ];
@@ -1665,6 +1674,54 @@ function formatEvaluationProposal(result = {}) {
     : `${proposalType}${validation}`;
 }
 
+function formatEvaluationExpected(scenario) {
+  const expected = scenario.expected ?? scenario.expectation?.expected ?? {};
+  const actionType = expected.action_type || "unknown";
+  const risk = expected.risk || "unknown";
+  const approval = expected.requires_approval ? "approval required" : "no approval";
+  const contract = expected.action_contract_type || "none";
+  const readiness = expected.click_readiness_status || "not_applicable";
+  const blocker = expected.blocker_reason
+    ? `; blocker ${compactText(expected.blocker_reason, 48)}`
+    : "";
+
+  return `${actionType}; risk ${risk}; ${approval}; contract ${contract}; readiness ${readiness}${blocker}`;
+}
+
+function formatEvaluationExpectation(scenario) {
+  const expectation = scenario.expectation ?? {};
+  const rule = formatEvaluationExpectationResult(expectation.rule_based);
+  const ai = formatEvaluationExpectationResult(expectation.ai_proposal);
+  const failures = Array.isArray(expectation.failures) && expectation.failures.length
+    ? `; failures ${formatEvaluationNotes(expectation.failures)}`
+    : "";
+
+  return `rule ${rule}; ai ${ai}${failures}`;
+}
+
+function formatEvaluationExpectationResult(result = {}) {
+  if (result.passed === false) {
+    return result.failures?.length
+      ? `fail: ${formatEvaluationNotes(result.failures)}`
+      : "fail";
+  }
+
+  return "pass";
+}
+
+function formatEvaluationRiskLabel(scenario) {
+  const expected = scenario.expected ?? scenario.expectation?.expected ?? {};
+  return `expected ${expected.risk || "unknown"}; rule ${formatEvaluationResultRisk(
+    scenario.rule_based
+  )}; ai ${formatEvaluationResultRisk(scenario.ai_proposal)}`;
+}
+
+function formatEvaluationResultRisk(result = {}) {
+  const action = result.proposal?.action ?? {};
+  const hint = action.target_risk_hint ? `/${action.target_risk_hint}` : "";
+  return `${action.risk || "unknown"}${hint}`;
+}
+
 function formatEvaluationSafety(result = {}) {
   const safetyDecision = result.safety_decision ?? {};
   const decision = safetyDecision.decision || "unknown";
@@ -1701,6 +1758,31 @@ function formatEvaluationReadiness(result = {}) {
     : "";
 
   return `${readiness}${reasons}`;
+}
+
+function formatEvaluationBlocker(scenario) {
+  return `rule ${formatEvaluationResultBlocker(scenario.rule_based)}; ai ${formatEvaluationResultBlocker(
+    scenario.ai_proposal
+  )}`;
+}
+
+function formatEvaluationResultBlocker(result = {}) {
+  const clickReadiness = result.click_readiness ?? {};
+  if (Array.isArray(clickReadiness.reasons) && clickReadiness.reasons.length) {
+    return clickReadiness.reasons.map((reason) => compactText(reason, 48)).join("; ");
+  }
+
+  const contract = result.action_contract;
+  if (contract?.status === "preview_only") {
+    return `${contract.type || "unknown"} preview-only contract`;
+  }
+
+  const action = result.proposal?.action ?? {};
+  if (action.type === "no_op" && action.reason) {
+    return compactText(action.reason, 72);
+  }
+
+  return "none";
 }
 
 function formatEvaluationRiskHints(scenario) {

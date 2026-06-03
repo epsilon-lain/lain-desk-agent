@@ -100,8 +100,33 @@ compact and normalized with `id`, `label`/`text`, `role`, `bbox`, `center`,
 read-only grounding only; they do not enable execution.
 
 The optional AI planner receives the same compact fields and local validation
-rejects low-confidence `target_hint` selections before they can become
-proposal actions.
+rejects low-confidence, invalid-geometry, or ambiguous same-label
+`target_hint` selections before they can become proposal actions.
+
+## Planner Evaluation Expansion
+
+Phase 6 expands the deterministic Planner Evaluation Harness while keeping the
+system read-only and preview-only. The harness compares the rule-based planner
+and deterministic AI proposal planner against fixture-defined expected
+behavior, then runs each proposal through Safety Gate, Action Contract, Click
+Readiness, and Execution Policy summaries.
+
+The demo suite now covers:
+
+- Normal safe `ui_tree` button
+- Disabled or hidden `ui_tree` button
+- Low-confidence target
+- Ambiguous same-label targets
+- High-risk manual or `ui_tree` target
+- Invalid or missing bbox target
+- Mixed manual plus `ui_tree` sources
+- No visible target
+
+Each scenario records the expected action type, risk, approval requirement,
+preview-only contract behavior, readiness status, and blocker reason. Unsafe or
+ambiguous states are expected to degrade to `no_op`, blocked readiness, or
+preview-only output. No evaluation scenario grants execution permission, and
+`wait` remains the only executable action.
 
 ## App mismatch hint
 

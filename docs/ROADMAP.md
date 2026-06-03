@@ -14,6 +14,11 @@ Phase 4 AI Planner integration is now wired end to end for proposal generation:
 validated, `/proposal` returns compact `planner_trace`, and unsafe or invalid
 AI output remains a safe `no_op`.
 
+Phase 6 Planner Evaluation Expansion is implemented as a deterministic,
+read-only reliability suite. It compares rule-based and AI proposal planner
+behavior across normalized `visible_elements` and `ui_tree` fixtures before any
+real action experiment.
+
 ## Completed
 
 - Observation / Understanding
@@ -24,6 +29,7 @@ AI output remains a safe `no_op`.
 - AI Planner runtime status fields
 - Planner Trace
 - Planner Evaluation Harness
+- Planner Evaluation Expansion
 - Planner Evaluation cockpit panel
 - Safety Gate
 - Action Contract
@@ -109,7 +115,30 @@ Goal: improve `visible_elements` without adding desktop control.
 - Keep planner inputs compact.
 - Continue excluding screenshot bytes and screenshot paths from LLM payloads.
 
-## Phase 6: Click Readiness Hardening
+## Phase 6: Planner Evaluation Expansion
+
+Status: implemented as a read-only, preview-only evaluation suite.
+
+Goal: evaluate planner reliability before any real action experiment.
+
+- Compare rule-based planner output against deterministic AI proposal planner
+  output without external LLM calls.
+- Define fixture-level expected behavior for action type, risk,
+  `requires_approval`, preview-only contract state, readiness status, and
+  blocker reason.
+- Cover normal safe `ui_tree` buttons, disabled or hidden `ui_tree` buttons,
+  low-confidence targets, ambiguous same-label targets, high-risk targets,
+  invalid or missing bbox targets, mixed manual plus `ui_tree` sources, and no
+  visible target.
+- Require conservative degradation: ambiguous, low-confidence, disabled,
+  hidden, invalid-geometry, or missing-target states become `no_op`, blocked,
+  or preview-only outcomes.
+- Continue routing every proposal through Safety Gate, Action Contract, Click
+  Readiness, and Execution Policy summaries.
+- Keep all evaluation paths read-only and preview-only; no real
+  click/type/hotkey/scroll/switch_app execution is enabled.
+
+## Phase 7: Click Readiness Hardening
 
 Status: started with structured readiness checks for preview-only click
 contracts, center/bbox consistency checks, Cockpit visibility for readiness
@@ -130,7 +159,7 @@ Goal: make preview-only click contracts safer before any real click experiment.
 - Keep real click disabled by default.
 - Keep click readiness as a blocker, not a permission grant.
 
-## Phase 7: Sandboxed Real-action Experiment
+## Phase 8: Sandboxed Real-action Experiment
 
 Goal: design a tightly bounded experiment before any limited real desktop
 action exists.
@@ -143,7 +172,7 @@ action exists.
 - Record audit events for every request, block, execution, and verification.
 - Do not broaden the default product behavior.
 
-## Phase 8: Limited Desktop Control
+## Phase 9: Limited Desktop Control
 
 Goal: consider narrow desktop control only after Phase 7 is reliable.
 

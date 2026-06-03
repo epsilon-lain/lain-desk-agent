@@ -41,6 +41,7 @@ def evaluate_demo_scenarios(
             "risk_hint is a read-only label-level hint; it does not replace Safety Gate or Click Readiness.",
             "preview-only click contracts do not make click executable.",
             "switch_app preview contracts do not make app switching executable.",
+            "expected behavior checks describe conservative planner degradation, not execution permission.",
         ],
         "scenarios": scenarios,
     }
@@ -50,6 +51,11 @@ def evaluate_demo_scenario(name: str, task: str = "") -> dict[str, Any]:
     """Evaluate one built-in fake UI state without observing the desktop."""
 
     scenario_input = demo_scenario_input(name, task=task)
+    expected = (
+        scenario_input.get("expected", {})
+        if isinstance(scenario_input.get("expected"), dict)
+        else {}
+    )
     planner_context = build_planner_context(
         scenario_input["task"],
         scenario_input["ui_state"],
@@ -65,7 +71,20 @@ def evaluate_demo_scenario(name: str, task: str = "") -> dict[str, Any]:
         "validation": ai_result.get("validation", {}),
     }
     differences = _compare_results(rule_based_result, ai_result_payload)
-    notes = _scenario_notes(rule_based_result, ai_result_payload, planner_context, differences)
+    expectation = _expectation_report(
+        expected,
+        {
+            "rule_based": rule_based_result,
+            "ai_proposal": ai_result_payload,
+        },
+    )
+    notes = _scenario_notes(
+        rule_based_result,
+        ai_result_payload,
+        planner_context,
+        differences,
+        expectation,
+    )
     observation = _scenario_observation_record(
         scenario_input["scenario"],
         scenario_input["task"],
@@ -73,6 +92,7 @@ def evaluate_demo_scenario(name: str, task: str = "") -> dict[str, Any]:
         rule_based_result,
         ai_result_payload,
         differences,
+        expectation,
         notes,
     )
 
@@ -86,6 +106,8 @@ def evaluate_demo_scenario(name: str, task: str = "") -> dict[str, Any]:
             "grounding_hints": _grounding_hints(planner_context),
             "safety_runtime": planner_context.get("safety_runtime"),
         },
+        "expected": expected,
+        "expectation": expectation,
         "rule_based": rule_based_result,
         "ai_proposal": ai_result_payload,
         "differences": differences,
@@ -157,6 +179,9 @@ def _compact_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
             "target_element_id": str(action.get("target_element_id") or ""),
             "target_label": str(action.get("target_label") or ""),
             "target_bbox": action.get("target_bbox") if isinstance(action.get("target_bbox"), dict) else None,
+            "target_confidence": action.get("target_confidence"),
+            "target_source": str(action.get("target_source") or ""),
+            "target_risk_hint": str(action.get("target_risk_hint") or ""),
             "risk": str(action.get("risk") or ""),
             "requires_approval": bool(action.get("requires_approval")),
             "reason": str(action.get("reason") or ""),
@@ -175,6 +200,9 @@ def _compact_action_contract(action_contract: dict[str, Any] | None) -> dict[str
         "preview_only": status == "preview_only",
         "executed": bool(action_contract.get("executed")),
         "target_label": str(action_contract.get("target_label") or ""),
+        "target_source": str(action_contract.get("target_source") or ""),
+        "target_risk_hint": str(action_contract.get("target_risk_hint") or ""),
+        "target_confidence": action_contract.get("target_confidence"),
         "target_app": str(action_contract.get("target_app") or ""),
     }
 
@@ -212,11 +240,237 @@ def _compare_results(rule_based: dict[str, Any], ai_proposal: dict[str, Any]) ->
     }
 
 
+def _expectation_report(
+    expected: dict[str, Any],
+    results: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Compare planner outputs against fixture-defined conservative behavior."""
+
+    if not expected:
+        return {
+            "expected": {},
+            "rule_based": _expectation_not_defined(),
+            "ai_proposal": _expectation_not_defined(),
+            "overall_passed": True,
+            "failures": [],
+        }
+
+    checked = {
+        planner_name: _check_expected_behavior(expected, result)
+        for planner_name, result in results.items()
+    }
+    failures = [
+        f"{planner_name}: {failure}"
+        for planner_name, check in checked.items()
+        for failure in check.get("failures", [])
+    ]
+
+    return {
+        "expected": expected,
+        "rule_based": checked.get("rule_based", _expectation_not_defined()),
+        "ai_proposal": checked.get("ai_proposal", _expectation_not_defined()),
+        "overall_passed": not failures,
+        "failures": failures,
+    }
+
+
+def _expectation_not_defined() -> dict[str, Any]:
+    return {
+        "passed": True,
+        "failures": [],
+        "actual": {},
+        "blocker_reason": "",
+    }
+
+
+def _check_expected_behavior(
+    expected: dict[str, Any],
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    actual = _actual_result_summary(result)
+    failures: list[str] = []
+
+    _expect_equal(failures, "action_type", expected.get("action_type"), actual["action_type"])
+    _expect_equal(failures, "risk", expected.get("risk"), actual["risk"])
+    _expect_equal(
+        failures,
+        "requires_approval",
+        expected.get("requires_approval"),
+        actual["requires_approval"],
+    )
+    _expect_equal(
+        failures,
+        "safety_decision",
+        expected.get("safety_decision"),
+        actual["safety_decision"],
+    )
+    _expect_equal(
+        failures,
+        "action_contract_type",
+        expected.get("action_contract_type"),
+        actual["action_contract_type"],
+    )
+    _expect_equal(failures, "preview_only", expected.get("preview_only"), actual["preview_only"])
+    _expect_equal(
+        failures,
+        "click_readiness_status",
+        expected.get("click_readiness_status"),
+        actual["click_readiness_status"],
+    )
+
+    if expected.get("action_type") == "target_hint":
+        _expect_equal(
+            failures,
+            "target_source",
+            expected.get("target_source"),
+            actual["target_source"],
+        )
+
+    expected_readiness_reason = str(expected.get("readiness_reason") or "")
+    if expected_readiness_reason and expected_readiness_reason not in actual["readiness_reasons"]:
+        failures.append(
+            "readiness_reason expected "
+            f"'{expected_readiness_reason}' in {actual['readiness_reasons']}"
+        )
+
+    if not _blocker_reason_matches(expected, actual["blocker_reason"]):
+        failures.append(
+            "blocker_reason expected "
+            f"'{expected.get('blocker_reason')}' but got '{actual['blocker_reason']}'"
+        )
+
+    if actual["action_type"] not in ALLOWED_PROPOSAL_ACTION_TYPES:
+        failures.append(f"action_type '{actual['action_type']}' is not proposal-only")
+
+    if actual["executed"]:
+        failures.append("action contract unexpectedly reports executed=true")
+
+    if not actual["safe_read_only"]:
+        failures.append("pipeline did not remain safe_read_only")
+
+    if actual["executable_actions"] != ["wait"]:
+        failures.append(
+            "execution_policy executable_actions expected ['wait'] "
+            f"but got {actual['executable_actions']}"
+        )
+
+    return {
+        "passed": not failures,
+        "failures": failures,
+        "actual": actual,
+        "blocker_reason": actual["blocker_reason"],
+    }
+
+
+def _actual_result_summary(result: dict[str, Any]) -> dict[str, Any]:
+    action = _result_action(result)
+    safety_decision = result.get("safety_decision")
+    action_contract = result.get("action_contract")
+    click_readiness = result.get("click_readiness")
+    execution_policy = result.get("execution_policy")
+
+    if not isinstance(safety_decision, dict):
+        safety_decision = {}
+    if not isinstance(action_contract, dict):
+        action_contract = {}
+    if not isinstance(click_readiness, dict):
+        click_readiness = {}
+    if not isinstance(execution_policy, dict):
+        execution_policy = {}
+
+    readiness_reasons = click_readiness.get("reasons")
+    if not isinstance(readiness_reasons, list):
+        readiness_reasons = []
+
+    contract_type = str(action_contract.get("type") or "none")
+    status = str(action_contract.get("status") or "")
+    executable_actions = execution_policy.get("executable_actions")
+    if not isinstance(executable_actions, list):
+        executable_actions = []
+
+    return {
+        "action_type": str(result.get("proposal_type") or action.get("type") or ""),
+        "target": _action_target(action),
+        "target_label": str(action.get("target_label") or ""),
+        "target_source": str(action.get("target_source") or ""),
+        "target_risk_hint": str(action.get("target_risk_hint") or ""),
+        "risk": str(action.get("risk") or ""),
+        "requires_approval": bool(action.get("requires_approval")),
+        "safety_decision": str(safety_decision.get("decision") or "unknown"),
+        "action_contract_type": contract_type,
+        "preview_only": status == "preview_only" or bool(action_contract.get("preview_only")),
+        "executed": bool(action_contract.get("executed")),
+        "click_readiness_status": str(click_readiness.get("status") or "not_present"),
+        "readiness_reasons": [str(reason) for reason in readiness_reasons],
+        "blocker_reason": _result_blocker_reason(action, safety_decision, action_contract, click_readiness),
+        "safe_read_only": bool(result.get("safe_read_only")),
+        "executable_actions": [str(action) for action in executable_actions],
+    }
+
+
+def _result_blocker_reason(
+    action: dict[str, Any],
+    safety_decision: dict[str, Any],
+    action_contract: dict[str, Any],
+    click_readiness: dict[str, Any],
+) -> str:
+    readiness_reasons = click_readiness.get("reasons")
+    if isinstance(readiness_reasons, list) and readiness_reasons:
+        return "; ".join(str(reason) for reason in readiness_reasons)
+
+    if action_contract:
+        contract_type = str(action_contract.get("type") or "unknown")
+        status = str(action_contract.get("status") or "unknown")
+        if status == "preview_only":
+            return f"{contract_type} preview-only contract"
+        return f"{contract_type} contract status {status}"
+
+    if str(safety_decision.get("decision") or "") == "blocked":
+        return str(safety_decision.get("reason") or "")
+
+    if action.get("type") == "no_op":
+        return str(action.get("reason") or "")
+
+    return ""
+
+
+def _expect_equal(
+    failures: list[str],
+    field: str,
+    expected_value: Any,
+    actual_value: Any,
+) -> None:
+    if expected_value in {None, ""}:
+        return
+
+    if expected_value != actual_value:
+        failures.append(f"{field} expected {expected_value!r} but got {actual_value!r}")
+
+
+def _blocker_reason_matches(expected: dict[str, Any], actual_reason: str) -> bool:
+    expected_reason = str(expected.get("blocker_reason") or "")
+    accepted = expected.get("accepted_blocker_reasons")
+    accepted_reasons = [str(reason) for reason in accepted] if isinstance(accepted, list) else []
+
+    if not expected_reason and not accepted_reasons:
+        return True
+
+    candidates = [expected_reason, *accepted_reasons]
+    actual = actual_reason.casefold()
+    for candidate in candidates:
+        normalized = str(candidate or "").casefold()
+        if normalized and (normalized in actual or actual in normalized):
+            return True
+
+    return False
+
+
 def _scenario_notes(
     rule_based: dict[str, Any],
     ai_proposal: dict[str, Any],
     planner_context: dict[str, Any],
     differences: dict[str, Any],
+    expectation: dict[str, Any],
 ) -> list[str]:
     notes = list(differences.get("notes", []))
     risk_hints = _high_risk_grounding_hints(planner_context)
@@ -232,6 +486,11 @@ def _scenario_notes(
         readiness = result.get("click_readiness")
         if isinstance(readiness, dict) and readiness.get("status") == "blocked":
             notes.append(f"{label} click readiness is blocked")
+
+    for label in ["rule_based", "ai_proposal"]:
+        result = expectation.get(label)
+        if isinstance(result, dict) and result.get("passed") is False:
+            notes.append(f"{label} did not match expected conservative behavior")
 
     return _unique_notes(notes)
 
@@ -277,6 +536,19 @@ def _report_summary(scenarios: list[dict[str, Any]]) -> dict[str, Any]:
         for scenario in scenarios
         if _scenario_has_blocked_click_readiness(scenario)
     ]
+    expectation_results = [
+        result
+        for scenario in scenarios
+        for result in _scenario_expectation_results(scenario)
+    ]
+    expectation_failure_count = sum(
+        1 for result in expectation_results if result.get("passed") is False
+    )
+    scenarios_with_expectation_failures = [
+        scenario["scenario"]
+        for scenario in scenarios
+        if _scenario_has_expectation_failure(scenario)
+    ]
 
     return {
         "total_scenario_count": len(scenarios),
@@ -288,6 +560,11 @@ def _report_summary(scenarios: list[dict[str, Any]]) -> dict[str, Any]:
         "scenarios_with_preview_only_click_contracts": scenarios_with_preview_clicks,
         "scenarios_with_switch_app_preview_contracts": scenarios_with_switch_app_previews,
         "scenarios_with_blocked_click_readiness": scenarios_with_blocked_click_readiness,
+        "expectation_check_count": len(expectation_results),
+        "expectation_pass_count": len(expectation_results) - expectation_failure_count,
+        "expectation_failure_count": expectation_failure_count,
+        "scenarios_with_expectation_failures": scenarios_with_expectation_failures,
+        "all_expected_behaviors_passed": expectation_failure_count == 0,
         "consistent_count": len(scenarios) - differences_count,
         "differences_count": differences_count,
         "ai_rejections": ai_rejections,
@@ -315,6 +592,7 @@ def _grounding_hints(planner_context: dict[str, Any]) -> list[dict[str, Any]]:
                     "role": str(role or ""),
                     "risk_hint": str(risk_hint or "unknown"),
                     "source": str(item.get("source") or "unknown"),
+                    "confidence": item.get("confidence"),
                 }
             )
 
@@ -370,6 +648,7 @@ def _scenario_observation_record(
     rule_based: dict[str, Any],
     ai_proposal: dict[str, Any],
     differences: dict[str, Any],
+    expectation: dict[str, Any],
     notes: list[str],
 ) -> dict[str, Any]:
     """Return a compact strategy-tuning observation for one scenario."""
@@ -401,6 +680,7 @@ def _scenario_observation_record(
             "rule_based": _observation_click_readiness_summary(rule_based),
             "ai_proposal": _observation_click_readiness_summary(ai_proposal),
         },
+        "expectation": _observation_expectation_summary(expectation),
         "strategy_notes": notes,
     }
 
@@ -478,6 +758,34 @@ def _observation_click_readiness_summary(result: dict[str, Any]) -> dict[str, An
     }
 
 
+def _observation_expectation_summary(expectation: dict[str, Any]) -> dict[str, Any]:
+    expected = expectation.get("expected")
+    if not isinstance(expected, dict):
+        expected = {}
+
+    return {
+        "expected_action_type": str(expected.get("action_type") or ""),
+        "expected_risk": str(expected.get("risk") or ""),
+        "expected_requires_approval": bool(expected.get("requires_approval")),
+        "expected_readiness_status": str(expected.get("click_readiness_status") or ""),
+        "expected_blocker_reason": str(expected.get("blocker_reason") or ""),
+        "rule_based_passed": _expectation_passed(expectation.get("rule_based")),
+        "ai_proposal_passed": _expectation_passed(expectation.get("ai_proposal")),
+        "overall_passed": bool(expectation.get("overall_passed", True)),
+        "failures": [
+            str(failure)
+            for failure in expectation.get("failures", [])
+            if str(failure)
+        ]
+        if isinstance(expectation.get("failures"), list)
+        else [],
+    }
+
+
+def _expectation_passed(value: Any) -> bool:
+    return isinstance(value, dict) and value.get("passed") is not False
+
+
 def _scenario_observation(scenario: dict[str, Any]) -> dict[str, Any]:
     observation = scenario.get("observation")
     return observation if isinstance(observation, dict) else {}
@@ -507,6 +815,25 @@ def _scenario_has_blocked_click_readiness(scenario: dict[str, Any]) -> bool:
     return any(
         isinstance(readiness, dict) and readiness.get("status") == "blocked"
         for readiness in readiness_by_planner.values()
+    )
+
+
+def _scenario_expectation_results(scenario: dict[str, Any]) -> list[dict[str, Any]]:
+    expectation = scenario.get("expectation")
+    if not isinstance(expectation, dict):
+        return []
+
+    return [
+        result
+        for result in [expectation.get("rule_based"), expectation.get("ai_proposal")]
+        if isinstance(result, dict)
+    ]
+
+
+def _scenario_has_expectation_failure(scenario: dict[str, Any]) -> bool:
+    return any(
+        result.get("passed") is False
+        for result in _scenario_expectation_results(scenario)
     )
 
 

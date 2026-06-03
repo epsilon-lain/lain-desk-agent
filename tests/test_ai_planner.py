@@ -181,6 +181,38 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertEqual(proposal["action"]["type"], "no_op")
         self.assertIn("confidence is too low", proposal["action"]["reason"])
 
+    def test_ambiguous_target_hint_is_rejected_safely(self) -> None:
+        context = _planner_context()
+        context["visible_elements"]["items"].append(
+            {
+                "id": "element_search_duplicate",
+                "role": "button",
+                "label": "search",
+                "text": "search",
+                "bbox": {"x": 310, "y": 40, "width": 120, "height": 36},
+                "center": {"x": 370, "y": 58},
+                "confidence": 0.94,
+                "source": "manual",
+                "risk_hint": "normal",
+                "timestamp": "2026-01-01T00:00:00Z",
+            }
+        )
+        context["visible_elements"]["count"] = len(context["visible_elements"]["items"])
+
+        proposal = build_ai_proposal_from_context(
+            context,
+            {"type": "target_hint", "target_element_id": "element_search"},
+        )
+        deterministic = build_ai_proposal_result_from_context(context)
+
+        self.assertEqual(proposal["action"]["type"], "no_op")
+        self.assertIn("is ambiguous", proposal["action"]["reason"])
+        self.assertEqual(deterministic["proposal"]["action"]["type"], "no_op")
+        self.assertIn(
+            "Ambiguous visible elements matched the task",
+            deterministic["proposal"]["action"]["reason"],
+        )
+
     def test_validated_target_hint_passes_existing_pipeline_as_preview_only(self) -> None:
         context = _planner_context()
         validation = validate_ai_proposal(

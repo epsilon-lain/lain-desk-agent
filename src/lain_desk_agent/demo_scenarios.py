@@ -22,6 +22,50 @@ class UnknownDemoScenarioError(ValueError):
     """Raised when a requested built-in demo scenario does not exist."""
 
 
+NO_RELIABLE_TARGET_REASONS = [
+    "Visible elements exist, but none are reliable enough to target.",
+    "Ambiguous visible elements matched the task; returning no_op.",
+    "No reliable next action yet.",
+    "No mock AI output was supplied and no deterministic target was found.",
+]
+
+GEOMETRY_UNAVAILABLE_REASONS = [
+    "No reliable next action yet.",
+    "No mock AI output was supplied and no deterministic target was found.",
+]
+
+
+def _expected_behavior(
+    *,
+    action_type: str,
+    risk: str = "low",
+    requires_approval: bool = False,
+    safety_decision: str = "allowed",
+    action_contract_type: str = "none",
+    preview_only: bool = False,
+    click_readiness_status: str = "not_applicable",
+    readiness_reason: str = "",
+    blocker_reason: str = "",
+    accepted_blocker_reasons: list[str] | None = None,
+    target_source: str = "",
+) -> dict[str, Any]:
+    """Describe the expected read-only outcome for one planner evaluation fixture."""
+
+    return {
+        "action_type": action_type,
+        "risk": risk,
+        "requires_approval": requires_approval,
+        "safety_decision": safety_decision,
+        "action_contract_type": action_contract_type,
+        "preview_only": preview_only,
+        "click_readiness_status": click_readiness_status,
+        "readiness_reason": readiness_reason,
+        "blocker_reason": blocker_reason,
+        "accepted_blocker_reasons": list(accepted_blocker_reasons or []),
+        "target_source": target_source,
+    }
+
+
 _SCENARIOS: dict[str, dict[str, Any]] = {
     "browser_search": {
         "default_task": "Search",
@@ -51,6 +95,15 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
             "summary": "Demo Chrome window with a visible Search button-like element.",
             "confidence": 0.99,
         },
+        "expected": _expected_behavior(
+            action_type="target_hint",
+            action_contract_type="click",
+            preview_only=True,
+            click_readiness_status="blocked",
+            readiness_reason="preview-only contract",
+            blocker_reason="preview-only contract",
+            target_source="manual",
+        ),
     },
     "dangerous_send": {
         "default_task": "Send",
@@ -80,6 +133,18 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
             "summary": "Demo WeChat window with a high-risk Send target.",
             "confidence": 0.99,
         },
+        "expected": _expected_behavior(
+            action_type="target_hint",
+            risk="high",
+            requires_approval=True,
+            safety_decision="needs_approval",
+            action_contract_type="click",
+            preview_only=True,
+            click_readiness_status="blocked",
+            readiness_reason="high-risk target label",
+            blocker_reason="high-risk target label",
+            target_source="manual",
+        ),
     },
     "dangerous_delete": {
         "default_task": "Delete",
@@ -109,6 +174,18 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
             "summary": "Demo File Explorer window with a high-risk Delete target.",
             "confidence": 0.99,
         },
+        "expected": _expected_behavior(
+            action_type="target_hint",
+            risk="high",
+            requires_approval=True,
+            safety_decision="needs_approval",
+            action_contract_type="click",
+            preview_only=True,
+            click_readiness_status="blocked",
+            readiness_reason="high-risk target label",
+            blocker_reason="high-risk target label",
+            target_source="manual",
+        ),
     },
     "app_mismatch": {
         "default_task": "Use WeChat to send a message",
@@ -138,6 +215,13 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
             "summary": "Demo Chrome window while the task asks for WeChat.",
             "confidence": 0.99,
         },
+        "expected": _expected_behavior(
+            action_type="switch_app_hint",
+            action_contract_type="switch_app",
+            preview_only=True,
+            click_readiness_status="not_applicable",
+            blocker_reason="switch_app preview-only contract",
+        ),
     },
     "ui_tree_save": {
         "default_task": "Save",
@@ -167,6 +251,15 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
             "summary": "Demo text editor window with a read-only ui_tree Save button.",
             "confidence": 0.99,
         },
+        "expected": _expected_behavior(
+            action_type="target_hint",
+            action_contract_type="click",
+            preview_only=True,
+            click_readiness_status="blocked",
+            readiness_reason="preview-only contract",
+            blocker_reason="preview-only contract",
+            target_source="ui_tree",
+        ),
     },
     "ui_tree_disabled_save": {
         "default_task": "Save",
@@ -196,6 +289,310 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
             "summary": "Demo text editor window with a disabled ui_tree Save button.",
             "confidence": 0.99,
         },
+        "expected": _expected_behavior(
+            action_type="no_op",
+            blocker_reason="no reliable target",
+            accepted_blocker_reasons=NO_RELIABLE_TARGET_REASONS,
+            target_source="ui_tree",
+        ),
+    },
+    "ui_tree_hidden_save": {
+        "default_task": "Save",
+        "ui_state": {
+            "ui_state_id": "state_demo_ui_tree_hidden_save",
+            "source_observation_id": "demo_observation",
+            "app_guess": "Notepad",
+            "state_guess": "text_editor_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
+            "visible_text": ["Save"],
+            "visible_text_boxes": [],
+            "visible_elements": [
+                {
+                    "id": "ui_tree_hidden_save_button",
+                    "label": "save",
+                    "text": "save",
+                    "role": "button",
+                    "bbox": {"x": 1040, "y": 56, "width": 82, "height": 32},
+                    "center": {"x": 1081, "y": 72},
+                    "confidence": 0.0,
+                    "source": "ui_tree",
+                    "risk_hint": "unknown",
+                    "timestamp": DEMO_TIMESTAMP,
+                }
+            ],
+            "summary": "Demo text editor window with a hidden ui_tree Save button.",
+            "confidence": 0.99,
+        },
+        "expected": _expected_behavior(
+            action_type="no_op",
+            blocker_reason="no reliable target",
+            accepted_blocker_reasons=NO_RELIABLE_TARGET_REASONS,
+            target_source="ui_tree",
+        ),
+    },
+    "low_confidence_search": {
+        "default_task": "Search",
+        "ui_state": {
+            "ui_state_id": "state_demo_low_confidence_search",
+            "source_observation_id": "demo_observation",
+            "app_guess": "Chrome",
+            "state_guess": "browser_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
+            "visible_text": ["Search"],
+            "visible_text_boxes": [],
+            "visible_elements": [
+                {
+                    "id": "element_low_confidence_search",
+                    "label": "search",
+                    "text": "search",
+                    "role": "button",
+                    "bbox": {"x": 420, "y": 88, "width": 96, "height": 34},
+                    "center": {"x": 468, "y": 105},
+                    "confidence": 0.2,
+                    "source": "manual",
+                    "risk_hint": "normal",
+                    "timestamp": DEMO_TIMESTAMP,
+                }
+            ],
+            "summary": "Demo browser window with a low-confidence Search target.",
+            "confidence": 0.99,
+        },
+        "expected": _expected_behavior(
+            action_type="no_op",
+            blocker_reason="no reliable target",
+            accepted_blocker_reasons=NO_RELIABLE_TARGET_REASONS,
+            target_source="manual",
+        ),
+    },
+    "ambiguous_search": {
+        "default_task": "Search",
+        "ui_state": {
+            "ui_state_id": "state_demo_ambiguous_search",
+            "source_observation_id": "demo_observation",
+            "app_guess": "Chrome",
+            "state_guess": "browser_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
+            "visible_text": ["Search", "Search"],
+            "visible_text_boxes": [],
+            "visible_elements": [
+                {
+                    "id": "element_search_primary",
+                    "label": "search",
+                    "text": "search",
+                    "role": "button",
+                    "bbox": {"x": 420, "y": 88, "width": 96, "height": 34},
+                    "center": {"x": 468, "y": 105},
+                    "confidence": 0.94,
+                    "source": "manual",
+                    "risk_hint": "normal",
+                    "timestamp": DEMO_TIMESTAMP,
+                },
+                {
+                    "id": "element_search_secondary",
+                    "label": "search",
+                    "text": "search",
+                    "role": "button",
+                    "bbox": {"x": 680, "y": 88, "width": 96, "height": 34},
+                    "center": {"x": 728, "y": 105},
+                    "confidence": 0.92,
+                    "source": "manual",
+                    "risk_hint": "normal",
+                    "timestamp": DEMO_TIMESTAMP,
+                },
+            ],
+            "summary": "Demo browser window with two similarly confident Search buttons.",
+            "confidence": 0.99,
+        },
+        "expected": _expected_behavior(
+            action_type="no_op",
+            blocker_reason="no reliable target",
+            accepted_blocker_reasons=NO_RELIABLE_TARGET_REASONS,
+            target_source="manual",
+        ),
+    },
+    "ui_tree_high_risk_delete": {
+        "default_task": "Delete",
+        "ui_state": {
+            "ui_state_id": "state_demo_ui_tree_high_risk_delete",
+            "source_observation_id": "demo_observation",
+            "app_guess": "File Explorer",
+            "state_guess": "file_manager_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
+            "visible_text": ["Delete"],
+            "visible_text_boxes": [],
+            "visible_elements": [
+                {
+                    "id": "ui_tree_delete_button",
+                    "label": "delete",
+                    "text": "delete",
+                    "role": "button",
+                    "bbox": {"x": 168, "y": 54, "width": 82, "height": 32},
+                    "center": {"x": 209, "y": 70},
+                    "confidence": 0.96,
+                    "source": "ui_tree",
+                    "risk_hint": "high_risk",
+                    "timestamp": DEMO_TIMESTAMP,
+                }
+            ],
+            "summary": "Demo file manager window with a high-risk ui_tree Delete target.",
+            "confidence": 0.99,
+        },
+        "expected": _expected_behavior(
+            action_type="target_hint",
+            risk="high",
+            requires_approval=True,
+            safety_decision="needs_approval",
+            action_contract_type="click",
+            preview_only=True,
+            click_readiness_status="blocked",
+            readiness_reason="high-risk target label",
+            blocker_reason="high-risk target label",
+            target_source="ui_tree",
+        ),
+    },
+    "invalid_bbox_search": {
+        "default_task": "Search",
+        "ui_state": {
+            "ui_state_id": "state_demo_invalid_bbox_search",
+            "source_observation_id": "demo_observation",
+            "app_guess": "Chrome",
+            "state_guess": "browser_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
+            "visible_text": ["Search"],
+            "visible_text_boxes": [],
+            "visible_elements": [
+                {
+                    "id": "element_invalid_bbox_search",
+                    "label": "search",
+                    "text": "search",
+                    "role": "button",
+                    "bbox": {"x": 420, "y": 88, "width": 0, "height": 34},
+                    "center": {"x": 420, "y": 105},
+                    "confidence": 0.96,
+                    "source": "manual",
+                    "risk_hint": "normal",
+                    "timestamp": DEMO_TIMESTAMP,
+                }
+            ],
+            "summary": "Demo browser window with a Search element whose bbox is invalid.",
+            "confidence": 0.99,
+        },
+        "expected": _expected_behavior(
+            action_type="no_op",
+            blocker_reason="target geometry unavailable",
+            accepted_blocker_reasons=GEOMETRY_UNAVAILABLE_REASONS,
+            target_source="manual",
+        ),
+    },
+    "missing_bbox_search": {
+        "default_task": "Search",
+        "ui_state": {
+            "ui_state_id": "state_demo_missing_bbox_search",
+            "source_observation_id": "demo_observation",
+            "app_guess": "Chrome",
+            "state_guess": "browser_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
+            "visible_text": ["Search"],
+            "visible_text_boxes": [],
+            "visible_elements": [
+                {
+                    "id": "element_missing_bbox_search",
+                    "label": "search",
+                    "text": "search",
+                    "role": "button",
+                    "center": {"x": 468, "y": 105},
+                    "confidence": 0.96,
+                    "source": "manual",
+                    "risk_hint": "normal",
+                    "timestamp": DEMO_TIMESTAMP,
+                }
+            ],
+            "summary": "Demo browser window with a Search element missing bbox.",
+            "confidence": 0.99,
+        },
+        "expected": _expected_behavior(
+            action_type="no_op",
+            blocker_reason="target geometry unavailable",
+            accepted_blocker_reasons=GEOMETRY_UNAVAILABLE_REASONS,
+            target_source="manual",
+        ),
+    },
+    "mixed_manual_ui_tree_save": {
+        "default_task": "Save",
+        "ui_state": {
+            "ui_state_id": "state_demo_mixed_manual_ui_tree_save",
+            "source_observation_id": "demo_observation",
+            "app_guess": "Notepad",
+            "state_guess": "text_editor_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
+            "visible_text": ["Cancel", "Save"],
+            "visible_text_boxes": [],
+            "visible_elements": [
+                {
+                    "id": "element_manual_cancel",
+                    "label": "cancel",
+                    "text": "cancel",
+                    "role": "button",
+                    "bbox": {"x": 930, "y": 56, "width": 82, "height": 32},
+                    "center": {"x": 971, "y": 72},
+                    "confidence": 0.96,
+                    "source": "manual",
+                    "risk_hint": "normal",
+                    "timestamp": DEMO_TIMESTAMP,
+                },
+                {
+                    "id": "ui_tree_mixed_save_button",
+                    "label": "save",
+                    "text": "save",
+                    "role": "button",
+                    "bbox": {"x": 1040, "y": 56, "width": 82, "height": 32},
+                    "center": {"x": 1081, "y": 72},
+                    "confidence": 0.97,
+                    "source": "ui_tree",
+                    "risk_hint": "normal",
+                    "timestamp": DEMO_TIMESTAMP,
+                },
+            ],
+            "summary": "Demo text editor window with manual and ui_tree elements.",
+            "confidence": 0.99,
+        },
+        "expected": _expected_behavior(
+            action_type="target_hint",
+            action_contract_type="click",
+            preview_only=True,
+            click_readiness_status="blocked",
+            readiness_reason="preview-only contract",
+            blocker_reason="preview-only contract",
+            target_source="ui_tree",
+        ),
+    },
+    "no_visible_target": {
+        "default_task": "Search",
+        "ui_state": {
+            "ui_state_id": "state_demo_no_visible_target",
+            "source_observation_id": "demo_observation",
+            "app_guess": "Chrome",
+            "state_guess": "browser_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
+            "visible_text": [],
+            "visible_text_boxes": [],
+            "visible_elements": [],
+            "summary": "Demo browser window with no visible target elements.",
+            "confidence": 0.99,
+        },
+        "expected": _expected_behavior(
+            action_type="no_op",
+            blocker_reason="no visible target",
+            accepted_blocker_reasons=GEOMETRY_UNAVAILABLE_REASONS,
+        ),
     },
 }
 
@@ -216,12 +613,14 @@ def demo_scenario_input(name: str = DEFAULT_DEMO_SCENARIO, task: str = "") -> di
 
     effective_task = str(task or scenario["default_task"])
     ui_state = deepcopy(scenario["ui_state"])
+    expected = deepcopy(scenario.get("expected", {}))
     ui_state["task"] = effective_task
 
     return {
         "scenario": scenario_name,
         "task": effective_task,
         "ui_state": ui_state,
+        "expected": expected,
     }
 
 
@@ -240,6 +639,7 @@ def run_demo_scenario(name: str = DEFAULT_DEMO_SCENARIO, task: str = "") -> dict
         "scenario": scenario_name,
         "task": effective_task,
         "ui_state": ui_state,
+        "expected": scenario_input.get("expected", {}),
         "proposal": proposal,
         "safety_decision": safety_decision,
         "action_contract": action_contract,

@@ -395,6 +395,9 @@ def _validate_target_hint(
     if _bounded_float(element.get("confidence")) < MIN_TARGET_CONFIDENCE:
         return _invalid(f"target_element_id '{target_element_id}' confidence is too low.")
 
+    if _target_is_ambiguous(planner_context, element):
+        return _invalid(f"target_element_id '{target_element_id}' is ambiguous.")
+
     return _valid(
         {
             "type": "target_hint",
@@ -455,17 +458,26 @@ def _deterministic_mock_output(planner_context: dict[str, Any]) -> dict[str, Any
         }
 
     if task_tokens:
-        for element in _visible_element_items(planner_context):
-            if (
-                _bounded_float(element.get("confidence")) >= MIN_TARGET_CONFIDENCE
-                and _has_valid_bbox(element.get("bbox"))
-                and _tokens(str(element.get("label") or "")) & task_tokens
-            ):
+        matches = [
+            (_target_match_score(element, task_tokens), _bounded_float(element.get("confidence")), element)
+            for element in _visible_element_items(planner_context)
+            if _eligible_target_element(element)
+            and _target_match_score(element, task_tokens) > 0
+        ]
+        matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        if matches:
+            target = matches[0][2]
+            if _target_is_ambiguous(planner_context, target, task_tokens=task_tokens):
                 return {
-                    "type": "target_hint",
-                    "target_element_id": str(element.get("id") or ""),
-                    "reason": "The mock planner found a visible element matching the task text.",
+                    "type": "no_op",
+                    "reason": "Ambiguous visible elements matched the task; returning no_op.",
                 }
+
+            return {
+                "type": "target_hint",
+                "target_element_id": str(target.get("id") or ""),
+                "reason": "The mock planner found a visible element matching the task text.",
+            }
 
     return {
         "type": "no_op",
@@ -583,6 +595,49 @@ def _visible_element_items(planner_context: dict[str, Any]) -> list[dict[str, An
     return [element for element in items if isinstance(element, dict)]
 
 
+def _eligible_target_element(element: dict[str, Any]) -> bool:
+    return (
+        bool(str(element.get("id") or ""))
+        and _bounded_float(element.get("confidence")) >= MIN_TARGET_CONFIDENCE
+        and _has_valid_bbox(element.get("bbox"))
+    )
+
+
+def _target_match_score(element: dict[str, Any], task_tokens: set[str]) -> int:
+    return len(_tokens(str(element.get("label") or "")) & task_tokens)
+
+
+def _target_is_ambiguous(
+    planner_context: dict[str, Any],
+    target_element: dict[str, Any],
+    task_tokens: set[str] | None = None,
+) -> bool:
+    target_label = _normalized_label(str(target_element.get("label") or ""))
+    if not target_label:
+        return False
+
+    target_confidence = _bounded_float(target_element.get("confidence"))
+    effective_task_tokens = task_tokens if task_tokens is not None else _tokens(
+        str(planner_context.get("task") or "")
+    )
+    target_score = _target_match_score(target_element, effective_task_tokens)
+    if effective_task_tokens and target_score <= 0:
+        return False
+
+    tied_targets = [
+        element
+        for element in _visible_element_items(planner_context)
+        if _eligible_target_element(element)
+        and _normalized_label(str(element.get("label") or "")) == target_label
+        and abs(_bounded_float(element.get("confidence")) - target_confidence) <= 0.05
+        and (
+            not effective_task_tokens
+            or _target_match_score(element, effective_task_tokens) == target_score
+        )
+    ]
+    return len(tied_targets) > 1
+
+
 def _has_valid_bbox(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
@@ -688,6 +743,11 @@ def _normalized_action_type(value: Any) -> str:
 def _tokens(text: str) -> set[str]:
     normalized = "".join(character.lower() if character.isalnum() else " " for character in text)
     return {token for token in normalized.split() if len(token) >= 2}
+
+
+def _normalized_label(text: str) -> str:
+    normalized = "".join(character.lower() if character.isalnum() else " " for character in text)
+    return " ".join(normalized.split())
 
 
 def _target_app_from_task(task: str) -> str | None:
