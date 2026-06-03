@@ -66,7 +66,21 @@ Observation captures a local read-only snapshot: screenshot, cursor position, ac
 
 ### Understanding
 
-Understanding turns an observation into `ui_state`. Current perception is OCR-first and exposes fields such as `app_guess`, `state_guess`, `visible_text`, `visible_text_boxes`, and `visible_elements`.
+Understanding turns an observation into `ui_state`. Current perception is OCR-first and exposes fields such as `app_guess`, `state_guess`, `screen`, `visible_text`, `visible_text_boxes`, and normalized `visible_elements`.
+
+`visible_elements` use the `VisibleElement` schema from `observer.py`:
+
+- `id`: unique string
+- `label` and `text`: trimmed, lowercase, punctuation-stripped text
+- `role`: normalized role such as `text` or `button`
+- `bbox`: `{x, y, width, height}` integer screen coordinates
+- `center`: `{x, y}` derived from `bbox`
+- `confidence`: float from `0` to `1`
+- `source`: `ocr`, `ui_tree`, or `manual`
+- `risk_hint`: `normal`, `high_risk`, or `unknown`
+- `timestamp`: ISO8601 observation time
+
+Malformed, out-of-bounds, unlabeled, or non-normalized candidates are not used as grounded elements. This prevents partial OCR or fixture data from becoming target candidates.
 
 ### Planner
 
@@ -76,7 +90,7 @@ Planner proposes conservative read-only actions:
 - `switch_app_hint` when the task names a different app than the current `app_guess`
 - `no_op` when no reliable next step exists
 
-Planner does not produce executable click/type actions.
+Planner consumes the normalized `VisibleElement` fields only. Low-confidence elements are ignored, ambiguous same-label matches become `no_op`, and high-risk labels are marked as approval-gated proposal hints. Planner does not produce executable click/type actions.
 
 ### Safety Gate
 
@@ -92,7 +106,7 @@ This decision is surfaced in the UI and recorded with approval/reject audit even
 
 Action Contract converts some proposals into future-facing contracts:
 
-- `target_hint` with a bbox becomes a preview-only `click` contract
+- `target_hint` with normalized `bbox`, `center`, `role`, `source`, `confidence`, `risk_hint`, and `timestamp` becomes a preview-only `click` contract
 - `switch_app_hint` becomes a preview-only `switch_app` contract
 - `no_op` produces no contract
 
@@ -130,6 +144,8 @@ Click Readiness Policy decides whether a click contract could ever become eligib
 - the current permission profile does not allow click
 
 It also blocks high-risk labels such as `send`, `submit`, `delete`, `pay`, `confirm`, `password`, `login`, `发送`, `删除`, `支付`, `确认`, `密码`, and `登录`.
+
+Readiness consumes the same target schema fields carried by the preview contract. It checks bbox shape, screen bounds, center consistency, observation freshness, disabled click capability, permission profile, Safety Gate result, and high-risk labels or `target_risk_hint`. A passing readiness diagnostic still would not execute in v0.3 because click capability and permission remain disabled.
 
 ### Actuation
 

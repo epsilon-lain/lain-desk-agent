@@ -26,15 +26,24 @@ GET /proposal
     "type": "target_hint",
     "target": "element_0007",
     "target_element_id": "element_0007",
-    "target_label": "Search",
+    "target_label": "search",
     "target_bbox": {
       "x": 120,
       "y": 240,
       "width": 80,
       "height": 24
     },
+    "target_center": {
+      "x": 160,
+      "y": 252
+    },
+    "target_role": "text",
+    "target_confidence": 0.86,
+    "target_source": "ocr",
+    "target_risk_hint": "normal",
+    "target_timestamp": "2026-05-28T12:00:00Z",
     "parameters": {},
-    "reason": "The task mentions text similar to 'Search', and visible_elements contains a matching read-only element.",
+    "reason": "The task mentions text similar to 'search', and visible_elements contains a matching read-only text element with risk_hint 'normal'.",
     "risk": "low",
     "requires_approval": false
   }
@@ -61,6 +70,10 @@ Planner v1.1 is deterministic and rule-based:
   suggests a login flow, propose `wait_for_user` with `risk: high`.
 - If a `task` query parameter is supplied, match task tokens against
   `visible_elements[*].label`. A confident match becomes a `target_hint`.
+- If multiple same-label candidates are similarly confident, return `no_op`
+  instead of guessing.
+- If a matched element has `risk_hint: "high_risk"`, keep the output
+  proposal-only but mark it `risk: "high"` and `requires_approval: true`.
 - If no task is supplied, only a small set of generic labels such as `Search`,
   `Find`, `OK`, `Done`, `Continue`, `Open`, `New`, or `Save` can become a
   `target_hint`.
@@ -80,8 +93,8 @@ Planner Proposal v1.1 does not use:
 It does not add executable `click`, `type`, `hotkey`, or `scroll` actions.
 Planner reads `visible_elements` only; it does not care whether an element came
 from OCR, DOM, accessibility, or vision. Planner context keeps those elements
-compact and normalized with `id`, `label`/`text`, `type`/`kind`, `bbox`,
-`confidence`, `source`, and `risk_hint` when inferable. These fields improve
+compact and normalized with `id`, `label`/`text`, `role`, `bbox`, `center`,
+`confidence`, `source`, `risk_hint`, and `timestamp`. These fields improve
 read-only grounding only; they do not enable execution.
 
 ## App mismatch hint
@@ -126,7 +139,7 @@ This lets Planner produce a target hint like:
 {
   "type": "target_hint",
   "target_element_id": "element_0007",
-  "reason": "The task mentions text similar to 'Search', and visible_elements contains a matching read-only element.",
+  "reason": "The task mentions text similar to 'search', and visible_elements contains a matching read-only text element with risk_hint 'normal'.",
   "risk": "low",
   "requires_approval": false
 }

@@ -85,16 +85,18 @@ Goal: evaluate the optional `ai_proposal` planner while keeping it proposal-only
 
 ## Phase 5: Better Read-only Grounding
 
-Status: started with compact visible-element normalization and high-risk label
-hints.
+Status: schema baseline implemented; richer read-only sources still pending.
 
 Goal: improve `visible_elements` without adding desktop control.
 
-- Normalize planner-context visible elements into a stable compact shape:
-  `id`, `label`/`text`, `type`/`kind`, `bbox`, `confidence`, `source`, and
-  `risk_hint`.
-- Keep OCR/demo/accessibility-stub sources explicitly marked as read-only
-  grounding.
+- Normalize visible elements into the stable `VisibleElement` shape:
+  `id`, normalized `label`/`text`, `role`, `bbox`, `center`, `confidence`,
+  `source`, `risk_hint`, and `timestamp`.
+- Keep sources explicitly marked as read-only grounding with source values
+  limited to `ocr`, `ui_tree`, or `manual`.
+- Filter malformed, out-of-bounds, unlabeled, and invalid-schema elements
+  before they can become planner targets.
+- Treat low-confidence or ambiguous target matches as `no_op`.
 - Add an accessibility source, DOM source, or improved OCR source.
 - Keep every grounding source read-only.
 - Improve visible element labels, bounding boxes, confidence scores, and source
@@ -105,8 +107,8 @@ Goal: improve `visible_elements` without adding desktop control.
 ## Phase 6: Click Readiness Hardening
 
 Status: started with structured readiness checks for preview-only click
-contracts, Cockpit visibility for readiness diagnostics, and copy-friendly
-debug summaries.
+contracts, center/bbox consistency checks, Cockpit visibility for readiness
+diagnostics, and copy-friendly debug summaries.
 
 Goal: make preview-only click contracts safer before any real click experiment.
 
@@ -114,6 +116,8 @@ Goal: make preview-only click contracts safer before any real click experiment.
 - Add stale observation checks.
 - Add coordinate and DPI checks.
 - Improve bbox and center validation.
+- Consume preview-contract target schema fields such as role, source,
+  confidence, timestamp, and `target_risk_hint`.
 - Show structured readiness diagnostics in the Cockpit for live proposals and
   planner evaluation reports.
 - Provide copy-friendly read-only readiness debug summaries for blocked click

@@ -1,6 +1,6 @@
-# Understanding v1.2
+# Understanding v1.3
 
-Understanding v1.2 is a read-only layer that converts an Observation snapshot
+Understanding v1.3 is a read-only layer that converts an Observation snapshot
 into a simple UI state snapshot.
 
 OCR belongs in Understanding, not Observation. Observation captures raw desktop
@@ -12,7 +12,7 @@ verification, or mouse/keyboard control.
 
 ## Input
 
-Understanding v1.2 receives the Observation JSON returned by `observe()`:
+Understanding v1.3 receives the Observation JSON returned by `observe()`:
 
 ```json
 {
@@ -42,6 +42,10 @@ Understanding v1.2 receives the Observation JSON returned by `observe()`:
   "source_observation_id": "obs_0001",
   "app_guess": "Chrome",
   "state_guess": "browser_window",
+  "screen": {
+    "width": 1920,
+    "height": 1080
+  },
   "visible_text": ["Example text"],
   "visible_text_boxes": [
     {
@@ -60,20 +64,23 @@ Understanding v1.2 receives the Observation JSON returned by `observe()`:
   "visible_elements": [
     {
       "id": "element_0001",
-      "source": "ocr",
-      "type": "text",
-      "kind": "text",
-      "label": "Example",
-      "text": "Example",
+      "label": "example",
+      "text": "example",
+      "role": "text",
       "bbox": {
         "x": 120,
         "y": 240,
         "width": 80,
         "height": 24
       },
+      "center": {
+        "x": 160,
+        "y": 252
+      },
       "confidence": 0.86,
-      "source_ref": "ocr_0001",
-      "risk_hint": "none"
+      "source": "ocr",
+      "risk_hint": "normal",
+      "timestamp": "2026-05-28T12:00:00Z"
     }
   ],
   "summary": "The active window appears to be Chrome. OCR detected 1 text line(s). No UI elements are recognized yet.",
@@ -92,11 +99,13 @@ The implementation is intentionally conservative:
 - `visible_text` comes from OCR against `observation.screen.screenshot_path`.
 - `visible_text_boxes` comes from OCR word-level data and includes text,
   bounding box, and normalized confidence.
-- `visible_elements` maps OCR boxes into text-only elements with
-  `type: "text"` and `kind: "text"`.
+- `visible_elements` maps OCR boxes into normalized `VisibleElement` records
+  with `role: "text"`, derived centers, source metadata, and timestamps.
 - High-risk labels such as `Send` or `Delete` receive a compact
-  `risk_hint: "high"` marker. This is a hint for downstream safety display and
-  validation only; it does not enable execution.
+  `risk_hint: "high_risk"` marker. This is a hint for downstream safety
+  display and validation only; it does not enable execution.
+- Malformed, out-of-bounds, unlabeled, or non-normalized OCR boxes are filtered
+  before they become `visible_elements`.
 - `confidence` remains low because OCR text is not the same as UI element
   detection.
 
@@ -106,7 +115,7 @@ The implementation is intentionally conservative:
   quick display.
 - `visible_text_boxes` is OCR word-level data with text, bbox, and OCR
   confidence.
-- `visible_elements` is the unified UI-state element list. In v1.2, OCR boxes
+- `visible_elements` is the unified UI-state element list. In v1.3, OCR boxes
   are mapped into this list only as text elements.
 
 OCR text elements use this shape:
@@ -114,20 +123,23 @@ OCR text elements use this shape:
 ```json
 {
   "id": "element_0001",
-  "source": "ocr",
-  "type": "text",
-  "kind": "text",
-  "label": "Search",
-  "text": "Search",
+  "label": "search",
+  "text": "search",
+  "role": "text",
   "bbox": {
     "x": 120,
     "y": 240,
     "width": 80,
     "height": 24
   },
+  "center": {
+    "x": 160,
+    "y": 252
+  },
   "confidence": 0.86,
-  "source_ref": "ocr_0001",
-  "risk_hint": "none"
+  "source": "ocr",
+  "risk_hint": "normal",
+  "timestamp": "2026-05-28T12:00:00Z"
 }
 ```
 
@@ -181,7 +193,7 @@ verify:
 tesseract --version
 ```
 
-If Tesseract is not on `PATH`, Understanding v1.2 also tries the default Windows
+If Tesseract is not on `PATH`, Understanding v1.3 also tries the default Windows
 path:
 
 ```text
@@ -194,9 +206,9 @@ Verify that Python can call Tesseract:
 python -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 ```
 
-Understanding v1.2 does not infer buttons, input boxes, menus, links, or
+Understanding v1.3 does not infer buttons, input boxes, menus, links, or
 clickable elements from OCR text boxes. OCR boxes are mapped into
-`visible_elements` only as `type: "text"`.
+`visible_elements` only as `role: "text"`.
 
 Future structured sources may also feed `visible_elements`, but are not
 implemented yet:
