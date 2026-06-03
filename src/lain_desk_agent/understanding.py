@@ -1,4 +1,4 @@
-"""Understanding v1.2: convert an observation into a simple read-only UI state."""
+"""Understanding v1.3: convert an observation into normalized read-only UI state."""
 
 from __future__ import annotations
 
@@ -7,7 +7,11 @@ from pathlib import Path
 from shutil import which
 from typing import Any
 
-from .click_policy import HIGH_RISK_LABELS
+from .observer import (
+    normalize_visible_elements,
+    visible_element_from_text_box,
+    visible_elements_from_ui_tree,
+)
 
 
 DEFAULT_WINDOWS_TESSERACT = Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe")
@@ -19,6 +23,7 @@ class UIState:
     source_observation_id: str
     app_guess: str | None
     state_guess: str
+    screen: dict[str, Any] | None = None
     visible_text: list[str] = field(default_factory=list)
     visible_text_boxes: list[dict[str, Any]] = field(default_factory=list)
     visible_elements: list[dict[str, Any]] = field(default_factory=list)
@@ -35,15 +40,23 @@ def understand(observation: dict[str, Any]) -> dict[str, Any]:
     observation_id = str(observation.get("observation_id") or "obs_0001")
     active_window = observation.get("active_window") or {}
     screen = observation.get("screen") or {}
+    timestamp = str(observation.get("timestamp") or "")
     title = active_window.get("title")
     app_name = active_window.get("app_name")
     screenshot_path = screen.get("screenshot_path")
+    screen_size = _screen_size(screen)
 
     app_guess = _guess_app(app_name, title)
     state_guess = _guess_state(app_guess, app_name, title)
     visible_text = _extract_visible_text(screenshot_path)
     visible_text_boxes = _extract_visible_text_boxes(screenshot_path)
-    visible_elements = _visible_elements_from_text_boxes(visible_text_boxes)
+    visible_elements = _visible_elements_from_sources(
+        visible_text_boxes=visible_text_boxes,
+        ui_tree=_ui_tree_from_observation(observation),
+        existing_elements=observation.get("visible_elements"),
+        screen=screen_size,
+        timestamp=timestamp,
+    )
     confidence = _confidence(app_guess, visible_text)
     summary = _build_summary(app_guess, visible_text)
 
@@ -52,6 +65,7 @@ def understand(observation: dict[str, Any]) -> dict[str, Any]:
         source_observation_id=observation_id,
         app_guess=app_guess,
         state_guess=state_guess,
+        screen=screen_size,
         visible_text=visible_text,
         visible_text_boxes=visible_text_boxes,
         visible_elements=visible_elements,
@@ -249,43 +263,78 @@ def _normalize_ocr_confidence(value: Any) -> float:
     return max(0.0, min(confidence, 1.0))
 
 
-def _visible_elements_from_text_boxes(text_boxes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _visible_elements_from_text_boxes(
+    text_boxes: list[dict[str, Any]],
+    screen: dict[str, Any] | None = None,
+    timestamp: str | None = None,
+) -> list[dict[str, Any]]:
+    """Normalize OCR boxes into VisibleElement records for read-only planning."""
+
     elements = []
 
     for text_box in text_boxes:
-        elements.append(
-            {
-                "id": f"element_{len(elements) + 1:04d}",
-                "source": "ocr",
-                "type": "text",
-                "kind": "text",
-                "label": str(text_box.get("text") or ""),
-                "text": str(text_box.get("text") or ""),
-                "bbox": text_box.get("bbox") or {},
-                "confidence": text_box.get("confidence", 0.0),
-                "source_ref": text_box.get("id"),
-                "risk_hint": _risk_hint_for_label(text_box.get("text")),
-            }
+        element = visible_element_from_text_box(
+            text_box,
+            index=len(elements),
+            screen=screen,
+            timestamp=timestamp,
         )
+        if element is not None:
+            elements.append(element)
 
     return elements
 
 
-def _risk_hint_for_label(label: Any) -> str:
-    normalized_label = _normalized_text(label)
-    if not normalized_label:
-        return "none"
+def _visible_elements_from_sources(
+    visible_text_boxes: list[dict[str, Any]],
+    ui_tree: Any,
+    existing_elements: Any,
+    screen: dict[str, Any] | None = None,
+    timestamp: str | None = None,
+) -> list[dict[str, Any]]:
+    """Fuse read-only OCR, ui_tree, and fixture elements into one schema."""
 
-    for high_risk_label in HIGH_RISK_LABELS:
-        normalized_risk = _normalized_text(high_risk_label)
-        if normalized_risk and normalized_risk in normalized_label:
-            return "high"
+    elements = [
+        *_visible_elements_from_text_boxes(
+            visible_text_boxes,
+            screen=screen,
+            timestamp=timestamp,
+        ),
+        *visible_elements_from_ui_tree(
+            ui_tree,
+            screen=screen,
+            timestamp=timestamp,
+        ),
+        *normalize_visible_elements(
+            existing_elements,
+            screen=screen,
+            timestamp=timestamp,
+        ),
+    ]
 
-    return "none"
+    return normalize_visible_elements(elements, screen=screen, timestamp=timestamp)
 
 
-def _normalized_text(value: Any) -> str:
-    return " ".join(str(value or "").casefold().split())
+def _ui_tree_from_observation(observation: dict[str, Any]) -> Any:
+    for key in ["ui_tree", "ui_tree_elements", "accessibility_tree"]:
+        value = observation.get(key)
+        if value:
+            return value
+
+    return None
+
+
+def _screen_size(screen: dict[str, Any]) -> dict[str, int] | None:
+    try:
+        width = int(screen["width"])
+        height = int(screen["height"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    if width <= 0 or height <= 0:
+        return None
+
+    return {"width": width, "height": height}
 
 
 def _configure_tesseract(pytesseract: Any) -> bool:

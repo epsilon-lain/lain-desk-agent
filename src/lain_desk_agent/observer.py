@@ -102,6 +102,68 @@ def visible_element_from_text_box(
     )
 
 
+def visible_element_from_ui_tree_node(
+    node: dict[str, Any],
+    index: int,
+    screen: dict[str, Any] | None = None,
+    timestamp: str | None = None,
+) -> dict[str, Any] | None:
+    """Convert one fixture-provided UI tree node into VisibleElement.
+
+    This adapter is read-only and intentionally accepts plain dictionaries. It
+    does not call platform accessibility, automation, mouse, or keyboard APIs.
+    Hidden or disabled nodes are retained only as low-confidence grounding, so
+    planners can show/debug them without treating them as safe targets.
+    """
+
+    if not isinstance(node, dict):
+        return None
+
+    visible = _truthy_ui_tree_flag(node.get("is_visible"), default=True)
+    enabled = _truthy_ui_tree_flag(node.get("is_enabled"), default=True)
+    actionable = visible and enabled
+    confidence = normalize_confidence(node.get("confidence", 1.0 if actionable else 0.0))
+    if not actionable:
+        confidence = 0.0
+
+    return normalize_visible_element(
+        {
+            "id": _ui_tree_node_id(node, index),
+            "source": "ui_tree",
+            "role": _ui_tree_role(node),
+            "label": _ui_tree_text(node, ["name", "label", "title", "value", "text", "automation_id"]),
+            "text": _ui_tree_text(node, ["text", "name", "label", "title", "value", "automation_id"]),
+            "bbox": _ui_tree_bbox(node),
+            "confidence": confidence,
+            "risk_hint": node.get("risk_hint") if actionable else "unknown",
+        },
+        index=index,
+        screen=screen,
+        timestamp=timestamp or node.get("timestamp"),
+    )
+
+
+def visible_elements_from_ui_tree(
+    ui_tree: Any,
+    screen: dict[str, Any] | None = None,
+    timestamp: str | None = None,
+) -> list[dict[str, Any]]:
+    """Normalize fixture-friendly UI tree input into VisibleElement records."""
+
+    elements: list[dict[str, Any]] = []
+    for node in _flatten_ui_tree_nodes(ui_tree):
+        element = visible_element_from_ui_tree_node(
+            node,
+            index=len(elements),
+            screen=screen,
+            timestamp=timestamp,
+        )
+        if element is not None:
+            elements.append(element)
+
+    return normalize_visible_elements(elements, screen=screen, timestamp=timestamp)
+
+
 def normalize_visible_elements(
     elements: Any,
     screen: dict[str, Any] | None = None,
@@ -383,6 +445,79 @@ def _first_text(element: dict[str, Any], keys: list[str]) -> str:
             return text
 
     return ""
+
+
+def _flatten_ui_tree_nodes(value: Any) -> list[dict[str, Any]]:
+    nodes: list[dict[str, Any]] = []
+
+    if isinstance(value, list):
+        for item in value:
+            nodes.extend(_flatten_ui_tree_nodes(item))
+        return nodes
+
+    if not isinstance(value, dict):
+        return nodes
+
+    nodes.append(value)
+    for key in ["children", "items", "nodes", "elements"]:
+        children = value.get(key)
+        if isinstance(children, list):
+            for child in children:
+                nodes.extend(_flatten_ui_tree_nodes(child))
+
+    return nodes
+
+
+def _ui_tree_node_id(node: dict[str, Any], index: int) -> str:
+    for key in ["id", "automation_id", "runtime_id", "name", "text"]:
+        value = node.get(key)
+        if value:
+            return f"ui_tree_{value}"
+
+    return f"ui_tree_{index + 1:04d}"
+
+
+def _ui_tree_role(node: dict[str, Any]) -> str:
+    return _ui_tree_text(node, ["control_type", "role", "type", "kind"]) or "unknown"
+
+
+def _ui_tree_text(node: dict[str, Any], keys: list[str]) -> str:
+    for key in keys:
+        value = node.get(key)
+        if value is None:
+            continue
+
+        text = str(value).strip()
+        if text:
+            return text
+
+    return ""
+
+
+def _ui_tree_bbox(node: dict[str, Any]) -> Any:
+    for key in ["bounding_rectangle", "bbox", "bounds", "rect"]:
+        value = node.get(key)
+        if isinstance(value, dict):
+            return value
+
+    return None
+
+
+def _truthy_ui_tree_flag(value: Any, default: bool) -> bool:
+    if value is None:
+        return default
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y", "visible", "enabled"}:
+            return True
+        if normalized in {"false", "0", "no", "n", "hidden", "disabled"}:
+            return False
+
+    return bool(value)
 
 
 def _normalized_element_id(value: Any, index: int) -> str:

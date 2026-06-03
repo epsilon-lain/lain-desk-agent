@@ -26,6 +26,7 @@ BLOCKED_EXECUTABLE_ACTION_TYPES = {
     "switch_app",
 }
 MAX_REASON_LENGTH = 240
+MIN_TARGET_CONFIDENCE = 0.45
 PLANNER_MODE_ENV = "LAIN_AGENT_PLANNER_MODE"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 RULE_BASED_MODE = "rule_based"
@@ -391,6 +392,9 @@ def _validate_target_hint(
     if not _has_valid_bbox(bbox):
         return _invalid(f"target_element_id '{target_element_id}' does not have a valid bbox.")
 
+    if _bounded_float(element.get("confidence")) < MIN_TARGET_CONFIDENCE:
+        return _invalid(f"target_element_id '{target_element_id}' confidence is too low.")
+
     return _valid(
         {
             "type": "target_hint",
@@ -398,13 +402,19 @@ def _validate_target_hint(
             "target_element_id": target_element_id,
             "target_label": str(element.get("label") or ""),
             "target_bbox": bbox,
+            "target_center": element.get("center") if isinstance(element.get("center"), dict) else {},
+            "target_role": str(element.get("role") or ""),
+            "target_confidence": _bounded_float(element.get("confidence")),
+            "target_source": str(element.get("source") or ""),
+            "target_risk_hint": str(element.get("risk_hint") or "unknown"),
+            "target_timestamp": str(element.get("timestamp") or ""),
             "parameters": {},
             "reason": _reason(
                 action,
                 f"Mock AI planner selected visible element '{target_element_id}'.",
             ),
-            "risk": "low",
-            "requires_approval": False,
+            "risk": _risk_from_visible_element(element),
+            "requires_approval": _requires_approval_from_visible_element(element),
         }
     )
 
@@ -446,7 +456,11 @@ def _deterministic_mock_output(planner_context: dict[str, Any]) -> dict[str, Any
 
     if task_tokens:
         for element in _visible_element_items(planner_context):
-            if _tokens(str(element.get("label") or "")) & task_tokens:
+            if (
+                _bounded_float(element.get("confidence")) >= MIN_TARGET_CONFIDENCE
+                and _has_valid_bbox(element.get("bbox"))
+                and _tokens(str(element.get("label") or "")) & task_tokens
+            ):
                 return {
                     "type": "target_hint",
                     "target_element_id": str(element.get("id") or ""),
@@ -467,14 +481,15 @@ def _compact_visible_elements(planner_context: dict[str, Any]) -> dict[str, Any]
     items = [
         {
             "id": str(element.get("id") or ""),
-            "type": str(element.get("type") or ""),
-            "kind": str(element.get("kind") or element.get("type") or ""),
             "label": str(element.get("label") or ""),
             "text": str(element.get("text") or ""),
+            "role": str(element.get("role") or ""),
             "bbox": element.get("bbox") if isinstance(element.get("bbox"), dict) else None,
+            "center": element.get("center") if isinstance(element.get("center"), dict) else None,
             "confidence": _bounded_float(element.get("confidence")),
             "source": str(element.get("source") or ""),
-            "risk_hint": str(element.get("risk_hint") or "none"),
+            "risk_hint": str(element.get("risk_hint") or "unknown"),
+            "timestamp": str(element.get("timestamp") or ""),
         }
         for element in _visible_element_items(planner_context)
     ]
@@ -581,6 +596,14 @@ def _has_valid_bbox(value: Any) -> bool:
         return False
 
     return all(math.isfinite(number) for number in [x, y, width, height]) and width > 0 and height > 0
+
+
+def _risk_from_visible_element(element: dict[str, Any]) -> str:
+    return "high" if str(element.get("risk_hint") or "") == "high_risk" else "low"
+
+
+def _requires_approval_from_visible_element(element: dict[str, Any]) -> bool:
+    return str(element.get("risk_hint") or "") == "high_risk"
 
 
 def _proposal_id_from_context(planner_context: dict[str, Any]) -> str:

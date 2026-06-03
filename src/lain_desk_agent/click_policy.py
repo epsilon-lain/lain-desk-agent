@@ -1,4 +1,4 @@
-"""Click Readiness Policy v0.1: strict non-executing click eligibility checks."""
+"""Click Readiness Policy v0.2: strict non-executing click eligibility checks."""
 
 from __future__ import annotations
 
@@ -6,28 +6,7 @@ import math
 from datetime import datetime, timezone
 from typing import Any
 
-
-HIGH_RISK_LABELS = [
-    "send",
-    "submit",
-    "delete",
-    "remove",
-    "pay",
-    "purchase",
-    "buy",
-    "confirm",
-    "password",
-    "login",
-    "sign in",
-    "log in",
-    "发送",
-    "删除",
-    "支付",
-    "购买",
-    "确认",
-    "密码",
-    "登录",
-]
+from .observer import HIGH_RISK_LABELS, normalize_label_text
 
 REQUIRED_CHECKS = [
     "action_contract exists",
@@ -38,6 +17,7 @@ REQUIRED_CHECKS = [
     "bbox has valid x, y, width, height",
     "bbox is inside screen bounds when screen bounds are available",
     "center has valid x, y",
+    "center matches bbox center",
     "click capability is enabled and executable",
     "permission profile allows click",
     "safety decision is not blocked",
@@ -96,11 +76,13 @@ def evaluate_click_readiness(
         _add_check(checks, "bbox_present", True)
         _add_check(checks, "bbox_shape", True)
 
-    if not _valid_point(action_contract.get("center")):
+    center = _normalized_point(action_contract.get("center"))
+    if center is None:
         _block(checks, reasons, "center_shape", "invalid center")
     else:
         _add_check(checks, "center_shape", True)
 
+    _check_center_matches_bbox(checks, reasons, bbox, center)
     _check_screen_bounds(checks, reasons, bbox, screen)
 
     _check_observation_freshness(
@@ -229,17 +211,22 @@ def _bbox_status(value: Any) -> tuple[str, dict[str, float] | None]:
     return "valid", bbox
 
 
-def _valid_point(value: Any) -> bool:
+def _normalized_point(value: Any) -> dict[str, float] | None:
     if not isinstance(value, dict):
-        return False
+        return None
 
     try:
-        x = float(value["x"])
-        y = float(value["y"])
+        point = {
+            "x": float(value["x"]),
+            "y": float(value["y"]),
+        }
     except (KeyError, TypeError, ValueError):
-        return False
+        return None
 
-    return math.isfinite(x) and math.isfinite(y)
+    if not all(math.isfinite(number) for number in point.values()):
+        return None
+
+    return point
 
 
 def _capability_allows_click(capability: dict[str, Any] | None) -> bool:
@@ -284,6 +271,31 @@ def _check_screen_bounds(
         return
 
     _add_check(checks, "bbox_screen_bounds", True)
+
+
+def _check_center_matches_bbox(
+    checks: list[dict[str, Any]],
+    reasons: list[str],
+    bbox: dict[str, float] | None,
+    center: dict[str, float] | None,
+) -> None:
+    if bbox is None or center is None:
+        _add_check(checks, "center_bbox_consistency", "not_applicable", "bbox or center unavailable")
+        return
+
+    expected = {
+        "x": round(bbox["x"] + bbox["width"] / 2),
+        "y": round(bbox["y"] + bbox["height"] / 2),
+    }
+    actual = {
+        "x": round(center["x"]),
+        "y": round(center["y"]),
+    }
+    if actual != expected:
+        _block(checks, reasons, "center_bbox_consistency", "center does not match bbox")
+        return
+
+    _add_check(checks, "center_bbox_consistency", True)
 
 
 def _screen_bounds(screen: dict[str, Any] | None) -> tuple[float, float] | None:
@@ -384,9 +396,9 @@ def _safety_blocks(safety_decision: dict[str, Any] | None) -> bool:
 
 
 def _has_high_risk_label(action_contract: dict[str, Any]) -> bool:
-    label = _normalized_label_text(action_contract.get("target_label"))
-    return any(_normalized_label_text(high_risk_label) in label for high_risk_label in HIGH_RISK_LABELS)
+    risk_hint = str(action_contract.get("target_risk_hint") or "").strip().lower()
+    if risk_hint in {"high", "high_risk"}:
+        return True
 
-
-def _normalized_label_text(value: Any) -> str:
-    return " ".join(str(value or "").casefold().split())
+    label = normalize_label_text(action_contract.get("target_label"))
+    return any(normalize_label_text(high_risk_label) in label for high_risk_label in HIGH_RISK_LABELS)

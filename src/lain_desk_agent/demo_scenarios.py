@@ -14,6 +14,8 @@ from .safety import assess_proposal
 
 
 DEFAULT_DEMO_SCENARIO = "browser_search"
+DEMO_TIMESTAMP = "2026-01-01T00:00:00Z"
+DEMO_SCREEN = {"width": 1440, "height": 900}
 
 
 class UnknownDemoScenarioError(ValueError):
@@ -28,16 +30,22 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
             "source_observation_id": "demo_observation",
             "app_guess": "Chrome",
             "state_guess": "browser_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
             "visible_text": ["Search"],
             "visible_text_boxes": [],
             "visible_elements": [
                 {
                     "id": "element_demo_search",
-                    "source": "demo",
-                    "type": "button",
-                    "label": "Search",
+                    "label": "search",
+                    "text": "search",
+                    "role": "button",
                     "bbox": {"x": 420, "y": 88, "width": 96, "height": 34},
+                    "center": {"x": 468, "y": 105},
                     "confidence": 0.96,
+                    "source": "manual",
+                    "risk_hint": "normal",
+                    "timestamp": DEMO_TIMESTAMP,
                 }
             ],
             "summary": "Demo Chrome window with a visible Search button-like element.",
@@ -51,16 +59,22 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
             "source_observation_id": "demo_observation",
             "app_guess": "WeChat",
             "state_guess": "messaging_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
             "visible_text": ["Send"],
             "visible_text_boxes": [],
             "visible_elements": [
                 {
                     "id": "element_demo_send",
-                    "source": "demo",
-                    "type": "button",
-                    "label": "Send",
+                    "label": "send",
+                    "text": "send",
+                    "role": "button",
                     "bbox": {"x": 890, "y": 700, "width": 84, "height": 36},
+                    "center": {"x": 932, "y": 718},
                     "confidence": 0.97,
+                    "source": "manual",
+                    "risk_hint": "high_risk",
+                    "timestamp": DEMO_TIMESTAMP,
                 }
             ],
             "summary": "Demo WeChat window with a high-risk Send target.",
@@ -74,16 +88,22 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
             "source_observation_id": "demo_observation",
             "app_guess": "File Explorer",
             "state_guess": "file_manager_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
             "visible_text": ["Delete"],
             "visible_text_boxes": [],
             "visible_elements": [
                 {
                     "id": "element_demo_delete",
-                    "source": "demo",
-                    "type": "button",
-                    "label": "Delete",
+                    "label": "delete",
+                    "text": "delete",
+                    "role": "button",
                     "bbox": {"x": 168, "y": 54, "width": 82, "height": 32},
+                    "center": {"x": 209, "y": 70},
                     "confidence": 0.95,
+                    "source": "manual",
+                    "risk_hint": "high_risk",
+                    "timestamp": DEMO_TIMESTAMP,
                 }
             ],
             "summary": "Demo File Explorer window with a high-risk Delete target.",
@@ -97,19 +117,83 @@ _SCENARIOS: dict[str, dict[str, Any]] = {
             "source_observation_id": "demo_observation",
             "app_guess": "Chrome",
             "state_guess": "browser_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
             "visible_text": ["Search"],
             "visible_text_boxes": [],
             "visible_elements": [
                 {
                     "id": "element_demo_chrome_search",
-                    "source": "demo",
-                    "type": "button",
-                    "label": "Search",
+                    "label": "search",
+                    "text": "search",
+                    "role": "button",
                     "bbox": {"x": 420, "y": 88, "width": 96, "height": 34},
+                    "center": {"x": 468, "y": 105},
                     "confidence": 0.96,
+                    "source": "manual",
+                    "risk_hint": "normal",
+                    "timestamp": DEMO_TIMESTAMP,
                 }
             ],
             "summary": "Demo Chrome window while the task asks for WeChat.",
+            "confidence": 0.99,
+        },
+    },
+    "ui_tree_save": {
+        "default_task": "Save",
+        "ui_state": {
+            "ui_state_id": "state_demo_ui_tree_save",
+            "source_observation_id": "demo_observation",
+            "app_guess": "Notepad",
+            "state_guess": "text_editor_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
+            "visible_text": ["Save"],
+            "visible_text_boxes": [],
+            "visible_elements": [
+                {
+                    "id": "ui_tree_save_button",
+                    "label": "save",
+                    "text": "save",
+                    "role": "button",
+                    "bbox": {"x": 1040, "y": 56, "width": 82, "height": 32},
+                    "center": {"x": 1081, "y": 72},
+                    "confidence": 0.97,
+                    "source": "ui_tree",
+                    "risk_hint": "normal",
+                    "timestamp": DEMO_TIMESTAMP,
+                }
+            ],
+            "summary": "Demo text editor window with a read-only ui_tree Save button.",
+            "confidence": 0.99,
+        },
+    },
+    "ui_tree_disabled_save": {
+        "default_task": "Save",
+        "ui_state": {
+            "ui_state_id": "state_demo_ui_tree_disabled_save",
+            "source_observation_id": "demo_observation",
+            "app_guess": "Notepad",
+            "state_guess": "text_editor_window",
+            "screen": DEMO_SCREEN,
+            "observation_timestamp": DEMO_TIMESTAMP,
+            "visible_text": ["Save"],
+            "visible_text_boxes": [],
+            "visible_elements": [
+                {
+                    "id": "ui_tree_disabled_save_button",
+                    "label": "save",
+                    "text": "save",
+                    "role": "button",
+                    "bbox": {"x": 1040, "y": 56, "width": 82, "height": 32},
+                    "center": {"x": 1081, "y": 72},
+                    "confidence": 0.0,
+                    "source": "ui_tree",
+                    "risk_hint": "unknown",
+                    "timestamp": DEMO_TIMESTAMP,
+                }
+            ],
+            "summary": "Demo text editor window with a disabled ui_tree Save button.",
             "confidence": 0.99,
         },
     },

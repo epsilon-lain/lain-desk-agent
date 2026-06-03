@@ -7,6 +7,10 @@ OCR belongs in Understanding, not Observation. Observation captures raw desktop
 state and saves the screenshot path. Understanding may read that screenshot and
 extract `visible_text` from it.
 
+Fixture-provided `ui_tree`, `ui_tree_elements`, or `accessibility_tree` data may
+also be supplied in an Observation object. This is a read-only dictionary input
+path for tests and demos; it does not query live platform accessibility APIs.
+
 This layer does not use AI vision, planning, safety decisions, actuation,
 verification, or mouse/keyboard control.
 
@@ -101,6 +105,12 @@ The implementation is intentionally conservative:
   bounding box, and normalized confidence.
 - `visible_elements` maps OCR boxes into normalized `VisibleElement` records
   with `role: "text"`, derived centers, source metadata, and timestamps.
+- Fixture-provided `ui_tree` nodes map `name`/`text` to normalized
+  `label`/`text`, `control_type` to `role`, and `bounding_rectangle` to `bbox`.
+  Their `source` is `ui_tree`.
+- Hidden or disabled `ui_tree` nodes are kept only as low-confidence debug
+  grounding with `risk_hint: "unknown"`; planners do not treat them as target
+  candidates.
 - High-risk labels such as `Send` or `Delete` receive a compact
   `risk_hint: "high_risk"` marker. This is a hint for downstream safety
   display and validation only; it does not enable execution.
@@ -116,7 +126,8 @@ The implementation is intentionally conservative:
 - `visible_text_boxes` is OCR word-level data with text, bbox, and OCR
   confidence.
 - `visible_elements` is the unified UI-state element list. In v1.3, OCR boxes
-  are mapped into this list only as text elements.
+  are mapped into this list only as text elements, while fixture `ui_tree` nodes
+  can contribute richer roles such as `button`.
 
 OCR text elements use this shape:
 
@@ -214,7 +225,7 @@ Future structured sources may also feed `visible_elements`, but are not
 implemented yet:
 
 - Browser DOM / HTML through explicit browser integration.
-- Windows accessibility tree.
+- Live Windows accessibility tree.
 - Vision model output.
 
 These future sources should be fused conservatively into `visible_elements`

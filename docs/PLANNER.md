@@ -72,6 +72,8 @@ Planner v1.1 is deterministic and rule-based:
   `visible_elements[*].label`. A confident match becomes a `target_hint`.
 - If multiple same-label candidates are similarly confident, return `no_op`
   instead of guessing.
+- If a target candidate has low confidence, including a hidden or disabled
+  fixture `ui_tree` node, return `no_op` instead of targeting it.
 - If a matched element has `risk_hint: "high_risk"`, keep the output
   proposal-only but mark it `risk: "high"` and `requires_approval: true`.
 - If no task is supplied, only a small set of generic labels such as `Search`,
@@ -92,10 +94,14 @@ Planner Proposal v1.1 does not use:
 
 It does not add executable `click`, `type`, `hotkey`, or `scroll` actions.
 Planner reads `visible_elements` only; it does not care whether an element came
-from OCR, DOM, accessibility, or vision. Planner context keeps those elements
+from OCR, fixture `ui_tree`, DOM, accessibility, or vision. Planner context keeps those elements
 compact and normalized with `id`, `label`/`text`, `role`, `bbox`, `center`,
 `confidence`, `source`, `risk_hint`, and `timestamp`. These fields improve
 read-only grounding only; they do not enable execution.
+
+The optional AI planner receives the same compact fields and local validation
+rejects low-confidence `target_hint` selections before they can become
+proposal actions.
 
 ## App mismatch hint
 

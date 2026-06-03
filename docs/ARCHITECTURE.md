@@ -82,6 +82,13 @@ Understanding turns an observation into `ui_state`. Current perception is OCR-fi
 
 Malformed, out-of-bounds, unlabeled, or non-normalized candidates are not used as grounded elements. This prevents partial OCR or fixture data from becoming target candidates.
 
+The `ui_tree` source is currently a fixture-friendly read-only adapter. It
+accepts plain dictionaries such as `name`, `control_type`, and
+`bounding_rectangle`, then normalizes them through the same `VisibleElement`
+schema. It does not call live accessibility automation or desktop input APIs.
+Hidden or disabled `ui_tree` nodes are retained only as low-confidence debug
+grounding with `risk_hint: "unknown"`, so they do not become planner targets.
+
 ### Planner
 
 Planner proposes conservative read-only actions:
@@ -90,7 +97,7 @@ Planner proposes conservative read-only actions:
 - `switch_app_hint` when the task names a different app than the current `app_guess`
 - `no_op` when no reliable next step exists
 
-Planner consumes the normalized `VisibleElement` fields only. Low-confidence elements are ignored, ambiguous same-label matches become `no_op`, and high-risk labels are marked as approval-gated proposal hints. Planner does not produce executable click/type actions.
+Planner consumes the normalized `VisibleElement` fields only. Low-confidence elements are ignored, ambiguous same-label matches become `no_op`, and high-risk labels are marked as approval-gated proposal hints. The optional AI planner receives the same compact schema and rejects low-confidence target hints during local validation. Planner does not produce executable click/type actions.
 
 ### Safety Gate
 

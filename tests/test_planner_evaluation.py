@@ -19,9 +19,9 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         self.assertEqual(report["report_type"], "planner_evaluation")
         self.assertEqual(report["source"], "demo_scenarios")
         self.assertIs(report["external_llm_calls"], False)
-        self.assertEqual(report["scenario_count"], 4)
-        self.assertEqual(report["summary"]["total_scenario_count"], 4)
-        self.assertEqual(report["summary"]["consistent_scenario_count"], 4)
+        self.assertEqual(report["scenario_count"], 6)
+        self.assertEqual(report["summary"]["total_scenario_count"], 6)
+        self.assertEqual(report["summary"]["consistent_scenario_count"], 6)
         self.assertEqual(report["summary"]["difference_count"], 0)
         self.assertEqual(report["summary"]["unsafe_ai_output_count"], 0)
         self.assertEqual(report["summary"]["ai_rejection_count"], 0)
@@ -32,7 +32,17 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         self.assertNotIn("image_bytes", encoded)
 
         scenarios = {scenario["scenario"]: scenario for scenario in report["scenarios"]}
-        self.assertEqual(set(scenarios), {"browser_search", "dangerous_send", "dangerous_delete", "app_mismatch"})
+        self.assertEqual(
+            set(scenarios),
+            {
+                "browser_search",
+                "dangerous_send",
+                "dangerous_delete",
+                "app_mismatch",
+                "ui_tree_save",
+                "ui_tree_disabled_save",
+            },
+        )
         self.assertEqual(scenarios["browser_search"]["rule_based"]["proposal_type"], "target_hint")
         self.assertEqual(scenarios["browser_search"]["ai_proposal"]["proposal_type"], "target_hint")
         self.assertTrue(scenarios["browser_search"]["rule_based"]["click_readiness"]["checks"])
@@ -43,6 +53,10 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         )
         self.assertEqual(scenarios["app_mismatch"]["rule_based"]["proposal_type"], "switch_app_hint")
         self.assertEqual(scenarios["app_mismatch"]["ai_proposal"]["proposal_type"], "switch_app_hint")
+        self.assertEqual(scenarios["ui_tree_save"]["inputs"]["visible_elements"]["items"][0]["source"], "ui_tree")
+        self.assertEqual(scenarios["ui_tree_save"]["rule_based"]["proposal_type"], "target_hint")
+        self.assertEqual(scenarios["ui_tree_disabled_save"]["rule_based"]["proposal_type"], "no_op")
+        self.assertEqual(scenarios["ui_tree_disabled_save"]["ai_proposal"]["proposal_type"], "no_op")
 
     def test_summary_records_risk_and_preview_groups(self) -> None:
         report = evaluate_demo_scenarios()
@@ -54,7 +68,7 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         )
         self.assertEqual(
             summary["scenarios_with_preview_only_click_contracts"],
-            ["browser_search", "dangerous_send", "dangerous_delete"],
+            ["browser_search", "dangerous_send", "dangerous_delete", "ui_tree_save"],
         )
         self.assertEqual(
             summary["scenarios_with_switch_app_preview_contracts"],
@@ -62,7 +76,7 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         )
         self.assertEqual(
             summary["scenarios_with_blocked_click_readiness"],
-            ["browser_search", "dangerous_send", "dangerous_delete"],
+            ["browser_search", "dangerous_send", "dangerous_delete", "ui_tree_save"],
         )
 
     def test_report_captures_visible_elements_and_risk_hints(self) -> None:
@@ -72,13 +86,14 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         observation = scenario["observation"]
 
         self.assertEqual(visible_elements["count"], 1)
-        self.assertEqual(visible_elements["items"][0]["label"], "Delete")
-        self.assertEqual(visible_elements["items"][0]["source"], "demo")
-        self.assertEqual(visible_elements["items"][0]["risk_hint"], "high")
-        self.assertEqual(grounding_hints[0]["risk_hint"], "high")
+        self.assertEqual(visible_elements["items"][0]["label"], "delete")
+        self.assertEqual(visible_elements["items"][0]["source"], "manual")
+        self.assertEqual(visible_elements["items"][0]["role"], "button")
+        self.assertEqual(visible_elements["items"][0]["risk_hint"], "high_risk")
+        self.assertEqual(grounding_hints[0]["risk_hint"], "high_risk")
         self.assertEqual(observation["element_count"], 1)
-        self.assertEqual(observation["risk_hints"][0]["label"], "Delete")
-        self.assertEqual(observation["risk_hints"][0]["risk_hint"], "high")
+        self.assertEqual(observation["risk_hints"][0]["label"], "delete")
+        self.assertEqual(observation["risk_hints"][0]["risk_hint"], "high_risk")
         self.assertIn("visible_elements include high-risk grounding hints", scenario["notes"])
         self.assertIn("high-risk target label", scenario["rule_based"]["click_readiness"]["reasons"])
         self.assertIn("high-risk target label", scenario["ai_proposal"]["click_readiness"]["reasons"])
@@ -87,7 +102,7 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         scenario = evaluate_demo_scenario("browser_search")
 
         self.assertEqual(scenario["observation"]["risk_hints"], [])
-        self.assertEqual(scenario["inputs"]["grounding_hints"][0]["risk_hint"], "none")
+        self.assertEqual(scenario["inputs"]["grounding_hints"][0]["risk_hint"], "normal")
 
     def test_app_mismatch_records_switch_app_preview_contract(self) -> None:
         scenario = evaluate_demo_scenario("app_mismatch")
@@ -171,7 +186,7 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
             thread.join(timeout=2)
             server.server_close()
 
-        self.assertEqual(payload["scenario_count"], 4)
+        self.assertEqual(payload["scenario_count"], 6)
         self.assertIs(payload["summary"]["all_safe_read_only"], True)
         self.assertEqual(payload["summary"]["scenarios_with_risk_hints"], ["dangerous_send", "dangerous_delete"])
         self.assertEqual(payload["scenarios"][0]["rule_based"]["proposal_type"], "target_hint")

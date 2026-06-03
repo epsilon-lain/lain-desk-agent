@@ -1,9 +1,11 @@
-"""Planner Proposal v1: create one conservative, non-executed proposal."""
+"""Planner Proposal v1.1: create one conservative, schema-grounded proposal."""
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from typing import Any
+
+from .observer import normalize_label_text, normalize_visible_elements
 
 
 @dataclass(frozen=True)
@@ -13,6 +15,12 @@ class ProposedAction:
     target_element_id: str | None = None
     target_label: str | None = None
     target_bbox: dict[str, Any] | None = None
+    target_center: dict[str, Any] | None = None
+    target_role: str | None = None
+    target_confidence: float | None = None
+    target_source: str | None = None
+    target_risk_hint: str | None = None
+    target_timestamp: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
     reason: str = ""
     risk: str = "low"
@@ -78,10 +86,16 @@ def propose(ui_state: dict[str, Any]) -> dict[str, Any]:
                 target_element_id=str(target.get("id") or ""),
                 target_label=str(target.get("label") or ""),
                 target_bbox=target.get("bbox") if isinstance(target.get("bbox"), dict) else {},
+                target_center=target.get("center") if isinstance(target.get("center"), dict) else {},
+                target_role=str(target.get("role") or ""),
+                target_confidence=_element_confidence(target),
+                target_source=str(target.get("source") or ""),
+                target_risk_hint=str(target.get("risk_hint") or "unknown"),
+                target_timestamp=str(target.get("timestamp") or ""),
                 parameters={},
                 reason=_target_hint_reason(target, task),
-                risk="low",
-                requires_approval=False,
+                risk=_target_risk(target),
+                requires_approval=_target_requires_approval(target),
             )
         else:
             action = ProposedAction(
@@ -188,10 +202,9 @@ def _normalized_task_text(text: str) -> str:
 
 def _visible_elements(ui_state: dict[str, Any]) -> list[dict[str, Any]]:
     elements = ui_state.get("visible_elements")
-    if not isinstance(elements, list):
-        return []
-
-    return [element for element in elements if isinstance(element, dict)]
+    screen = ui_state.get("screen") if isinstance(ui_state.get("screen"), dict) else None
+    timestamp = _first_optional_string(ui_state, ["timestamp", "observation_timestamp"])
+    return normalize_visible_elements(elements, screen=screen, timestamp=timestamp)
 
 
 def _select_target_element(
@@ -203,6 +216,7 @@ def _select_target_element(
         for element in visible_elements
         if _has_element_id(element)
         and _has_visible_label(element)
+        and _has_target_geometry(element)
         and _element_confidence(element) >= 0.45
     ]
 
@@ -217,6 +231,8 @@ def _select_target_element(
         ]
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
         if scored[0][0] > 0:
+            if _top_match_is_ambiguous(scored):
+                return None
             return scored[0][2]
 
         return None
@@ -224,9 +240,11 @@ def _select_target_element(
     general_targets = [
         element
         for element in candidates
-        if _normalized_label(element) in _GENERAL_TARGET_LABELS
+        if normalize_label_text(element.get("label")) in _GENERAL_TARGET_LABELS
     ]
     if general_targets:
+        if _general_targets_are_ambiguous(general_targets):
+            return None
         return max(general_targets, key=_element_confidence)
 
     return None
@@ -234,15 +252,18 @@ def _select_target_element(
 
 def _target_hint_reason(element: dict[str, Any], task: str) -> str:
     label = str(element.get("label") or "")
+    role = str(element.get("role") or "unknown")
+    risk_hint = str(element.get("risk_hint") or "unknown")
 
     if task.strip():
         return (
             f"The task mentions text similar to '{label}', and visible_elements "
-            "contains a matching read-only element."
+            f"contains a matching read-only {role} element with risk_hint '{risk_hint}'."
         )
 
     return (
-        f"visible_elements contains a conservative target candidate labeled '{label}'. "
+        f"visible_elements contains a conservative target candidate labeled '{label}' "
+        f"with role '{role}' and risk_hint '{risk_hint}'. "
         "This is only a target hint, not an executable action."
     )
 
@@ -253,6 +274,10 @@ def _has_element_id(element: dict[str, Any]) -> bool:
 
 def _has_visible_label(element: dict[str, Any]) -> bool:
     return bool(str(element.get("label") or "").strip())
+
+
+def _has_target_geometry(element: dict[str, Any]) -> bool:
+    return isinstance(element.get("bbox"), dict) and isinstance(element.get("center"), dict)
 
 
 def _element_confidence(element: dict[str, Any]) -> float:
@@ -269,12 +294,51 @@ def _task_match_score(element: dict[str, Any], task_tokens: set[str]) -> int:
 
 
 def _tokens(text: str) -> set[str]:
-    normalized = "".join(character.lower() if character.isalnum() else " " for character in text)
-    return {token for token in normalized.split() if len(token) >= 2}
+    return {token for token in normalize_label_text(text).split() if len(token) >= 2}
 
 
-def _normalized_label(element: dict[str, Any]) -> str:
-    return " ".join(str(element.get("label") or "").lower().split())
+def _top_match_is_ambiguous(scored: list[tuple[int, float, dict[str, Any]]]) -> bool:
+    top_score, top_confidence, top_element = scored[0]
+    if top_score <= 0:
+        return False
+
+    top_label = normalize_label_text(top_element.get("label"))
+    tied = [
+        element
+        for score, confidence, element in scored
+        if score == top_score
+        and abs(confidence - top_confidence) <= 0.05
+        and normalize_label_text(element.get("label")) == top_label
+    ]
+    return len(tied) > 1
+
+
+def _general_targets_are_ambiguous(elements: list[dict[str, Any]]) -> bool:
+    best_confidence = max(_element_confidence(element) for element in elements)
+    best = [
+        element
+        for element in elements
+        if abs(_element_confidence(element) - best_confidence) <= 0.05
+    ]
+    labels = {normalize_label_text(element.get("label")) for element in best}
+    return len(best) > 1 and len(labels) <= 1
+
+
+def _target_risk(element: dict[str, Any]) -> str:
+    return "high" if str(element.get("risk_hint") or "") == "high_risk" else "low"
+
+
+def _target_requires_approval(element: dict[str, Any]) -> bool:
+    return str(element.get("risk_hint") or "") == "high_risk"
+
+
+def _first_optional_string(ui_state: dict[str, Any], keys: list[str]) -> str | None:
+    for key in keys:
+        value = ui_state.get(key)
+        if isinstance(value, str) and value:
+            return value
+
+    return None
 
 
 _GENERAL_TARGET_LABELS = {

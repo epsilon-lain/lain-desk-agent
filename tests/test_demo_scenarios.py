@@ -21,7 +21,7 @@ class DemoScenarioTests(unittest.TestCase):
         self.assertEqual(payload["scenario"], "browser_search")
         self.assertEqual(payload["ui_state"]["app_guess"], "Chrome")
         self.assertEqual(action["type"], "target_hint")
-        self.assertEqual(action["target_label"], "Search")
+        self.assertEqual(action["target_label"], "search")
         self.assertEqual(payload["action_contract"]["type"], "click")
         self.assertEqual(payload["action_contract"]["status"], "preview_only")
         self.assertIs(payload["action_contract"]["executed"], False)
@@ -35,7 +35,8 @@ class DemoScenarioTests(unittest.TestCase):
             payload = run_demo_scenario("dangerous_send", task="Send")
 
         self.assertEqual(payload["proposal"]["action"]["type"], "target_hint")
-        self.assertEqual(payload["action_contract"]["target_label"], "Send")
+        self.assertEqual(payload["action_contract"]["target_label"], "send")
+        self.assertEqual(payload["action_contract"]["target_risk_hint"], "high_risk")
         self.assertEqual(payload["click_readiness"]["status"], "blocked")
         self.assertIs(payload["click_readiness"]["ready"], False)
         self.assertEqual(payload["click_readiness"]["risk"], "high")
@@ -46,7 +47,8 @@ class DemoScenarioTests(unittest.TestCase):
             payload = run_demo_scenario("dangerous_delete", task="Delete")
 
         self.assertEqual(payload["proposal"]["action"]["type"], "target_hint")
-        self.assertEqual(payload["action_contract"]["target_label"], "Delete")
+        self.assertEqual(payload["action_contract"]["target_label"], "delete")
+        self.assertEqual(payload["action_contract"]["target_risk_hint"], "high_risk")
         self.assertEqual(payload["click_readiness"]["status"], "blocked")
         self.assertIs(payload["click_readiness"]["ready"], False)
         self.assertEqual(payload["click_readiness"]["risk"], "high")
@@ -61,6 +63,27 @@ class DemoScenarioTests(unittest.TestCase):
         self.assertEqual(action["parameters"]["current_app"], "Chrome")
         self.assertEqual(payload["action_contract"]["type"], "switch_app")
         self.assertEqual(payload["click_readiness"]["status"], "not_applicable")
+
+    def test_ui_tree_save_returns_preview_target_hint(self) -> None:
+        payload = run_demo_scenario("ui_tree_save")
+
+        action = payload["proposal"]["action"]
+        self.assertEqual(action["type"], "target_hint")
+        self.assertEqual(action["target_source"], "ui_tree")
+        self.assertEqual(action["target_label"], "save")
+        self.assertEqual(payload["action_contract"]["type"], "click")
+        self.assertEqual(payload["action_contract"]["status"], "preview_only")
+        self.assertIs(payload["action_contract"]["executed"], False)
+        self.assertEqual(payload["click_readiness"]["status"], "blocked")
+
+    def test_disabled_ui_tree_save_returns_no_op(self) -> None:
+        payload = run_demo_scenario("ui_tree_disabled_save")
+
+        self.assertEqual(payload["proposal"]["action"]["type"], "no_op")
+        self.assertIsNone(payload["action_contract"])
+        self.assertEqual(payload["click_readiness"]["status"], "not_applicable")
+        self.assertEqual(payload["ui_state"]["visible_elements"][0]["source"], "ui_tree")
+        self.assertEqual(payload["ui_state"]["visible_elements"][0]["confidence"], 0.0)
 
     def test_endpoint_does_not_observe_or_understand(self) -> None:
         server = create_server("127.0.0.1", 0)

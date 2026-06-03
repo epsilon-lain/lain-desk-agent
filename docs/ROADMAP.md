@@ -85,7 +85,8 @@ Goal: evaluate the optional `ai_proposal` planner while keeping it proposal-only
 
 ## Phase 5: Better Read-only Grounding
 
-Status: schema baseline implemented; richer read-only sources still pending.
+Status: schema baseline and fixture-friendly `ui_tree` adapter implemented;
+live read-only sources still pending.
 
 Goal: improve `visible_elements` without adding desktop control.
 
@@ -94,10 +95,14 @@ Goal: improve `visible_elements` without adding desktop control.
   `source`, `risk_hint`, and `timestamp`.
 - Keep sources explicitly marked as read-only grounding with source values
   limited to `ocr`, `ui_tree`, or `manual`.
+- Convert fixture-provided `ui_tree` nodes into the same schema without using
+  live OS automation APIs.
+- Keep hidden or disabled `ui_tree` nodes low-confidence so they remain debug
+  grounding rather than target candidates.
 - Filter malformed, out-of-bounds, unlabeled, and invalid-schema elements
   before they can become planner targets.
 - Treat low-confidence or ambiguous target matches as `no_op`.
-- Add an accessibility source, DOM source, or improved OCR source.
+- Add a live read-only accessibility source, DOM source, or improved OCR source.
 - Keep every grounding source read-only.
 - Improve visible element labels, bounding boxes, confidence scores, and source
   metadata.

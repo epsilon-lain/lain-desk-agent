@@ -21,8 +21,14 @@ class ActionContractTests(unittest.TestCase):
                 "action": {
                     "type": "target_hint",
                     "target_element_id": "element_0007",
-                    "target_label": "Search",
+                    "target_label": "search",
                     "target_bbox": {"x": 10, "y": 20, "width": 80, "height": 24},
+                    "target_center": {"x": 50, "y": 32},
+                    "target_role": "button",
+                    "target_confidence": 0.92,
+                    "target_source": "manual",
+                    "target_risk_hint": "normal",
+                    "target_timestamp": "2026-01-01T00:00:00Z",
                 },
             }
         )
@@ -33,7 +39,12 @@ class ActionContractTests(unittest.TestCase):
         self.assertEqual(contract["source_proposal_id"], "proposal_0007")
         self.assertEqual(contract["type"], "click")
         self.assertEqual(contract["target_element_id"], "element_0007")
-        self.assertEqual(contract["target_label"], "Search")
+        self.assertEqual(contract["target_label"], "search")
+        self.assertEqual(contract["target_role"], "button")
+        self.assertEqual(contract["target_confidence"], 0.92)
+        self.assertEqual(contract["target_source"], "manual")
+        self.assertEqual(contract["target_risk_hint"], "normal")
+        self.assertEqual(contract["target_timestamp"], "2026-01-01T00:00:00Z")
         self.assertEqual(contract["bbox"], {"x": 10, "y": 20, "width": 80, "height": 24})
         self.assertEqual(contract["center"], {"x": 50, "y": 32})
         self.assertEqual(contract["status"], "preview_only")
@@ -97,8 +108,14 @@ class ActionContractTests(unittest.TestCase):
                 "action": {
                     "type": "target_hint",
                     "target_element_id": "element_0011",
-                    "target_label": "Search",
+                    "target_label": "search",
                     "target_bbox": {"x": 1, "y": 2, "width": 3, "height": 4},
+                    "target_center": {"x": 2, "y": 4},
+                    "target_role": "button",
+                    "target_confidence": 0.9,
+                    "target_source": "manual",
+                    "target_risk_hint": "normal",
+                    "target_timestamp": "2026-01-01T00:00:00Z",
                 },
             }
         )
@@ -125,7 +142,7 @@ class ActionContractTests(unittest.TestCase):
                 "action": {
                     "type": "target_hint",
                     "target_element_id": "element_0010",
-                    "target_label": "Search",
+                    "target_label": "search",
                 },
             }
         )

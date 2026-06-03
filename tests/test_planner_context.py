@@ -49,27 +49,29 @@ class PlannerContextBundleTests(unittest.TestCase):
             set(item),
             {
                 "id",
-                "type",
-                "kind",
                 "label",
                 "text",
+                "role",
                 "bbox",
+                "center",
                 "confidence",
                 "source",
                 "risk_hint",
+                "timestamp",
             },
         )
         self.assertEqual(item["id"], "element_0000")
-        self.assertEqual(item["type"], "text")
-        self.assertEqual(item["kind"], "text")
-        self.assertEqual(item["label"], "Label 0")
-        self.assertEqual(item["text"], "Label 0")
-        self.assertEqual(item["source"], "unknown")
-        self.assertEqual(item["risk_hint"], "none")
+        self.assertEqual(item["label"], "label 0")
+        self.assertEqual(item["text"], "label 0")
+        self.assertEqual(item["role"], "text")
+        self.assertEqual(item["center"], {"x": 10, "y": 6})
+        self.assertEqual(item["source"], "manual")
+        self.assertEqual(item["risk_hint"], "normal")
+        self.assertEqual(item["timestamp"], "2026-01-01T00:00:00Z")
         self.assertEqual(context["visible_elements"]["summary"]["item_count"], 20)
-        self.assertEqual(context["visible_elements"]["summary"]["sources"], {"unknown": 20})
+        self.assertEqual(context["visible_elements"]["summary"]["sources"], {"manual": 20})
 
-    def test_visible_elements_missing_fields_fallback_safely(self) -> None:
+    def test_visible_elements_missing_fields_are_filtered_safely(self) -> None:
         ui_state = _large_ui_state()
         ui_state["visible_elements"] = [
             {
@@ -84,25 +86,18 @@ class PlannerContextBundleTests(unittest.TestCase):
             runtime_status=_runtime_status(),
             recent_events=[],
         )
-        item = context["visible_elements"]["items"][0]
 
-        self.assertEqual(item["id"], "element_0001")
-        self.assertEqual(item["label"], "OK")
-        self.assertEqual(item["text"], "OK")
-        self.assertEqual(item["type"], "button_like_text")
-        self.assertEqual(item["kind"], "button_like_text")
-        self.assertIsNone(item["bbox"])
-        self.assertEqual(item["confidence"], 0.0)
-        self.assertEqual(item["source"], "unknown")
-        self.assertEqual(item["risk_hint"], "none")
+        self.assertEqual(context["visible_elements"]["count"], 0)
+        self.assertEqual(context["visible_elements"]["items"], [])
+        self.assertEqual(context["visible_elements"]["summary"]["item_count"], 0)
 
     def test_visible_elements_mark_high_risk_label_hint(self) -> None:
         ui_state = _large_ui_state()
         ui_state["visible_elements"] = [
             {
                 "id": "danger_delete",
-                "source": "demo",
-                "type": "button",
+                "source": "manual",
+                "role": "button",
                 "label": "Delete account",
                 "bbox": {"x": 10, "y": 20, "width": 120, "height": 32},
                 "confidence": 0.97,
@@ -117,10 +112,36 @@ class PlannerContextBundleTests(unittest.TestCase):
         )
         item = context["visible_elements"]["items"][0]
 
-        self.assertEqual(item["source"], "demo")
-        self.assertEqual(item["kind"], "button")
-        self.assertEqual(item["risk_hint"], "high")
-        self.assertEqual(context["visible_elements"]["summary"]["risk_hints"], {"high": 1})
+        self.assertEqual(item["source"], "manual")
+        self.assertEqual(item["role"], "button")
+        self.assertEqual(item["risk_hint"], "high_risk")
+        self.assertEqual(context["visible_elements"]["summary"]["risk_hints"], {"high_risk": 1})
+
+    def test_visible_elements_preserve_ui_tree_source(self) -> None:
+        ui_state = _large_ui_state()
+        ui_state["visible_elements"] = [
+            {
+                "id": "ui_tree_save",
+                "source": "ui_tree",
+                "role": "button",
+                "label": "Save",
+                "bbox": {"x": 10, "y": 20, "width": 120, "height": 32},
+                "confidence": 0.97,
+            }
+        ]
+
+        context = build_planner_context(
+            "Save",
+            ui_state,
+            runtime_status=_runtime_status(),
+            recent_events=[],
+        )
+        item = context["visible_elements"]["items"][0]
+
+        self.assertEqual(item["source"], "ui_tree")
+        self.assertEqual(item["role"], "button")
+        self.assertEqual(item["label"], "save")
+        self.assertEqual(context["visible_elements"]["summary"]["sources"], {"ui_tree": 1})
 
     def test_context_summarizes_safety_runtime(self) -> None:
         runtime_status = _runtime_status()
@@ -179,6 +200,7 @@ def _large_ui_state() -> dict[str, object]:
         "source_observation_id": "obs_0001",
         "app_guess": "Chrome",
         "state_guess": "browser_window",
+        "observation_timestamp": "2026-01-01T00:00:00Z",
         "summary": "A browser window with many OCR elements.",
         "confidence": 0.91,
         "screen": {
@@ -189,10 +211,11 @@ def _large_ui_state() -> dict[str, object]:
         "visible_elements": [
             {
                 "id": f"element_{index:04d}",
-                "type": "text",
+                "role": "text",
                 "label": f"Label {index}",
                 "bbox": {"x": index, "y": index + 1, "width": 20, "height": 10},
                 "confidence": 0.8,
+                "source": "manual",
                 "raw_ocr": "not included",
             }
             for index in range(25)

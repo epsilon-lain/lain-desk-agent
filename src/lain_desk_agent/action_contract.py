@@ -38,6 +38,11 @@ def _click_contract(proposal: dict[str, Any], action: dict[str, Any]) -> dict[st
         "type": "click",
         "target_element_id": str(action.get("target_element_id") or ""),
         "target_label": str(action.get("target_label") or ""),
+        "target_role": str(action.get("target_role") or ""),
+        "target_confidence": action.get("target_confidence"),
+        "target_source": str(action.get("target_source") or ""),
+        "target_risk_hint": str(action.get("target_risk_hint") or ""),
+        "target_timestamp": str(action.get("target_timestamp") or ""),
         "bbox": bbox,
         "center": {
             "x": round(bbox["x"] + bbox["width"] / 2),
@@ -81,6 +86,9 @@ def _normalized_bbox(value: Any) -> dict[str, float] | None:
         return None
 
     if not all(math.isfinite(number) for number in bbox.values()):
+        return None
+
+    if bbox["width"] <= 0 or bbox["height"] <= 0:
         return None
 
     return {key: _compact_number(number) for key, number in bbox.items()}

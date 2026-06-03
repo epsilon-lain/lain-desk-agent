@@ -36,8 +36,9 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertEqual(payload["task"], "Search")
         self.assertEqual(payload["visible_elements"]["count"], 2)
         self.assertEqual(len(payload["visible_elements"]["items"]), 2)
-        self.assertEqual(payload["visible_elements"]["items"][0]["source"], "unknown")
-        self.assertEqual(payload["visible_elements"]["items"][0]["risk_hint"], "none")
+        self.assertEqual(payload["visible_elements"]["items"][0]["source"], "manual")
+        self.assertEqual(payload["visible_elements"]["items"][0]["role"], "button")
+        self.assertEqual(payload["visible_elements"]["items"][0]["risk_hint"], "normal")
         self.assertEqual(payload["safety_runtime"]["executable_actions"], ["wait"])
         self.assertNotIn("screenshot_path", encoded)
         self.assertNotIn("image_bytes", encoded)
@@ -58,8 +59,11 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertTrue(proposal["proposal_id"].startswith("proposal_ai_"))
         self.assertEqual(action["type"], "target_hint")
         self.assertEqual(action["target_element_id"], "element_search")
-        self.assertEqual(action["target_label"], "Search")
+        self.assertEqual(action["target_label"], "search")
         self.assertEqual(action["target_bbox"], {"x": 30, "y": 40, "width": 120, "height": 36})
+        self.assertEqual(action["target_center"], {"x": 90, "y": 58})
+        self.assertEqual(action["target_role"], "button")
+        self.assertEqual(action["target_risk_hint"], "normal")
         self.assertEqual(action["risk"], "low")
         self.assertIs(action["requires_approval"], False)
 
@@ -164,6 +168,19 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertEqual(proposal["action"]["type"], "no_op")
         self.assertIn("not present in planner_context", proposal["action"]["reason"])
 
+    def test_low_confidence_ui_tree_target_hint_is_rejected_safely(self) -> None:
+        context = _planner_context()
+        context["visible_elements"]["items"][0]["source"] = "ui_tree"
+        context["visible_elements"]["items"][0]["confidence"] = 0.2
+
+        proposal = build_ai_proposal_from_context(
+            context,
+            {"type": "target_hint", "target_element_id": "element_search"},
+        )
+
+        self.assertEqual(proposal["action"]["type"], "no_op")
+        self.assertIn("confidence is too low", proposal["action"]["reason"])
+
     def test_validated_target_hint_passes_existing_pipeline_as_preview_only(self) -> None:
         context = _planner_context()
         validation = validate_ai_proposal(
@@ -218,7 +235,7 @@ class AIPlannerHarnessTests(unittest.TestCase):
         self.assertEqual(len(seen_payloads), 1)
         self.assertEqual(proposal["action"]["type"], "target_hint")
         self.assertEqual(proposal["action"]["target_element_id"], "element_search")
-        self.assertEqual(proposal["action"]["target_label"], "Search")
+        self.assertEqual(proposal["action"]["target_label"], "search")
 
     def test_openai_unsafe_output_is_rejected_safely(self) -> None:
         proposal = build_ai_proposal_with_llm(
@@ -417,20 +434,23 @@ def _planner_context(task: str = "Search", app_guess: str = "Chrome") -> dict[st
                 "height": 900,
                 "screenshot_path": "runs/run_001/obs_0042.png",
             },
+            "observation_timestamp": "2026-01-01T00:00:00Z",
             "visible_elements": [
                 {
                     "id": "element_search",
-                    "type": "button",
+                    "role": "button",
                     "label": "Search",
                     "bbox": {"x": 30, "y": 40, "width": 120, "height": 36},
                     "confidence": 0.96,
+                    "source": "manual",
                 },
                 {
                     "id": "element_cancel",
-                    "type": "button",
+                    "role": "button",
                     "label": "Cancel",
                     "bbox": {"x": 180, "y": 40, "width": 100, "height": 36},
                     "confidence": 0.95,
+                    "source": "manual",
                 },
             ],
             "visible_text": ["Search", "Cancel"],
@@ -514,15 +534,17 @@ def _ui_state() -> dict[str, object]:
         "state_guess": "browser_window",
         "summary": "A browser with Search visible.",
         "confidence": 0.9,
+        "observation_timestamp": "2026-01-01T00:00:00Z",
         "visible_text": ["Search"],
         "visible_text_boxes": [],
         "visible_elements": [
             {
                 "id": "element_search",
-                "type": "button",
+                "role": "button",
                 "label": "Search",
                 "bbox": {"x": 30, "y": 40, "width": 120, "height": 36},
                 "confidence": 0.96,
+                "source": "manual",
             }
         ],
     }

@@ -1,11 +1,12 @@
-"""Compact context bundle for a future AI planner."""
+"""Compact context bundle for proposal-only planners."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from .click_policy import HIGH_RISK_LABELS, click_readiness_metadata
+from .click_policy import click_readiness_metadata
 from .execution_policy import ACTION_TYPES, execution_policy_summary
+from .observer import normalize_visible_elements
 from .permission_profile import get_permission_profile_payload
 
 
@@ -36,7 +37,11 @@ def build_planner_context(
         "confidence": _bounded_float(safe_ui_state.get("confidence")),
         "screen": _screen_size(safe_ui_state),
         "source_observation_id": str(safe_ui_state.get("source_observation_id") or ""),
-        "visible_elements": _compact_visible_elements(safe_ui_state.get("visible_elements")),
+        "visible_elements": _compact_visible_elements(
+            safe_ui_state.get("visible_elements"),
+            screen=_screen_size(safe_ui_state),
+            timestamp=_first_optional_string(safe_ui_state, ["timestamp", "observation_timestamp"]),
+        ),
         "visible_text": _compact_visible_text(safe_ui_state.get("visible_text")),
         "safety_runtime": _safety_runtime_summary(safe_runtime_status),
         "recent_events": _compact_recent_events(safe_recent_events),
@@ -102,14 +107,16 @@ def _safety_runtime_summary(runtime_status: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _compact_visible_elements(value: Any) -> dict[str, Any]:
-    elements = value if isinstance(value, list) else []
+def _compact_visible_elements(
+    value: Any,
+    screen: dict[str, int] | None = None,
+    timestamp: str | None = None,
+) -> dict[str, Any]:
+    raw_elements = value if isinstance(value, list) else []
+    elements = normalize_visible_elements(raw_elements, screen=screen, timestamp=timestamp)
     compact_items = []
 
     for index, element in enumerate(elements[:MAX_VISIBLE_ELEMENTS]):
-        if not isinstance(element, dict):
-            continue
-
         compact_items.append(_compact_visible_element(element, index))
 
     return {
@@ -121,22 +128,17 @@ def _compact_visible_elements(value: Any) -> dict[str, Any]:
 
 
 def _compact_visible_element(element: dict[str, Any], index: int) -> dict[str, Any]:
-    label = _element_label(element)
-    text = _truncate_element_text(str(element.get("text") or label))
-    raw_type = _short_text(_first_text(element, ["type", "kind", "role"]), 32)
-    kind = _infer_element_kind(raw_type, label)
-    source = _short_text(_first_text(element, ["source", "origin", "source_type"]) or "unknown", 32)
-
     return {
         "id": _stable_element_id(element, index),
-        "type": raw_type or kind,
-        "kind": kind,
-        "label": label,
-        "text": text,
+        "label": _truncate_element_text(str(element.get("label") or "")),
+        "text": _truncate_element_text(str(element.get("text") or "")),
+        "role": _short_text(str(element.get("role") or "unknown"), 32),
         "bbox": _compact_bbox(element.get("bbox")),
+        "center": _compact_point(element.get("center")),
         "confidence": _bounded_float(element.get("confidence")),
-        "source": source,
-        "risk_hint": _risk_hint_for_label(label),
+        "source": _short_text(str(element.get("source") or "manual"), 32),
+        "risk_hint": str(element.get("risk_hint") or "unknown"),
+        "timestamp": str(element.get("timestamp") or ""),
     }
 
 
@@ -148,62 +150,13 @@ def _stable_element_id(element: dict[str, Any], index: int) -> str:
     return f"element_{index + 1:04d}"
 
 
-def _element_label(element: dict[str, Any]) -> str:
-    return _truncate_element_text(_first_text(element, ["label", "text", "name", "title", "value"]))
-
-
-def _first_text(element: dict[str, Any], keys: list[str]) -> str:
-    for key in keys:
-        value = element.get(key)
-        if value is None:
-            continue
-
-        text = " ".join(str(value).split())
-        if text:
-            return text
-
-    return ""
-
-
-def _infer_element_kind(raw_type: str, label: str) -> str:
-    normalized_type = _normalized_text(raw_type)
-    normalized_label = _normalized_text(label)
-
-    if normalized_type in {"button", "link", "input", "textbox", "text", "menu", "checkbox"}:
-        return normalized_type
-
-    if normalized_type in {"edit", "textfield"}:
-        return "input"
-
-    if normalized_type in {"statictext", "label"}:
-        return "text"
-
-    if normalized_label in {"search", "find", "ok", "cancel", "done", "continue", "next", "back"}:
-        return "button_like_text"
-
-    return normalized_type or "unknown"
-
-
-def _risk_hint_for_label(label: str) -> str:
-    normalized_label = _normalized_text(label)
-    if not normalized_label:
-        return "none"
-
-    for high_risk_label in HIGH_RISK_LABELS:
-        normalized_risk = _normalized_text(high_risk_label)
-        if normalized_risk and normalized_risk in normalized_label:
-            return "high"
-
-    return "none"
-
-
 def _visible_elements_summary(items: list[dict[str, Any]]) -> dict[str, Any]:
     sources: dict[str, int] = {}
     risk_hints: dict[str, int] = {}
 
     for item in items:
         source = str(item.get("source") or "unknown")
-        risk_hint = str(item.get("risk_hint") or "none")
+        risk_hint = str(item.get("risk_hint") or "unknown")
         sources[source] = sources.get(source, 0) + 1
         risk_hints[risk_hint] = risk_hints.get(risk_hint, 0) + 1
 
@@ -303,6 +256,20 @@ def _compact_bbox(value: Any) -> dict[str, int | float] | None:
     return bbox
 
 
+def _compact_point(value: Any) -> dict[str, int | float] | None:
+    if not isinstance(value, dict):
+        return None
+
+    point: dict[str, int | float] = {}
+    for key in ["x", "y"]:
+        number = _finite_number(value.get(key))
+        if number is None:
+            return None
+        point[key] = number
+
+    return point
+
+
 def _positive_int(value: Any) -> int | None:
     try:
         number = int(value)
@@ -354,6 +321,15 @@ def _short_text(text: str, max_length: int) -> str:
 
 def _normalized_text(text: str) -> str:
     return " ".join(str(text or "").casefold().split())
+
+
+def _first_optional_string(ui_state: dict[str, Any], keys: list[str]) -> str | None:
+    for key in keys:
+        value = ui_state.get(key)
+        if isinstance(value, str) and value:
+            return value
+
+    return None
 
 
 def _optional_string(value: Any) -> str | None:

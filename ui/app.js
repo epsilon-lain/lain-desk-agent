@@ -305,7 +305,7 @@ function formatVisibleElements(elements) {
   const preview = elements.slice(0, 3).map((element) => {
     const bbox = element.bbox ?? {};
     const confidence = Number.isFinite(element.confidence) ? element.confidence.toFixed(2) : "unknown";
-    return `${element.type ?? "unknown"}:${compactText(element.label ?? "", 48)} @ ${bbox.x ?? "?"},${
+    return `${element.role ?? "unknown"}:${compactText(element.label ?? "", 48)} @ ${bbox.x ?? "?"},${
       bbox.y ?? "?"
     } ${bbox.width ?? "?"}x${bbox.height ?? "?"} (${confidence})`;
   });
@@ -1709,7 +1709,7 @@ function formatEvaluationRiskHints(scenario) {
     : Array.isArray(scenario.inputs?.grounding_hints)
       ? scenario.inputs.grounding_hints
       : [];
-  const riskyHints = hints.filter((hint) => hint.risk_hint && hint.risk_hint !== "none");
+  const riskyHints = hints.filter((hint) => hint.risk_hint === "high_risk");
 
   if (!riskyHints.length) {
     return "none";
@@ -1725,7 +1725,7 @@ function hasEvaluationRiskHint(scenario) {
     ? scenario.observation.risk_hints
     : [];
 
-  return hints.some((hint) => hint.risk_hint && hint.risk_hint !== "none");
+  return hints.some((hint) => hint.risk_hint === "high_risk");
 }
 
 function formatEvaluationNotes(notes) {

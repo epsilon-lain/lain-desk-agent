@@ -219,11 +219,7 @@ def _scenario_notes(
     differences: dict[str, Any],
 ) -> list[str]:
     notes = list(differences.get("notes", []))
-    risk_hints = [
-        hint
-        for hint in _grounding_hints(planner_context)
-        if hint.get("risk_hint") and hint.get("risk_hint") != "none"
-    ]
+    risk_hints = _high_risk_grounding_hints(planner_context)
 
     if risk_hints:
         notes.append("visible_elements include high-risk grounding hints")
@@ -309,15 +305,15 @@ def _grounding_hints(planner_context: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
 
-        role_hint = item.get("role_hint")
+        role = item.get("role")
         risk_hint = item.get("risk_hint")
-        if role_hint or risk_hint:
+        if role or risk_hint:
             hints.append(
                 {
                     "id": str(item.get("id") or ""),
                     "label": str(item.get("label") or ""),
-                    "role_hint": str(role_hint or ""),
-                    "risk_hint": str(risk_hint or "none"),
+                    "role": str(role or ""),
+                    "risk_hint": str(risk_hint or "unknown"),
                     "source": str(item.get("source") or "unknown"),
                 }
             )
@@ -378,11 +374,7 @@ def _scenario_observation_record(
 ) -> dict[str, Any]:
     """Return a compact strategy-tuning observation for one scenario."""
 
-    risk_hints = [
-        hint
-        for hint in _grounding_hints(planner_context)
-        if hint.get("risk_hint") and hint.get("risk_hint") != "none"
-    ]
+    risk_hints = _high_risk_grounding_hints(planner_context)
 
     return {
         "scenario": scenario_name,
@@ -459,6 +451,14 @@ def _observation_contract_summary(result: dict[str, Any]) -> dict[str, Any]:
         "preview_only": bool(action_contract.get("preview_only")) or status == "preview_only",
         "executed": bool(action_contract.get("executed")),
     }
+
+
+def _high_risk_grounding_hints(planner_context: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        hint
+        for hint in _grounding_hints(planner_context)
+        if hint.get("risk_hint") == "high_risk"
+    ]
 
 
 def _observation_click_readiness_summary(result: dict[str, Any]) -> dict[str, Any]:
