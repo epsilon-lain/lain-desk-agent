@@ -128,6 +128,34 @@ ambiguous states are expected to degrade to `no_op`, blocked readiness, or
 preview-only output. No evaluation scenario grants execution permission, and
 `wait` remains the only executable action.
 
+## Click Readiness Hardening
+
+Phase 6.5 hardens Click Readiness as a theoretical pre-execution check. It
+does not permit real clicks and does not override Safety Gate, Action Contract,
+Capability Registry, Permission Profile, or Execution Policy.
+
+Readiness now reports stable blocker codes alongside human-readable reasons:
+
+- `stale_observation`
+- `missing_target`
+- `missing_bbox`
+- `invalid_bbox`
+- `missing_center`
+- `bbox_center_mismatch`
+- `out_of_viewport`
+- `coordinate_space_unknown`
+- `dpi_uncertain`
+- `low_confidence_target`
+- `hidden_or_disabled_target`
+- `ambiguous_target`
+- `high_risk_requires_approval`
+- `action_not_enabled_by_policy`
+
+It also exposes target risk, target confidence, blocker details, and coordinate
+debug fields for cockpit and evaluation reports. These diagnostics can only
+block readiness or explain why a preview is not ready; they are never execution
+permission.
+
 ## App mismatch hint
 
 Planner detects simple app mentions in the task:

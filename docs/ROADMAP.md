@@ -19,6 +19,11 @@ read-only reliability suite. It compares rule-based and AI proposal planner
 behavior across normalized `visible_elements` and `ui_tree` fixtures before any
 real action experiment.
 
+Phase 6.5 Click Readiness Hardening is implemented as structured theoretical
+pre-execution diagnostics. It adds stable blocker codes and stricter coordinate,
+freshness, confidence, risk, and ambiguity checks while real clicks remain
+disabled.
+
 ## Completed
 
 - Observation / Understanding
@@ -34,6 +39,7 @@ real action experiment.
 - Safety Gate
 - Action Contract
 - Click Readiness Policy
+- Click Readiness Hardening
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -138,26 +144,38 @@ Goal: evaluate planner reliability before any real action experiment.
 - Keep all evaluation paths read-only and preview-only; no real
   click/type/hotkey/scroll/switch_app execution is enabled.
 
-## Phase 7: Click Readiness Hardening
+## Phase 6.5: Click Readiness Hardening
 
-Status: started with structured readiness checks for preview-only click
-contracts, center/bbox consistency checks, Cockpit visibility for readiness
-diagnostics, and copy-friendly debug summaries.
+Status: implemented as structured read-only readiness diagnostics.
 
-Goal: make preview-only click contracts safer before any real click experiment.
+Goal: make preview-only click contracts stricter and easier to test before any
+real click experiment.
 
-- Strengthen high-risk label policy.
-- Add stale observation checks.
-- Add coordinate and DPI checks.
-- Improve bbox and center validation.
+- Record stable blocker codes including stale observation, missing or invalid
+  geometry, center mismatch, out-of-viewport targets, unknown coordinate space,
+  uncertain DPI, low-confidence targets, hidden or disabled targets, ambiguous
+  targets, high-risk approval gates, and policy-disabled actions.
+- Validate bbox and center against declared viewport metadata.
+- Block readiness when coordinate space or DPI/scale metadata is unavailable.
 - Consume preview-contract target schema fields such as role, source,
   confidence, timestamp, and `target_risk_hint`.
-- Show structured readiness diagnostics in the Cockpit for live proposals and
-  planner evaluation reports.
-- Provide copy-friendly read-only readiness debug summaries for blocked click
-  previews.
+- Keep high-risk targets preview-only and approval-gated.
+- Show blocker codes, human-readable blocker copy, target risk/confidence, and
+  coordinate debug in the Cockpit and planner evaluation reports.
+- Keep readiness as a theoretical pre-execution check, not an execution
+  permission.
 - Keep real click disabled by default.
 - Keep click readiness as a blocker, not a permission grant.
+
+## Phase 7: Click Readiness Hardening Follow-ups
+
+Goal: continue tightening readiness diagnostics before any sandboxed action
+experiment.
+
+- Improve live coordinate-space and DPI metadata collection without adding
+  actuation APIs.
+- Add richer stale-observation reporting for live observations.
+- Keep all readiness outputs read-only and preview-only.
 
 ## Phase 8: Sandboxed Real-action Experiment
 

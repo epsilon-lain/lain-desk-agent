@@ -19,9 +19,9 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         self.assertEqual(report["report_type"], "planner_evaluation")
         self.assertEqual(report["source"], "demo_scenarios")
         self.assertIs(report["external_llm_calls"], False)
-        self.assertEqual(report["scenario_count"], 14)
-        self.assertEqual(report["summary"]["total_scenario_count"], 14)
-        self.assertEqual(report["summary"]["consistent_scenario_count"], 14)
+        self.assertEqual(report["scenario_count"], 25)
+        self.assertEqual(report["summary"]["total_scenario_count"], 25)
+        self.assertEqual(report["summary"]["consistent_scenario_count"], 25)
         self.assertEqual(report["summary"]["difference_count"], 0)
         self.assertEqual(report["summary"]["unsafe_ai_output_count"], 0)
         self.assertEqual(report["summary"]["ai_rejection_count"], 0)
@@ -29,7 +29,7 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
         self.assertEqual(report["summary"]["ai_rejections"], 0)
         self.assertIs(report["summary"]["all_safe_read_only"], True)
         self.assertIs(report["summary"]["all_expected_behaviors_passed"], True)
-        self.assertEqual(report["summary"]["expectation_check_count"], 28)
+        self.assertEqual(report["summary"]["expectation_check_count"], 50)
         self.assertEqual(report["summary"]["expectation_failure_count"], 0)
         self.assertNotIn("screenshot_path", encoded)
         self.assertNotIn("image_bytes", encoded)
@@ -48,6 +48,17 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
                 "low_confidence_search",
                 "ambiguous_search",
                 "ui_tree_high_risk_delete",
+                "readiness_stale_search",
+                "readiness_missing_bbox_search",
+                "readiness_invalid_bbox_search",
+                "readiness_bbox_center_mismatch",
+                "readiness_missing_center_search",
+                "readiness_missing_target",
+                "readiness_out_of_viewport_search",
+                "readiness_missing_coordinate_space",
+                "readiness_low_confidence_target",
+                "readiness_hidden_disabled_target",
+                "readiness_ambiguous_target",
                 "invalid_bbox_search",
                 "missing_bbox_search",
                 "mixed_manual_ui_tree_save",
@@ -95,6 +106,17 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
                 "dangerous_delete",
                 "ui_tree_save",
                 "ui_tree_high_risk_delete",
+                "readiness_stale_search",
+                "readiness_missing_bbox_search",
+                "readiness_invalid_bbox_search",
+                "readiness_bbox_center_mismatch",
+                "readiness_missing_center_search",
+                "readiness_missing_target",
+                "readiness_out_of_viewport_search",
+                "readiness_missing_coordinate_space",
+                "readiness_low_confidence_target",
+                "readiness_hidden_disabled_target",
+                "readiness_ambiguous_target",
                 "mixed_manual_ui_tree_save",
             ],
         )
@@ -110,10 +132,47 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
                 "dangerous_delete",
                 "ui_tree_save",
                 "ui_tree_high_risk_delete",
+                "readiness_stale_search",
+                "readiness_missing_bbox_search",
+                "readiness_invalid_bbox_search",
+                "readiness_bbox_center_mismatch",
+                "readiness_missing_center_search",
+                "readiness_missing_target",
+                "readiness_out_of_viewport_search",
+                "readiness_missing_coordinate_space",
+                "readiness_low_confidence_target",
+                "readiness_hidden_disabled_target",
+                "readiness_ambiguous_target",
                 "mixed_manual_ui_tree_save",
             ],
         )
         self.assertEqual(summary["scenarios_with_expectation_failures"], [])
+
+    def test_summary_records_structured_readiness_blocker_codes(self) -> None:
+        report = evaluate_demo_scenarios()
+        blocker_codes = report["summary"]["readiness_blocker_codes"]
+
+        expected_code_scenarios = {
+            "stale_observation": "readiness_stale_search",
+            "missing_target": "readiness_missing_target",
+            "missing_bbox": "readiness_missing_bbox_search",
+            "invalid_bbox": "readiness_invalid_bbox_search",
+            "missing_center": "readiness_missing_center_search",
+            "bbox_center_mismatch": "readiness_bbox_center_mismatch",
+            "out_of_viewport": "readiness_out_of_viewport_search",
+            "coordinate_space_unknown": "readiness_missing_coordinate_space",
+            "dpi_uncertain": "readiness_missing_coordinate_space",
+            "low_confidence_target": "readiness_low_confidence_target",
+            "hidden_or_disabled_target": "readiness_hidden_disabled_target",
+            "ambiguous_target": "readiness_ambiguous_target",
+            "high_risk_requires_approval": "ui_tree_high_risk_delete",
+            "action_not_enabled_by_policy": "browser_search",
+        }
+
+        for code, scenario_name in expected_code_scenarios.items():
+            with self.subTest(code=code):
+                self.assertIn(code, blocker_codes)
+                self.assertIn(scenario_name, blocker_codes[code])
 
     def test_report_captures_visible_elements_and_risk_hints(self) -> None:
         scenario = evaluate_demo_scenario("dangerous_delete")
@@ -279,7 +338,7 @@ class PlannerEvaluationHarnessTests(unittest.TestCase):
             thread.join(timeout=2)
             server.server_close()
 
-        self.assertEqual(payload["scenario_count"], 14)
+        self.assertEqual(payload["scenario_count"], 25)
         self.assertIs(payload["summary"]["all_safe_read_only"], True)
         self.assertIs(payload["summary"]["all_expected_behaviors_passed"], True)
         self.assertEqual(

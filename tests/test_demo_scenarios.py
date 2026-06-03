@@ -29,6 +29,8 @@ class DemoScenarioTests(unittest.TestCase):
         self.assertIs(payload["click_readiness"]["ready"], False)
         self.assertIn("preview-only contract", payload["click_readiness"]["reasons"])
         self.assertIn("click capability disabled", payload["click_readiness"]["reasons"])
+        self.assertIn("preview_only_contract", payload["click_readiness"]["blocker_codes"])
+        self.assertIn("action_not_enabled_by_policy", payload["click_readiness"]["blocker_codes"])
 
     def test_dangerous_send_blocks_readiness_for_high_risk_label(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -41,6 +43,7 @@ class DemoScenarioTests(unittest.TestCase):
         self.assertIs(payload["click_readiness"]["ready"], False)
         self.assertEqual(payload["click_readiness"]["risk"], "high")
         self.assertIn("high-risk target label", payload["click_readiness"]["reasons"])
+        self.assertIn("high_risk_requires_approval", payload["click_readiness"]["blocker_codes"])
 
     def test_dangerous_delete_blocks_readiness_for_high_risk_label(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -53,6 +56,7 @@ class DemoScenarioTests(unittest.TestCase):
         self.assertIs(payload["click_readiness"]["ready"], False)
         self.assertEqual(payload["click_readiness"]["risk"], "high")
         self.assertIn("high-risk target label", payload["click_readiness"]["reasons"])
+        self.assertIn("high_risk_requires_approval", payload["click_readiness"]["blocker_codes"])
 
     def test_app_mismatch_returns_switch_app_hint(self) -> None:
         payload = run_demo_scenario("app_mismatch")
@@ -119,6 +123,32 @@ class DemoScenarioTests(unittest.TestCase):
         self.assertIs(payload["action_contract"]["executed"], False)
         self.assertEqual(payload["click_readiness"]["status"], "blocked")
         self.assertIn("high-risk target label", payload["click_readiness"]["reasons"])
+        self.assertIn("high_risk_requires_approval", payload["click_readiness"]["blocker_codes"])
+
+    def test_readiness_hardening_demo_scenarios_expose_blocker_codes(self) -> None:
+        cases = {
+            "readiness_stale_search": "stale_observation",
+            "readiness_missing_bbox_search": "missing_bbox",
+            "readiness_invalid_bbox_search": "invalid_bbox",
+            "readiness_bbox_center_mismatch": "bbox_center_mismatch",
+            "readiness_missing_center_search": "missing_center",
+            "readiness_missing_target": "missing_target",
+            "readiness_out_of_viewport_search": "out_of_viewport",
+            "readiness_missing_coordinate_space": "coordinate_space_unknown",
+            "readiness_low_confidence_target": "low_confidence_target",
+            "readiness_hidden_disabled_target": "hidden_or_disabled_target",
+            "readiness_ambiguous_target": "ambiguous_target",
+        }
+
+        for scenario_name, blocker_code in cases.items():
+            with self.subTest(scenario=scenario_name):
+                payload = run_demo_scenario(scenario_name)
+
+                self.assertEqual(payload["proposal"]["action"]["type"], "target_hint")
+                self.assertEqual(payload["action_contract"]["type"], "click")
+                self.assertEqual(payload["click_readiness"]["status"], "blocked")
+                self.assertIs(payload["click_readiness"]["ready"], False)
+                self.assertIn(blocker_code, payload["click_readiness"]["blocker_codes"])
 
     def test_mixed_manual_and_ui_tree_sources_selects_matching_ui_tree_target(self) -> None:
         payload = run_demo_scenario("mixed_manual_ui_tree_save")

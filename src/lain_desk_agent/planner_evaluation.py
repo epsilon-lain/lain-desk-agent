@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from datetime import datetime
 from typing import Any
 
 from .action_contract import action_contract_from_proposal
@@ -56,6 +58,11 @@ def evaluate_demo_scenario(name: str, task: str = "") -> dict[str, Any]:
         if isinstance(scenario_input.get("expected"), dict)
         else {}
     )
+    readiness = (
+        scenario_input.get("readiness", {})
+        if isinstance(scenario_input.get("readiness"), dict)
+        else {}
+    )
     planner_context = build_planner_context(
         scenario_input["task"],
         scenario_input["ui_state"],
@@ -65,9 +72,9 @@ def evaluate_demo_scenario(name: str, task: str = "") -> dict[str, Any]:
     ai_result = build_ai_proposal_result_from_context(planner_context)
     ai_proposal = ai_result["proposal"]
 
-    rule_based_result = _pipeline_result(rule_based_proposal)
+    rule_based_result = _pipeline_result(rule_based_proposal, planner_context, readiness)
     ai_result_payload = {
-        **_pipeline_result(ai_proposal),
+        **_pipeline_result(ai_proposal, planner_context, readiness),
         "validation": ai_result.get("validation", {}),
     }
     differences = _compare_results(rule_based_result, ai_result_payload)
@@ -105,6 +112,7 @@ def evaluate_demo_scenario(name: str, task: str = "") -> dict[str, Any]:
             "visible_elements": planner_context.get("visible_elements"),
             "grounding_hints": _grounding_hints(planner_context),
             "safety_runtime": planner_context.get("safety_runtime"),
+            "readiness": readiness,
         },
         "expected": expected,
         "expectation": expectation,
@@ -132,10 +140,19 @@ def _rule_based_input_from_context(planner_context: dict[str, Any]) -> dict[str,
     }
 
 
-def _pipeline_result(proposal: dict[str, Any]) -> dict[str, Any]:
+def _pipeline_result(
+    proposal: dict[str, Any],
+    planner_context: dict[str, Any],
+    readiness: dict[str, Any],
+) -> dict[str, Any]:
     safety_decision = assess_proposal(proposal)
-    action_contract = action_contract_from_proposal(proposal)
-    click_readiness = _click_readiness_for_contract(action_contract, safety_decision)
+    action_contract = _readiness_contract(action_contract_from_proposal(proposal), readiness)
+    click_readiness = _click_readiness_for_contract(
+        action_contract,
+        safety_decision,
+        planner_context,
+        readiness,
+    )
 
     return {
         "proposal": _compact_proposal(proposal),
@@ -151,17 +168,28 @@ def _pipeline_result(proposal: dict[str, Any]) -> dict[str, Any]:
 def _click_readiness_for_contract(
     action_contract: dict[str, Any] | None,
     safety_decision: dict[str, Any],
+    planner_context: dict[str, Any],
+    readiness: dict[str, Any],
 ) -> dict[str, Any]:
     if not isinstance(action_contract, dict) or action_contract.get("type") != "click":
         return click_readiness_not_applicable()
+
+    visible_elements = planner_context.get("visible_elements")
+    visible_items = visible_elements.get("items", []) if isinstance(visible_elements, dict) else []
 
     return evaluate_click_readiness(
         action_contract,
         safety_decision,
         get_capability("click"),
         get_permission_profile_payload(),
-        screen=action_contract.get("screen"),
-        observation_timestamp=action_contract.get("observation_timestamp"),
+        screen=_readiness_value(readiness, "screen", planner_context.get("screen")),
+        observation_timestamp=_readiness_value(
+            readiness,
+            "observation_timestamp",
+            action_contract.get("target_timestamp"),
+        ),
+        now=_parse_readiness_now(readiness.get("now")),
+        visible_elements=_readiness_value(readiness, "visible_elements", visible_items),
     )
 
 
@@ -182,6 +210,7 @@ def _compact_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
             "target_confidence": action.get("target_confidence"),
             "target_source": str(action.get("target_source") or ""),
             "target_risk_hint": str(action.get("target_risk_hint") or ""),
+            "target_timestamp": str(action.get("target_timestamp") or ""),
             "risk": str(action.get("risk") or ""),
             "requires_approval": bool(action.get("requires_approval")),
             "reason": str(action.get("reason") or ""),
@@ -199,10 +228,14 @@ def _compact_action_contract(action_contract: dict[str, Any] | None) -> dict[str
         "status": status,
         "preview_only": status == "preview_only",
         "executed": bool(action_contract.get("executed")),
+        "bbox": action_contract.get("bbox") if isinstance(action_contract.get("bbox"), dict) else None,
+        "center": action_contract.get("center") if isinstance(action_contract.get("center"), dict) else None,
         "target_label": str(action_contract.get("target_label") or ""),
+        "target_role": str(action_contract.get("target_role") or ""),
         "target_source": str(action_contract.get("target_source") or ""),
         "target_risk_hint": str(action_contract.get("target_risk_hint") or ""),
         "target_confidence": action_contract.get("target_confidence"),
+        "target_timestamp": str(action_contract.get("target_timestamp") or ""),
         "target_app": str(action_contract.get("target_app") or ""),
     }
 
@@ -333,6 +366,19 @@ def _check_expected_behavior(
             f"'{expected_readiness_reason}' in {actual['readiness_reasons']}"
         )
 
+    expected_blocker_codes = expected.get("readiness_blocker_codes")
+    if isinstance(expected_blocker_codes, list):
+        missing_codes = [
+            str(code)
+            for code in expected_blocker_codes
+            if str(code) not in actual["readiness_blocker_codes"]
+        ]
+        if missing_codes:
+            failures.append(
+                "readiness_blocker_codes missing "
+                f"{missing_codes!r} from {actual['readiness_blocker_codes']!r}"
+            )
+
     if not _blocker_reason_matches(expected, actual["blocker_reason"]):
         failures.append(
             "blocker_reason expected "
@@ -381,6 +427,9 @@ def _actual_result_summary(result: dict[str, Any]) -> dict[str, Any]:
     readiness_reasons = click_readiness.get("reasons")
     if not isinstance(readiness_reasons, list):
         readiness_reasons = []
+    blocker_codes = click_readiness.get("blocker_codes")
+    if not isinstance(blocker_codes, list):
+        blocker_codes = []
 
     contract_type = str(action_contract.get("type") or "none")
     status = str(action_contract.get("status") or "")
@@ -402,6 +451,7 @@ def _actual_result_summary(result: dict[str, Any]) -> dict[str, Any]:
         "executed": bool(action_contract.get("executed")),
         "click_readiness_status": str(click_readiness.get("status") or "not_present"),
         "readiness_reasons": [str(reason) for reason in readiness_reasons],
+        "readiness_blocker_codes": [str(code) for code in blocker_codes],
         "blocker_reason": _result_blocker_reason(action, safety_decision, action_contract, click_readiness),
         "safe_read_only": bool(result.get("safe_read_only")),
         "executable_actions": [str(action) for action in executable_actions],
@@ -445,6 +495,42 @@ def _expect_equal(
 
     if expected_value != actual_value:
         failures.append(f"{field} expected {expected_value!r} but got {actual_value!r}")
+
+
+def _readiness_contract(
+    action_contract: dict[str, Any] | None,
+    readiness: dict[str, Any],
+) -> dict[str, Any] | None:
+    if not isinstance(action_contract, dict):
+        return None
+
+    contract = deepcopy(action_contract)
+    overrides = readiness.get("contract_overrides") if isinstance(readiness, dict) else None
+    if isinstance(overrides, dict):
+        for key, value in overrides.items():
+            if value is None:
+                contract.pop(str(key), None)
+            else:
+                contract[str(key)] = deepcopy(value)
+
+    return contract
+
+
+def _readiness_value(readiness: dict[str, Any], key: str, fallback: Any) -> Any:
+    if isinstance(readiness, dict) and key in readiness:
+        return readiness[key]
+
+    return fallback
+
+
+def _parse_readiness_now(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def _blocker_reason_matches(expected: dict[str, Any], actual_reason: str) -> bool:
@@ -536,6 +622,7 @@ def _report_summary(scenarios: list[dict[str, Any]]) -> dict[str, Any]:
         for scenario in scenarios
         if _scenario_has_blocked_click_readiness(scenario)
     ]
+    readiness_blocker_codes = _readiness_blocker_code_summary(scenarios)
     expectation_results = [
         result
         for scenario in scenarios
@@ -560,6 +647,7 @@ def _report_summary(scenarios: list[dict[str, Any]]) -> dict[str, Any]:
         "scenarios_with_preview_only_click_contracts": scenarios_with_preview_clicks,
         "scenarios_with_switch_app_preview_contracts": scenarios_with_switch_app_previews,
         "scenarios_with_blocked_click_readiness": scenarios_with_blocked_click_readiness,
+        "readiness_blocker_codes": readiness_blocker_codes,
         "expectation_check_count": len(expectation_results),
         "expectation_pass_count": len(expectation_results) - expectation_failure_count,
         "expectation_failure_count": expectation_failure_count,
@@ -751,10 +839,12 @@ def _observation_click_readiness_summary(result: dict[str, Any]) -> dict[str, An
         }
 
     reasons = click_readiness.get("reasons")
+    blocker_codes = click_readiness.get("blocker_codes")
     return {
         "status": str(click_readiness.get("status") or "unknown"),
         "ready": bool(click_readiness.get("ready")),
         "reasons": [str(reason) for reason in reasons] if isinstance(reasons, list) else [],
+        "blocker_codes": [str(code) for code in blocker_codes] if isinstance(blocker_codes, list) else [],
     }
 
 
@@ -769,6 +859,13 @@ def _observation_expectation_summary(expectation: dict[str, Any]) -> dict[str, A
         "expected_requires_approval": bool(expected.get("requires_approval")),
         "expected_readiness_status": str(expected.get("click_readiness_status") or ""),
         "expected_blocker_reason": str(expected.get("blocker_reason") or ""),
+        "expected_blocker_codes": [
+            str(code)
+            for code in expected.get("readiness_blocker_codes", [])
+            if str(code)
+        ]
+        if isinstance(expected.get("readiness_blocker_codes"), list)
+        else [],
         "rule_based_passed": _expectation_passed(expectation.get("rule_based")),
         "ai_proposal_passed": _expectation_passed(expectation.get("ai_proposal")),
         "overall_passed": bool(expectation.get("overall_passed", True)),
@@ -816,6 +913,32 @@ def _scenario_has_blocked_click_readiness(scenario: dict[str, Any]) -> bool:
         isinstance(readiness, dict) and readiness.get("status") == "blocked"
         for readiness in readiness_by_planner.values()
     )
+
+
+def _readiness_blocker_code_summary(scenarios: list[dict[str, Any]]) -> dict[str, list[str]]:
+    summary: dict[str, list[str]] = {}
+    for scenario in scenarios:
+        scenario_name = str(scenario.get("scenario") or "")
+        observation = _scenario_observation(scenario)
+        readiness_by_planner = observation.get("click_readiness")
+        if not isinstance(readiness_by_planner, dict):
+            continue
+
+        for readiness in readiness_by_planner.values():
+            if not isinstance(readiness, dict):
+                continue
+            codes = readiness.get("blocker_codes")
+            if not isinstance(codes, list):
+                continue
+            for code in codes:
+                code_text = str(code or "")
+                if not code_text:
+                    continue
+                summary.setdefault(code_text, [])
+                if scenario_name and scenario_name not in summary[code_text]:
+                    summary[code_text].append(scenario_name)
+
+    return summary
 
 
 def _scenario_expectation_results(scenario: dict[str, Any]) -> list[dict[str, Any]]:

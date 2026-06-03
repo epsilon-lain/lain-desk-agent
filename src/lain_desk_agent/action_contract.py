@@ -32,6 +32,11 @@ def _click_contract(proposal: dict[str, Any], action: dict[str, Any]) -> dict[st
     if bbox is None:
         return None
 
+    center = _normalized_point(action.get("target_center")) or {
+        "x": round(bbox["x"] + bbox["width"] / 2),
+        "y": round(bbox["y"] + bbox["height"] / 2),
+    }
+
     return {
         "action_id": ACTION_ID,
         "source_proposal_id": str(proposal.get("proposal_id") or ""),
@@ -43,11 +48,10 @@ def _click_contract(proposal: dict[str, Any], action: dict[str, Any]) -> dict[st
         "target_source": str(action.get("target_source") or ""),
         "target_risk_hint": str(action.get("target_risk_hint") or ""),
         "target_timestamp": str(action.get("target_timestamp") or ""),
+        "target_visible": action.get("target_visible"),
+        "target_enabled": action.get("target_enabled"),
         "bbox": bbox,
-        "center": {
-            "x": round(bbox["x"] + bbox["width"] / 2),
-            "y": round(bbox["y"] + bbox["height"] / 2),
-        },
+        "center": center,
         "status": "preview_only",
         "executed": False,
     }
@@ -92,6 +96,24 @@ def _normalized_bbox(value: Any) -> dict[str, float] | None:
         return None
 
     return {key: _compact_number(number) for key, number in bbox.items()}
+
+
+def _normalized_point(value: Any) -> dict[str, float] | None:
+    if not isinstance(value, dict):
+        return None
+
+    try:
+        point = {
+            "x": float(value["x"]),
+            "y": float(value["y"]),
+        }
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    if not all(math.isfinite(number) for number in point.values()):
+        return None
+
+    return {key: _compact_number(number) for key, number in point.items()}
 
 
 def _compact_number(value: float) -> float | int:

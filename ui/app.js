@@ -600,17 +600,33 @@ function buildReadinessDebugSummary({
   const reasons = Array.isArray(clickReadiness.reasons)
     ? clickReadiness.reasons.map((reason) => String(reason))
     : [];
+  const blockerCodes = Array.isArray(clickReadiness.blocker_codes)
+    ? clickReadiness.blocker_codes.map((code) => String(code))
+    : [];
+  const blockers = Array.isArray(clickReadiness.blockers)
+    ? clickReadiness.blockers.map((blocker) => ({
+        code: String(blocker?.code || ""),
+        reason: String(blocker?.reason || ""),
+        severity: String(blocker?.severity || ""),
+      }))
+    : [];
   const checks = Array.isArray(clickReadiness.checks)
     ? clickReadiness.checks.map((check) => readinessDebugCheck(check, clickReadiness))
     : [];
+  const target = clickReadiness.target ?? {};
   const summary = {
     proposal_id: String(proposal?.proposal_id || actionContract?.source_proposal_id || ""),
     contract_type: String(actionContract?.type || ""),
     target_label: String(actionContract?.target_label || action.target_label || ""),
+    target_risk_hint: String(target.risk_hint || actionContract?.target_risk_hint || action.target_risk_hint || ""),
+    target_confidence: target.confidence ?? actionContract?.target_confidence ?? action.target_confidence ?? null,
     status: String(clickReadiness.status || "not_applicable"),
     ready: Boolean(clickReadiness.ready),
     risk: String(clickReadiness.risk || "unknown"),
     reasons,
+    blocker_codes: blockerCodes,
+    blockers,
+    coordinate_debug: clickReadiness.coordinate_debug ?? {},
     checks,
     note: "Read-only diagnostics. Blocked readiness means click is not executable.",
   };
@@ -628,6 +644,7 @@ function readinessDebugCheck(check, clickReadiness = {}) {
 
   return {
     name: String(check?.name || "unknown_check"),
+    code: String(check?.code || ""),
     status,
     reason,
     severity: readinessCheckSeverity(check, clickReadiness),
@@ -674,7 +691,14 @@ function displayReadinessCheckName(name) {
     bbox_present: "bbox present",
     bbox_shape: "bbox shape",
     bbox_screen_bounds: "screen bounds",
+    coordinate_space: "coordinate space",
+    dpi_scale: "DPI / scale",
     center_shape: "center",
+    center_bbox_consistency: "center vs bbox",
+    target_present: "target",
+    target_confidence: "target confidence",
+    target_visibility: "target visibility",
+    target_ambiguity: "target ambiguity",
     observation_freshness: "observation freshness",
     click_capability: "click capability",
     permission_profile: "permission profile",
@@ -718,13 +742,19 @@ function displayReadinessCheckStatus(status) {
 function readinessCheckSeverity(check, clickReadiness = {}) {
   const reason = String(check?.reason || "").toLowerCase();
   const name = String(check?.name || "");
+  const code = String(check?.code || "");
   const status = normalizeReadinessCheckStatus(check?.status);
 
   if (status !== "blocked") {
     return "none";
   }
 
-  if (reason.includes("high-risk") || name === "target_label_risk" || clickReadiness.risk === "high") {
+  if (
+    reason.includes("high-risk") ||
+    code === "high_risk_requires_approval" ||
+    name === "target_label_risk" ||
+    clickReadiness.risk === "high"
+  ) {
     return "high";
   }
 
@@ -733,7 +763,21 @@ function readinessCheckSeverity(check, clickReadiness = {}) {
     reason.includes("capability") ||
     reason.includes("permission profile") ||
     reason.includes("bbox") ||
-    reason.includes("stale")
+    reason.includes("stale") ||
+    [
+      "missing_target",
+      "missing_bbox",
+      "invalid_bbox",
+      "missing_center",
+      "bbox_center_mismatch",
+      "out_of_viewport",
+      "coordinate_space_unknown",
+      "dpi_uncertain",
+      "low_confidence_target",
+      "hidden_or_disabled_target",
+      "ambiguous_target",
+      "action_not_enabled_by_policy",
+    ].includes(code)
   ) {
     return "medium";
   }
@@ -769,12 +813,52 @@ function displayReadinessReason(reason) {
     return "missing bbox; no target geometry";
   }
 
+  if (lower.includes("missing target")) {
+    return "missing target; no stable element identity";
+  }
+
+  if (lower.includes("missing center")) {
+    return "missing center; target point unavailable";
+  }
+
   if (lower.includes("malformed bbox")) {
     return "malformed bbox; target geometry is invalid";
   }
 
+  if (lower.includes("invalid center")) {
+    return "invalid center; target point is invalid";
+  }
+
+  if (lower.includes("center does not match bbox")) {
+    return "center does not match bbox";
+  }
+
   if (lower.includes("bbox outside screen bounds")) {
     return "bbox outside screen bounds";
+  }
+
+  if (lower.includes("coordinate space unknown")) {
+    return "coordinate space unknown";
+  }
+
+  if (lower.includes("dpi is uncertain")) {
+    return "DPI or scale is uncertain";
+  }
+
+  if (lower.includes("low-confidence target")) {
+    return "low-confidence target; not ready";
+  }
+
+  if (lower.includes("hidden or disabled target")) {
+    return "hidden or disabled target; not ready";
+  }
+
+  if (lower.includes("ambiguous target")) {
+    return "ambiguous target; not ready";
+  }
+
+  if (lower.includes("target risk is unknown")) {
+    return "target risk is unknown; not ready";
   }
 
   if (lower.includes("stale observation")) {
@@ -1684,8 +1768,11 @@ function formatEvaluationExpected(scenario) {
   const blocker = expected.blocker_reason
     ? `; blocker ${compactText(expected.blocker_reason, 48)}`
     : "";
+  const blockerCodes = Array.isArray(expected.readiness_blocker_codes) && expected.readiness_blocker_codes.length
+    ? `; codes ${expected.readiness_blocker_codes.map((code) => compactText(code, 32)).join(", ")}`
+    : "";
 
-  return `${actionType}; risk ${risk}; ${approval}; contract ${contract}; readiness ${readiness}${blocker}`;
+  return `${actionType}; risk ${risk}; ${approval}; contract ${contract}; readiness ${readiness}${blocker}${blockerCodes}`;
 }
 
 function formatEvaluationExpectation(scenario) {
@@ -1756,8 +1843,11 @@ function formatEvaluationReadiness(result = {}) {
   const reasons = Array.isArray(clickReadiness.reasons) && clickReadiness.reasons.length
     ? `: ${clickReadiness.reasons.map((reason) => compactText(reason, 48)).join("; ")}`
     : "";
+  const blockerCodes = Array.isArray(clickReadiness.blocker_codes) && clickReadiness.blocker_codes.length
+    ? ` [${clickReadiness.blocker_codes.map((code) => compactText(code, 32)).join(", ")}]`
+    : "";
 
-  return `${readiness}${reasons}`;
+  return `${readiness}${reasons}${blockerCodes}`;
 }
 
 function formatEvaluationBlocker(scenario) {
