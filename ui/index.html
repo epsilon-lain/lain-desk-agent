@@ -270,6 +270,26 @@
               <dl class="planner-evaluation-summary" id="plannerEvaluationSummary" hidden></dl>
               <div class="planner-evaluation-results" id="plannerEvaluationResults" aria-live="polite"></div>
             </section>
+            <section
+              class="planner-evaluation-panel"
+              id="sandboxEvaluationPanel"
+              aria-label="Sandbox evaluation trace"
+            >
+              <div class="planner-evaluation-header">
+                <div>
+                  <p class="planner-evaluation-title">Sandbox evaluation trace</p>
+                  <p class="planner-evaluation-helper">
+                    Read-only Phase 8.1 sandbox gate report. Dry-run or skipped only; no execution.
+                  </p>
+                </div>
+                <button class="planner-evaluation-button" id="loadSandboxEvaluation" type="button">
+                  Load sandbox trace
+                </button>
+              </div>
+              <p class="planner-evaluation-status" id="sandboxEvaluationStatus">Not loaded yet.</p>
+              <dl class="planner-evaluation-summary" id="sandboxEvaluationSummary" hidden></dl>
+              <div class="planner-evaluation-results" id="sandboxEvaluationResults" aria-live="polite"></div>
+            </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
               <p id="safetyBrakeMessage">No safety decision yet.</p>
               <div class="safety-buttons" id="safetyButtons" hidden>
