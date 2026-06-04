@@ -66,6 +66,11 @@ const loadPlannerEvaluationButton = document.querySelector("#loadPlannerEvaluati
 const plannerEvaluationStatus = document.querySelector("#plannerEvaluationStatus");
 const plannerEvaluationSummary = document.querySelector("#plannerEvaluationSummary");
 const plannerEvaluationResults = document.querySelector("#plannerEvaluationResults");
+const sandboxEvaluationPanel = document.querySelector("#sandboxEvaluationPanel");
+const loadSandboxEvaluationButton = document.querySelector("#loadSandboxEvaluation");
+const sandboxEvaluationStatus = document.querySelector("#sandboxEvaluationStatus");
+const sandboxEvaluationSummary = document.querySelector("#sandboxEvaluationSummary");
+const sandboxEvaluationResults = document.querySelector("#sandboxEvaluationResults");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -213,6 +218,7 @@ renderExecutionPolicy();
 renderPlannerContext();
 renderPlannerTrace();
 renderPlannerEvaluation();
+renderSandboxEvaluation();
 renderPermissionProfile();
 renderCapabilities();
 fetchRuntimeStatus({ silent: true });
@@ -251,6 +257,10 @@ buildPlannerContextButton.addEventListener("click", async () => {
 
 loadPlannerEvaluationButton.addEventListener("click", async () => {
   await loadDemoPlannerEvaluation();
+});
+
+loadSandboxEvaluationButton.addEventListener("click", async () => {
+  await loadSandboxEvaluation();
 });
 
 function setDetailsFromUiState(uiState) {
@@ -1581,6 +1591,263 @@ function renderPlannerEvaluationError(error) {
   plannerEvaluationResults.replaceChildren(
     plannerEvaluationEmptyState(error.message || String(error))
   );
+}
+
+async function loadSandboxEvaluation() {
+  sandboxEvaluationPanel.dataset.state = "running";
+  loadSandboxEvaluationButton.disabled = true;
+  sandboxEvaluationStatus.textContent = "Loading sandbox evaluation trace...";
+  sandboxEvaluationSummary.hidden = true;
+  sandboxEvaluationResults.replaceChildren();
+  statusText.textContent = "loading sandbox evaluation...";
+
+  try {
+    const response = await fetch("/sandbox-evaluation/demo");
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Sandbox evaluation failed with HTTP ${response.status}`);
+    }
+
+    renderSandboxEvaluation(payload);
+    detailError.textContent = "none";
+    statusText.textContent = "sandbox evaluation ready";
+  } catch (error) {
+    renderSandboxEvaluationError(error);
+    detailError.textContent = `Sandbox evaluation failed: ${error.message || String(error)}`;
+    detailsPanel.open = true;
+    statusText.textContent = "sandbox evaluation failed";
+  } finally {
+    loadSandboxEvaluationButton.disabled = false;
+  }
+}
+
+function renderSandboxEvaluation(report = null) {
+  sandboxEvaluationSummary.replaceChildren();
+  sandboxEvaluationResults.replaceChildren();
+
+  if (!report) {
+    sandboxEvaluationPanel.dataset.state = "empty";
+    sandboxEvaluationStatus.textContent = "Not loaded yet.";
+    sandboxEvaluationSummary.hidden = true;
+    sandboxEvaluationResults.appendChild(
+      plannerEvaluationEmptyState("Load the sandbox trace to inspect Phase 8.1 gate scenarios.")
+    );
+    return;
+  }
+
+  const summary = report.summary ?? {};
+  const scenarios = Array.isArray(report.scenarios) ? report.scenarios : [];
+  const totalScenarioCount = summary.total_scenario_count ?? report.scenario_count ?? scenarios.length;
+  const passedScenarioCount = summary.passed_scenario_count ?? 0;
+  const allPassed =
+    summary.all_expected_outcomes_passed === true &&
+    Number(summary.real_action_attempted_count ?? 0) === 0;
+
+  sandboxEvaluationPanel.dataset.state = allPassed ? "ready" : "warning";
+  sandboxEvaluationStatus.textContent =
+    "Phase 8.1 deterministic sandbox trace loaded. This is debug output, not execution permission.";
+  sandboxEvaluationSummary.hidden = false;
+  setSandboxEvaluationSummary([
+    ["Scenarios", String(totalScenarioCount)],
+    ["Pass/fail", `${passedScenarioCount}/${totalScenarioCount} passed`],
+    [
+      "Gate results",
+      `${summary.gate_passed_count ?? 0} passed; ${summary.gate_blocked_count ?? 0} blocked`,
+    ],
+    ["Dry-run cases", String(summary.dry_run_scenario_count ?? "unknown")],
+    ["Real-action enabled", String(summary.real_action_enabled_count ?? 0)],
+    ["Real-action skipped", String(summary.real_action_skipped_count ?? 0)],
+    ["Real-action attempted", String(summary.real_action_attempted_count ?? 0)],
+    [
+      "Post verification",
+      `${summary.post_action_verification_planned_count ?? 0} planned`,
+    ],
+    ["Failure reasons", formatSandboxCodeMap(summary.failure_reason_codes)],
+    ["Blockers", formatSandboxCodeMap(summary.blocker_codes)],
+    ["Audit events", formatSandboxCodeMap(summary.audit_event_names)],
+    [
+      "Boundary",
+      "read-only fixture report; dry-run or skipped only; no /execute call",
+    ],
+  ]);
+
+  if (!scenarios.length) {
+    sandboxEvaluationResults.appendChild(
+      plannerEvaluationEmptyState("No sandbox evaluation scenarios returned.")
+    );
+    return;
+  }
+
+  for (const scenario of scenarios) {
+    sandboxEvaluationResults.appendChild(sandboxEvaluationScenarioCard(scenario));
+  }
+}
+
+function renderSandboxEvaluationError(error) {
+  sandboxEvaluationPanel.dataset.state = "error";
+  sandboxEvaluationStatus.textContent = "Sandbox evaluation trace could not be loaded.";
+  sandboxEvaluationSummary.hidden = true;
+  sandboxEvaluationSummary.replaceChildren();
+  sandboxEvaluationResults.replaceChildren(
+    plannerEvaluationEmptyState(error.message || String(error))
+  );
+}
+
+function setSandboxEvaluationSummary(rows) {
+  sandboxEvaluationSummary.replaceChildren();
+
+  for (const [label, value] of rows) {
+    sandboxEvaluationSummary.appendChild(plannerEvaluationFact(label, value));
+  }
+}
+
+function sandboxEvaluationScenarioCard(scenario) {
+  const card = document.createElement("article");
+  const title = document.createElement("p");
+  const facts = document.createElement("dl");
+  const passed = scenario.passed === true;
+  const failureReasons = Array.isArray(scenario.failure_reason_codes)
+    ? scenario.failure_reason_codes
+    : [];
+  const targetRisk = scenario.target_risk_hint || "none";
+
+  card.className = "planner-evaluation-card";
+  card.dataset.different = String(!passed || failureReasons.length > 0 || scenario.real_action_skipped === true);
+  card.dataset.risk = String(targetRisk === "high_risk" || targetRisk === "unknown");
+  title.className = "planner-evaluation-card-title";
+  title.textContent = `${scenario.scenario_name || scenario.scenario_id || "unknown scenario"} - ${
+    passed ? "pass" : "fail"
+  } / ${scenario.actual_outcome?.status || "unknown"}`;
+  facts.className = "planner-evaluation-facts";
+
+  for (const [label, value] of sandboxEvaluationRows(scenario)) {
+    facts.appendChild(plannerEvaluationFact(label, value));
+  }
+
+  card.append(title, facts);
+
+  if (scenario.trace) {
+    card.appendChild(sandboxEvaluationTraceDetails(scenario));
+  }
+
+  return card;
+}
+
+function sandboxEvaluationRows(scenario) {
+  return [
+    ["Scenario ID", scenario.scenario_id || "unknown"],
+    ["Expected", formatSandboxOutcome(scenario.expected_outcome)],
+    ["Actual", formatSandboxOutcome(scenario.actual_outcome)],
+    ["Gate", scenario.gate_passed === true ? "passed" : "blocked"],
+    ["Failure reasons", formatSandboxCodeList(scenario.failure_reason_codes)],
+    ["Blockers", formatSandboxCodeList(scenario.blocker_codes)],
+    ["Audit events", formatSandboxCodeList(scenario.audit_event_names)],
+    ["Dry-run", formatSandboxBool(scenario.dry_run)],
+    [
+      "Real action",
+      `enabled ${formatSandboxBool(scenario.real_action_enabled)}; skipped ${formatSandboxBool(
+        scenario.real_action_skipped
+      )}; attempted ${formatSandboxBool(scenario.actual_outcome?.real_action_attempted)}`,
+    ],
+    [
+      "Post verify",
+      scenario.post_action_verification_planned === true ? "planned" : "not planned",
+    ],
+    [
+      "Target",
+      `risk ${scenario.target_risk_hint || "none"}; confidence ${formatSandboxConfidence(
+        scenario.target_confidence
+      )}`,
+    ],
+    [
+      "Readiness",
+      `${scenario.readiness_ready === true ? "ready" : "blocked or unknown"}; action ${
+        scenario.action_type || "unknown"
+      }`,
+    ],
+    ["Notes", formatEvaluationNotes(scenario.notes)],
+  ];
+}
+
+function sandboxEvaluationTraceDetails(scenario) {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const pre = document.createElement("pre");
+
+  details.className = "planner-evaluation-readiness-debug";
+  summary.textContent = "trace debug JSON";
+  pre.textContent = JSON.stringify(
+    {
+      scenario_id: scenario.scenario_id,
+      trace: scenario.trace,
+      actual_outcome: scenario.actual_outcome,
+    },
+    null,
+    2
+  );
+  details.append(summary, pre);
+  return details;
+}
+
+function formatSandboxOutcome(outcome = {}) {
+  if (!outcome || typeof outcome !== "object") {
+    return "unknown";
+  }
+
+  const status = outcome.status || "unknown";
+  const gate =
+    outcome.gate_passed === true ? "gate passed" : outcome.gate_passed === false ? "gate blocked" : "gate unknown";
+  const skipped = formatSandboxBool(outcome.real_action_skipped);
+  const attempted = formatSandboxBool(outcome.real_action_attempted);
+  const reasons = formatSandboxCodeList(outcome.failure_reason_codes, 4);
+
+  return `${status}; ${gate}; skipped ${skipped}; attempted ${attempted}; reasons ${reasons}`;
+}
+
+function formatSandboxCodeList(values, limit = 8) {
+  if (!Array.isArray(values) || !values.length) {
+    return "none";
+  }
+
+  const visibleValues = values.slice(0, limit).map((value) => compactText(String(value), 42));
+  const extraCount = values.length - visibleValues.length;
+  return extraCount > 0 ? `${visibleValues.join(", ")} +${extraCount} more` : visibleValues.join(", ");
+}
+
+function formatSandboxCodeMap(valueMap) {
+  if (!valueMap || typeof valueMap !== "object") {
+    return "none";
+  }
+
+  const entries = Object.entries(valueMap).filter(
+    ([, scenarioIds]) => Array.isArray(scenarioIds) && scenarioIds.length
+  );
+
+  if (!entries.length) {
+    return "none";
+  }
+
+  return entries
+    .slice(0, 8)
+    .map(([code, scenarioIds]) => `${compactText(code, 32)} (${scenarioIds.length})`)
+    .join(", ");
+}
+
+function formatSandboxBool(value) {
+  if (value === true) {
+    return "yes";
+  }
+
+  if (value === false) {
+    return "no";
+  }
+
+  return "unknown";
+}
+
+function formatSandboxConfidence(value) {
+  return Number.isFinite(value) ? value.toFixed(2) : "unknown";
 }
 
 function setPlannerEvaluationSummary(rows) {

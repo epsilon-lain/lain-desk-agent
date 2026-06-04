@@ -35,6 +35,10 @@ from .planner_context import build_planner_context
 from .planner_evaluation import evaluate_demo_scenarios
 from .resource_guard import DEFAULT_LIMITS, ResourceGuardError
 from .safety import assess_proposal
+from .sandbox_evaluation import (
+    UnknownSandboxEvaluationScenarioError,
+    evaluate_sandbox_experiment_scenarios,
+)
 from .understanding import understand
 from .verification import verification_failed_result, verify_execution
 
@@ -72,6 +76,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/planner-evaluation/demo":
             self._handle_planner_evaluation_demo()
+            return
+
+        if path == "/sandbox-evaluation/demo":
+            self._handle_sandbox_evaluation_demo()
             return
 
         if path == "/demo/scenario":
@@ -266,6 +274,22 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 task_overrides={scenario_name: task} if scenario_name and task else None,
             )
         except UnknownDemoScenarioError as exc:
+            self._send_json({"error": str(exc)}, status=404)
+            return
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+
+        self._send_json(payload)
+
+    def _handle_sandbox_evaluation_demo(self) -> None:
+        try:
+            query = parse_qs(urlparse(self.path).query)
+            scenario_id = _first_query_value(query, "scenario_id") or _first_query_value(query, "name")
+            payload = evaluate_sandbox_experiment_scenarios(
+                scenario_ids=[scenario_id] if scenario_id else None,
+            )
+        except UnknownSandboxEvaluationScenarioError as exc:
             self._send_json({"error": str(exc)}, status=404)
             return
         except Exception as exc:

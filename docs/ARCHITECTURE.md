@@ -288,6 +288,28 @@ call `/execute`, does not add UI controls or real-action triggers, does not
 change Capability Registry, Permission Profile, or Execution Policy, and does
 not import any desktop control API.
 
+### Phase 8.2 Sandbox Evaluation Cockpit Trace
+
+Phase 8.2 exposes the existing Phase 8.1 sandbox evaluation report in the
+cockpit through `GET /sandbox-evaluation/demo`. The endpoint calls
+`evaluate_sandbox_experiment_scenarios(...)` and returns the same deterministic
+report shape; it does not observe the live desktop, understand a screen,
+execute an action contract, or call `/execute`.
+
+The cockpit panel is read-only debug output. It displays scenario name,
+expected versus actual outcome, pass/fail, gate status, failure reason codes,
+readiness blocker codes, audit event names, dry-run status,
+real-action-enabled status, real-action-skipped status, post-action
+verification planning, target risk/confidence, readiness state, action type,
+notes, and trace JSON. It does not provide approve, execute, real-action
+toggle, click/type/hotkey/scroll/switch_app, or sandbox action trigger
+controls.
+
+Phase 8.2 is not execution permission. It does not change Capability Registry,
+Permission Profile, Execution Policy, Action Contract behavior, Click
+Readiness, or the Phase 7 gate. It only makes deterministic gate behavior
+inspectable before any future real-action adapter is considered.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -301,6 +323,8 @@ The current safety boundaries are intentionally narrow:
 - Phase 8 sandbox experiments are dry-run or explicitly skipped; they are not
   execution permission.
 - Phase 8.1 sandbox evaluation is a deterministic trace report, not an
+  execution path.
+- Phase 8.2 sandbox evaluation cockpit trace is read-only debug output, not an
   execution path.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
@@ -321,6 +345,7 @@ The current safety boundaries are intentionally narrow:
 | `/permission-profile` | GET | Return the active permission profile and known profiles. |
 | `/click-readiness` | GET | Return static click readiness policy metadata. |
 | `/runtime/status` | GET | Return the current runtime safety summary. |
+| `/sandbox-evaluation/demo` | GET | Return deterministic Phase 8.1 sandbox evaluation trace for cockpit display; no observation or execution. |
 | `/execute` | POST | Execute only approved wait contracts and verify them. |
 
 ## Development rule

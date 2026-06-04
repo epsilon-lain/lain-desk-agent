@@ -36,6 +36,9 @@ Phase 8.1 adds deterministic sandbox experiment evaluation and trace reporting.
 It evaluates only fixture-backed dry-run and skipped outcomes, including gate
 failure reasons and audit event ordering.
 
+Phase 8.2 exposes that sandbox evaluation trace in the cockpit as read-only
+debug output. It does not add execution controls or real-action permissions.
+
 ## Completed
 
 - Observation / Understanding
@@ -55,6 +58,7 @@ failure reasons and audit event ordering.
 - Phase 7 Sandbox Action Design Gate
 - Phase 8 Dry-run Sandbox Experiment Framework
 - Phase 8.1 Sandbox Evaluation Trace
+- Phase 8.2 Sandbox Evaluation Cockpit Trace
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -80,6 +84,7 @@ failure reasons and audit event ordering.
 - `/execute` remains wait-only.
 - Phase 8 sandbox experiments are dry-run or skipped only.
 - Phase 8.1 sandbox evaluation is fixture-only and performs no actions.
+- Phase 8.2 cockpit trace exposure is read-only/debug-only.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -260,11 +265,32 @@ Goal: make the sandbox gate inspectable before any real-action adapter exists.
   control API.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions.
 
+## Phase 8.2: Sandbox Evaluation Cockpit Trace
+
+Status: implemented as read-only cockpit debug integration.
+
+Goal: make deterministic sandbox gate behavior inspectable in the cockpit
+without adding any real-action path.
+
+- Expose the existing `sandbox_evaluation.py` report through a read-only
+  cockpit endpoint.
+- Display scenario ID/name, expected versus actual outcome, pass/fail, gate
+  status, failure reason codes, readiness blocker codes, audit event names,
+  dry-run status, real-action-enabled status, real-action-skipped status,
+  post-action verification planning, target risk/confidence, readiness state,
+  action type, notes, and trace debug JSON.
+- Show empty/error states when the report is unavailable.
+- Keep the cockpit panel debug-only: no execute button, no approval button, no
+  real-action toggle, and no sandbox UI path to `/execute`.
+- Keep the endpoint fixture-backed and deterministic; no live desktop
+  observation, no actuation, and no desktop control API.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions.
+
 ## Phase 9: Limited Desktop Control
 
-Goal: consider narrow desktop control only after the Phase 8/8.1 dry-run
-framework and evaluation are reliable and the Phase 7 real-action checklist is
-satisfied.
+Goal: consider narrow desktop control only after the Phase 8/8.1/8.2 dry-run
+framework, evaluation, and cockpit trace are reliable and the Phase 7
+real-action checklist is satisfied.
 
 - Enable click, type, hotkey, and scroll only as individually gated
   capabilities.

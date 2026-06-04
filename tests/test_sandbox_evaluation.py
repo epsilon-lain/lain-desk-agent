@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import inspect
+import json
+import threading
 import unittest
+from pathlib import Path
+from unittest.mock import patch
+from urllib.request import urlopen
 
 import _path  # noqa: F401
 from lain_desk_agent import sandbox_evaluation, sandbox_experiment
+from lain_desk_agent.main import create_server
 from lain_desk_agent.sandbox_evaluation import (
     evaluate_sandbox_experiment_scenario,
     evaluate_sandbox_experiment_scenarios,
@@ -75,6 +81,9 @@ REQUIRED_RESULT_FIELDS = {
     "action_type",
     "notes",
 }
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+UI_APP_JS = PROJECT_ROOT / "ui" / "app.js"
 
 
 class SandboxEvaluationTests(unittest.TestCase):
@@ -316,6 +325,84 @@ class SandboxEvaluationTests(unittest.TestCase):
         for fragment in forbidden_fragments:
             with self.subTest(fragment=fragment):
                 self.assertNotIn(fragment, source)
+
+    def test_cockpit_endpoint_exposes_stable_read_only_report(self) -> None:
+        server = create_server("127.0.0.1", 0)
+        host, port = server.server_address
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            with (
+                patch("lain_desk_agent.main.observe", side_effect=AssertionError("observe called")),
+                patch("lain_desk_agent.main.understand", side_effect=AssertionError("understand called")),
+                patch(
+                    "lain_desk_agent.main.execute_action_contract",
+                    side_effect=AssertionError("execution called"),
+                ),
+            ):
+                with urlopen(
+                    f"http://{host}:{port}/sandbox-evaluation/demo",
+                    timeout=5,
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+        finally:
+            server.shutdown()
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(payload["report_type"], "sandbox_experiment_evaluation")
+        self.assertEqual(payload["phase"], "phase8_1")
+        self.assertIs(payload["real_desktop_actions"], False)
+        self.assertEqual(payload["scenario_ids"], EXPECTED_SCENARIO_IDS)
+        self.assertEqual(payload["scenario_count"], len(EXPECTED_SCENARIO_IDS))
+        self.assertEqual(payload["summary"]["real_action_attempted_count"], 0)
+        self.assertEqual(payload["summary"]["real_action_enabled_count"], 0)
+
+        scenario = payload["scenarios"][0]
+        self.assertTrue(REQUIRED_RESULT_FIELDS.issubset(scenario))
+        self.assertIn("expected_outcome", scenario)
+        self.assertIn("actual_outcome", scenario)
+        self.assertIn("trace", scenario)
+
+    def test_cockpit_endpoint_can_filter_one_scenario_by_id(self) -> None:
+        server = create_server("127.0.0.1", 0)
+        host, port = server.server_address
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            with urlopen(
+                f"http://{host}:{port}/sandbox-evaluation/demo?scenario_id=dry_run_success_all_gates_pass",
+                timeout=5,
+            ) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        finally:
+            server.shutdown()
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(payload["scenario_count"], 1)
+        self.assertEqual(payload["scenario_ids"], ["dry_run_success_all_gates_pass"])
+        self.assertEqual(payload["scenarios"][0]["scenario_id"], "dry_run_success_all_gates_pass")
+
+    def test_cockpit_ui_sandbox_trace_does_not_trigger_execution(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        start = source.index("async function loadSandboxEvaluation")
+        end = source.index("function setPlannerEvaluationSummary", start)
+        sandbox_ui_source = source[start:end]
+
+        self.assertIn('fetch("/sandbox-evaluation/demo")', sandbox_ui_source)
+        for forbidden_fragment in [
+            'fetch("/execute"',
+            "fetch('/execute'",
+            'fetch("/approval"',
+            "fetch('/approval'",
+            "recordApprovalDecision",
+            "runWaitExecutionSelfTest",
+        ]:
+            with self.subTest(fragment=forbidden_fragment):
+                self.assertNotIn(forbidden_fragment, sandbox_ui_source)
 
 
 if __name__ == "__main__":
