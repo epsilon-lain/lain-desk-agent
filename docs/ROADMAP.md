@@ -32,6 +32,10 @@ Phase 8 now has a dry-run sandbox experiment framework. It validates the
 Phase 7 gate shape, records structured audit events, and skips any non-dry-run
 request because no real-action adapter exists.
 
+Phase 8.1 adds deterministic sandbox experiment evaluation and trace reporting.
+It evaluates only fixture-backed dry-run and skipped outcomes, including gate
+failure reasons and audit event ordering.
+
 ## Completed
 
 - Observation / Understanding
@@ -50,6 +54,7 @@ request because no real-action adapter exists.
 - Click Readiness Hardening
 - Phase 7 Sandbox Action Design Gate
 - Phase 8 Dry-run Sandbox Experiment Framework
+- Phase 8.1 Sandbox Evaluation Trace
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -74,6 +79,7 @@ request because no real-action adapter exists.
 - `/proposal` is inspectable but never executes desktop input.
 - `/execute` remains wait-only.
 - Phase 8 sandbox experiments are dry-run or skipped only.
+- Phase 8.1 sandbox evaluation is fixture-only and performs no actions.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -231,10 +237,30 @@ any real desktop action adapter.
 - Do not broaden default product behavior or enable click/type/hotkey/scroll/
   switch_app in production.
 
+## Phase 8.1: Sandbox Experiment Evaluation And Trace
+
+Status: implemented as deterministic dry-run evaluation.
+
+Goal: make the sandbox gate inspectable before any real-action adapter exists.
+
+- Add deterministic sandbox scenarios for dry-run success, real-action skip,
+  missing approval, stale observation, high-risk and unknown-risk targets,
+  low-confidence targets, invalid geometry, missing post-action verification,
+  forbidden action types, out-of-scope targets, readiness blockers, and missing
+  emergency stop.
+- Report expected and actual outcome, pass/fail, gate status, failure reason
+  codes, audit event names, dry-run status, real-action-enabled status,
+  real-action-skipped status, and post-action verification planning.
+- Include trace/debug output with validation checks and audit event ordering.
+- Keep evaluation fixture-only; no live desktop observation, no `/execute`
+  call, no UI real-action trigger, and no desktop control API.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions.
+
 ## Phase 9: Limited Desktop Control
 
-Goal: consider narrow desktop control only after the Phase 8 dry-run framework
-is reliable and the Phase 7 real-action checklist is satisfied.
+Goal: consider narrow desktop control only after the Phase 8/8.1 dry-run
+framework and evaluation are reliable and the Phase 7 real-action checklist is
+satisfied.
 
 - Enable click, type, hotkey, and scroll only as individually gated
   capabilities.

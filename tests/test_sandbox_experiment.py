@@ -16,6 +16,7 @@ from lain_desk_agent.sandbox_experiment import (
     FAILURE_FORBIDDEN_ACTION_TYPE,
     FAILURE_HIGH_RISK_TARGET,
     FAILURE_INVALID_TARGET_GEOMETRY,
+    FAILURE_LOW_CONFIDENCE_TARGET,
     FAILURE_MISSING_PHASE7_CHECKLIST,
     FAILURE_MISSING_POST_ACTION_VERIFICATION,
     FAILURE_MISSING_USER_APPROVAL,
@@ -111,6 +112,18 @@ class SandboxExperimentTests(unittest.TestCase):
 
         self.assertEqual(result.status, "blocked")
         self.assertIn(FAILURE_HIGH_RISK_TARGET, result.failure_reasons)
+
+    def test_low_confidence_target_blocks(self) -> None:
+        contract = _contract(target_confidence=0.2)
+        element = _visible_element(confidence=0.2)
+
+        result = run_sandbox_experiment(
+            _config(),
+            _request(action_contract=contract, visible_elements=[element]),
+        )
+
+        self.assertEqual(result.status, "blocked")
+        self.assertIn(FAILURE_LOW_CONFIDENCE_TARGET, result.failure_reasons)
 
     def test_stale_observation_blocks(self) -> None:
         stale_timestamp = (NOW - timedelta(seconds=30)).isoformat().replace("+00:00", "Z")
@@ -235,6 +248,7 @@ def _contract(
     action_type: str = "click",
     target_risk_hint: str = "normal",
     risk: str = "low",
+    target_confidence: float = 0.96,
     bbox: dict[str, int] | None = None,
     center: dict[str, int] | None = None,
 ) -> dict[str, object]:
@@ -246,7 +260,7 @@ def _contract(
         "target_element_id": "element_0001",
         "target_label": "sandbox test button",
         "target_role": "button",
-        "target_confidence": 0.96,
+        "target_confidence": target_confidence,
         "target_source": "ui_tree",
         "target_risk_hint": target_risk_hint,
         "target_timestamp": OBSERVATION_TIMESTAMP,
@@ -257,7 +271,7 @@ def _contract(
     }
 
 
-def _visible_element(risk_hint: str = "normal") -> dict[str, object]:
+def _visible_element(risk_hint: str = "normal", confidence: float = 0.96) -> dict[str, object]:
     return {
         "id": "element_0001",
         "label": "sandbox test button",
@@ -265,7 +279,7 @@ def _visible_element(risk_hint: str = "normal") -> dict[str, object]:
         "role": "button",
         "bbox": {"x": 10, "y": 20, "width": 80, "height": 24},
         "center": {"x": 50, "y": 32},
-        "confidence": 0.96,
+        "confidence": confidence,
         "source": "ui_tree",
         "risk_hint": risk_hint,
         "timestamp": OBSERVATION_TIMESTAMP,

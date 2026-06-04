@@ -19,6 +19,7 @@ FAILURE_MISSING_USER_APPROVAL = "missing_user_approval"
 FAILURE_REAL_ACTION_DISABLED = "real_action_disabled"
 FAILURE_READINESS_NOT_READY = "readiness_not_ready"
 FAILURE_HIGH_RISK_TARGET = "high_risk_target"
+FAILURE_LOW_CONFIDENCE_TARGET = "low_confidence_target"
 FAILURE_STALE_OBSERVATION = "stale_observation"
 FAILURE_INVALID_TARGET_GEOMETRY = "invalid_target_geometry"
 FAILURE_MISSING_POST_ACTION_VERIFICATION = "missing_post_action_verification"
@@ -68,6 +69,7 @@ FORBIDDEN_ACTION_TYPES = (
 ALLOWED_SANDBOX_ACTION_TYPES = ("click",)
 LOW_RISK_VALUES = ("low", "normal")
 DEFAULT_MAX_OBSERVATION_AGE_SECONDS = 10.0
+MIN_SANDBOX_TARGET_CONFIDENCE = 0.45
 
 
 @dataclass(frozen=True)
@@ -237,6 +239,14 @@ def validate_phase7_gate(
         _low_risk_target(action_contract, target_element, request.safety_decision),
         FAILURE_HIGH_RISK_TARGET,
         failure_reasons,
+    )
+    _check(
+        checks,
+        "target_confidence",
+        _target_confidence_ready(action_contract, target_element),
+        FAILURE_LOW_CONFIDENCE_TARGET,
+        failure_reasons,
+        {"min_confidence": MIN_SANDBOX_TARGET_CONFIDENCE},
     )
     _check(
         checks,
@@ -419,6 +429,32 @@ def _low_risk_target(
         return False
 
     return all(value in LOW_RISK_VALUES or value == "allowed" for value in meaningful_values)
+
+
+def _target_confidence_ready(
+    action_contract: dict[str, Any] | None,
+    target_element: dict[str, Any] | None,
+) -> bool:
+    confidence = _finite_float(_mapping_value(action_contract, "target_confidence"))
+    if confidence is None:
+        confidence = _finite_float(_mapping_value(target_element, "confidence"))
+    return confidence is not None and confidence >= MIN_SANDBOX_TARGET_CONFIDENCE
+
+
+def _mapping_value(mapping: dict[str, Any] | None, key: str) -> Any:
+    if not isinstance(mapping, dict):
+        return None
+    return mapping.get(key)
+
+
+def _finite_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return number
 
 
 def _fresh_observation(

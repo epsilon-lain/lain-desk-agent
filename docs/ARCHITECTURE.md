@@ -261,6 +261,27 @@ real desktop adapter exists. This framework does not call `/execute`, does not
 change Capability Registry, Permission Profile, or Execution Policy, and does
 not import any desktop control API.
 
+### Phase 8.1 Sandbox Evaluation
+
+Phase 8.1 adds `sandbox_evaluation.py` as a deterministic report and trace
+layer for the dry-run sandbox framework. It builds fixture-backed
+`SandboxExperimentConfig` and `SandboxExperimentRequest` pairs, runs them
+through `run_sandbox_experiment(...)`, and summarizes expected versus actual
+outcomes.
+
+The evaluation covers dry-run success, real-action skip, missing approval,
+stale observations, high-risk and unknown-risk targets, low-confidence targets,
+invalid geometry, missing post-action verification, forbidden action types,
+out-of-scope targets, readiness blockers, and missing emergency stop. Each
+scenario reports pass/fail, gate status, failure reason codes, audit event
+names, dry-run status, real-action-enabled status, real-action-skipped status,
+post-action verification planning, and validation-check trace data.
+
+Phase 8.1 remains fixture-only. It does not observe the live desktop, does not
+call `/execute`, does not add UI controls, does not change Capability Registry,
+Permission Profile, or Execution Policy, and does not import any desktop
+control API.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -273,6 +294,8 @@ The current safety boundaries are intentionally narrow:
 - `preview_only` contracts are never executable.
 - Phase 8 sandbox experiments are dry-run or explicitly skipped; they are not
   execution permission.
+- Phase 8.1 sandbox evaluation is a deterministic trace report, not an
+  execution path.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.
