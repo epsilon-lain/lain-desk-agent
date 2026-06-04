@@ -16,6 +16,10 @@ from typing import Any
 
 FAILURE_MISSING_PHASE7_CHECKLIST = "missing_phase7_checklist"
 FAILURE_MISSING_USER_APPROVAL = "missing_user_approval"
+FAILURE_MISSING_AUDIT_PLAN = "missing_audit_plan"
+FAILURE_MISSING_ACTION_CONTRACT = "missing_action_contract"
+FAILURE_MISSING_TARGET = "missing_target"
+FAILURE_MISSING_EMERGENCY_STOP = "missing_emergency_stop"
 FAILURE_REAL_ACTION_DISABLED = "real_action_disabled"
 FAILURE_READINESS_NOT_READY = "readiness_not_ready"
 FAILURE_HIGH_RISK_TARGET = "high_risk_target"
@@ -68,6 +72,7 @@ FORBIDDEN_ACTION_TYPES = (
 
 ALLOWED_SANDBOX_ACTION_TYPES = ("click",)
 LOW_RISK_VALUES = ("low", "normal")
+KNOWN_COORDINATE_SPACES = {"screen", "viewport", "desktop"}
 DEFAULT_MAX_OBSERVATION_AGE_SECONDS = 10.0
 MIN_SANDBOX_TARGET_CONFIDENCE = 0.45
 
@@ -185,14 +190,14 @@ def validate_phase7_gate(
         checks,
         "audit_events_required",
         config.audit_events_required,
-        FAILURE_MISSING_PHASE7_CHECKLIST,
+        FAILURE_MISSING_AUDIT_PLAN,
         failure_reasons,
     )
     _check(
         checks,
         "emergency_stop_available",
         config.emergency_stop_available and not config.emergency_stop_active,
-        FAILURE_OUTSIDE_SANDBOX_SCOPE,
+        FAILURE_MISSING_EMERGENCY_STOP,
         failure_reasons,
     )
 
@@ -201,9 +206,22 @@ def validate_phase7_gate(
         checks,
         "action_contract_present",
         action_contract is not None,
-        FAILURE_MISSING_PHASE7_CHECKLIST,
+        FAILURE_MISSING_ACTION_CONTRACT,
         failure_reasons,
     )
+    if action_contract is None:
+        _check(
+            checks,
+            "post_action_verification",
+            _has_post_action_verification_plan(request.post_action_verification_plan),
+            FAILURE_MISSING_POST_ACTION_VERIFICATION,
+            failure_reasons,
+        )
+        return {
+            "passed": not failure_reasons,
+            "failure_reasons": _unique(failure_reasons),
+            "checks": checks,
+        }
 
     action_type = _string_field(action_contract, "type")
     target_id = _raw_string_field(action_contract, "target_element_id").strip()
@@ -220,7 +238,16 @@ def validate_phase7_gate(
     _check(checks, "allowed_action_type", allowed_action, FAILURE_OUTSIDE_SANDBOX_SCOPE, failure_reasons)
 
     target_element = _find_visible_target(request.visible_elements, target_id)
-    target_in_scope = target_element is not None
+    target_present = bool(target_id) and target_element is not None
+    _check(
+        checks,
+        "target_present",
+        target_present,
+        FAILURE_MISSING_TARGET,
+        failure_reasons,
+    )
+
+    target_in_scope = target_present
     if config.allowed_target_id:
         target_in_scope = target_in_scope and target_id == config.allowed_target_id
     if config.allowed_window_id:
@@ -228,7 +255,7 @@ def validate_phase7_gate(
     _check(
         checks,
         "target_from_visible_elements",
-        target_in_scope,
+        (not target_present) or target_in_scope,
         FAILURE_OUTSIDE_SANDBOX_SCOPE,
         failure_reasons,
     )
@@ -517,6 +544,10 @@ def _valid_target_geometry(
         return False
     if viewport["width"] <= 0 or viewport["height"] <= 0:
         return False
+    if _coordinate_space(screen) not in KNOWN_COORDINATE_SPACES:
+        return False
+    if _screen_scale(screen) is None:
+        return False
 
     expected_center = {
         "x": round(bbox["x"] + bbox["width"] / 2),
@@ -537,6 +568,18 @@ def _valid_target_geometry(
         return False
 
     return True
+
+
+def _coordinate_space(screen: dict[str, Any]) -> str:
+    return str(screen.get("coordinate_space") or screen.get("space") or "").strip().lower()
+
+
+def _screen_scale(screen: dict[str, Any]) -> float | None:
+    for key in ["dpi_scale", "scale", "device_pixel_ratio"]:
+        value = _finite_float(screen.get(key))
+        if value is not None:
+            return value
+    return None
 
 
 def _geometry_mapping(value: Any, required_keys: tuple[str, ...]) -> dict[str, int] | None:

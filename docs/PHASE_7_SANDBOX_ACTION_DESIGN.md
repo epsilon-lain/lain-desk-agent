@@ -261,6 +261,18 @@ The dry-run skeleton is not a permission change. It does not satisfy the
 real-action exit criteria by itself, and it must not import or call desktop
 control APIs.
 
+## Phase 8.1 Evaluation Note
+
+Phase 8.1 may add deterministic fixture scenarios and trace summaries for this
+gate. Those scenarios are allowed only to validate dry-run, blocked, and
+real-action-skipped outcomes. They may report Phase 7 checklist state, failure
+reason codes, readiness blocker codes, audit event ordering, target risk,
+target confidence, and post-action verification planning.
+
+Phase 8.1 evaluation is not execution permission. A passing sandbox evaluation
+does not enable click/type/hotkey/scroll/switch_app and does not satisfy the
+real-action checklist below by itself.
+
 ## Checklist Before Any Phase 8 Real-action Experiment
 
 Before implementing real actuation inside a minimal sandbox experiment:

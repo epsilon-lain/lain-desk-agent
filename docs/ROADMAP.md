@@ -245,15 +245,19 @@ Goal: make the sandbox gate inspectable before any real-action adapter exists.
 
 - Add deterministic sandbox scenarios for dry-run success, real-action skip,
   missing approval, stale observation, high-risk and unknown-risk targets,
-  low-confidence targets, invalid geometry, missing post-action verification,
-  forbidden action types, out-of-scope targets, readiness blockers, and missing
-  emergency stop.
-- Report expected and actual outcome, pass/fail, gate status, failure reason
-  codes, audit event names, dry-run status, real-action-enabled status,
-  real-action-skipped status, and post-action verification planning.
+  low-confidence targets, invalid bbox, bbox/center mismatch, missing viewport
+  or coordinate metadata, missing post-action verification, forbidden action
+  types, out-of-scope targets, readiness blockers, missing emergency stop,
+  missing audit plan, missing action contract, and missing target.
+- Report scenario ID/name, expected and actual outcome, pass/fail, gate status,
+  failure reason codes, readiness blocker codes, audit event names, dry-run
+  status, real-action-enabled status, real-action-skipped status, post-action
+  verification planning, target risk hint, target confidence, readiness state,
+  action type, and notes.
 - Include trace/debug output with validation checks and audit event ordering.
-- Keep evaluation fixture-only; no live desktop observation, no `/execute`
-  call, no UI real-action trigger, and no desktop control API.
+- Keep evaluation fixture-only and backend/test-only; no live desktop
+  observation, no `/execute` call, no UI real-action trigger, and no desktop
+  control API.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions.
 
 ## Phase 9: Limited Desktop Control

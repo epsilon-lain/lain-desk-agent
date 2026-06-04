@@ -271,16 +271,22 @@ outcomes.
 
 The evaluation covers dry-run success, real-action skip, missing approval,
 stale observations, high-risk and unknown-risk targets, low-confidence targets,
-invalid geometry, missing post-action verification, forbidden action types,
-out-of-scope targets, readiness blockers, and missing emergency stop. Each
-scenario reports pass/fail, gate status, failure reason codes, audit event
-names, dry-run status, real-action-enabled status, real-action-skipped status,
-post-action verification planning, and validation-check trace data.
+invalid bbox, bbox/center mismatch, missing viewport or coordinate metadata,
+missing post-action verification, forbidden action types, out-of-scope targets,
+readiness blockers, missing emergency stop, missing audit plan, missing action
+contract, and missing target.
+
+Each scenario reports `scenario_id`, `scenario_name`, expected outcome, actual
+outcome, pass/fail, gate status, failure reason codes, readiness blocker codes,
+audit event names, dry-run status, real-action-enabled status,
+real-action-skipped status, post-action verification planning, target risk
+hint, target confidence, readiness state, action type, notes, and
+validation-check trace data.
 
 Phase 8.1 remains fixture-only. It does not observe the live desktop, does not
-call `/execute`, does not add UI controls, does not change Capability Registry,
-Permission Profile, or Execution Policy, and does not import any desktop
-control API.
+call `/execute`, does not add UI controls or real-action triggers, does not
+change Capability Registry, Permission Profile, or Execution Policy, and does
+not import any desktop control API.
 
 ## Safety boundaries
 

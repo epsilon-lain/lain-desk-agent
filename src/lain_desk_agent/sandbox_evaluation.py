@@ -1,8 +1,8 @@
-"""Deterministic Phase 8.1 sandbox experiment evaluation.
+"""Deterministic Phase 8.1 sandbox gate evaluation and trace reporting.
 
-The scenarios in this module exercise only the dry-run sandbox framework. They
-do not observe the live desktop, do not call the execution endpoint, and do not
-perform any real desktop action.
+The evaluation scenarios in this module are fixture-only. They reuse the Phase
+8 sandbox gate, normalized target fields, action-contract shape, and readiness
+diagnostics, but they never observe the live desktop and never execute actions.
 """
 
 from __future__ import annotations
@@ -22,7 +22,11 @@ from .sandbox_experiment import (
     FAILURE_HIGH_RISK_TARGET,
     FAILURE_INVALID_TARGET_GEOMETRY,
     FAILURE_LOW_CONFIDENCE_TARGET,
+    FAILURE_MISSING_ACTION_CONTRACT,
+    FAILURE_MISSING_AUDIT_PLAN,
+    FAILURE_MISSING_EMERGENCY_STOP,
     FAILURE_MISSING_POST_ACTION_VERIFICATION,
+    FAILURE_MISSING_TARGET,
     FAILURE_MISSING_USER_APPROVAL,
     FAILURE_OUTSIDE_SANDBOX_SCOPE,
     FAILURE_READINESS_NOT_READY,
@@ -48,28 +52,30 @@ class UnknownSandboxEvaluationScenarioError(ValueError):
 
 
 def sandbox_evaluation_scenario_names() -> list[str]:
-    """Return Phase 8.1 sandbox scenario names in deterministic order."""
+    """Return sandbox evaluation scenario IDs in deterministic order."""
 
     return list(_SCENARIO_BUILDERS)
 
 
-def sandbox_evaluation_scenario_input(name: str) -> dict[str, Any]:
-    """Return one deterministic sandbox config/request/expectation fixture."""
+def sandbox_evaluation_scenario_input(scenario_id: str) -> dict[str, Any]:
+    """Return one fixture-backed sandbox scenario definition."""
 
-    scenario_name = str(name or "")
-    builder = _SCENARIO_BUILDERS.get(scenario_name)
+    normalized_id = str(scenario_id or "")
+    builder = _SCENARIO_BUILDERS.get(normalized_id)
     if builder is None:
         raise UnknownSandboxEvaluationScenarioError(
-            f"Unknown sandbox evaluation scenario '{scenario_name}'."
+            f"Unknown sandbox evaluation scenario '{normalized_id}'."
         )
     return builder()
 
 
-def evaluate_sandbox_experiment_scenarios(names: list[str] | None = None) -> dict[str, Any]:
-    """Evaluate all or selected dry-run sandbox experiment fixtures."""
+def evaluate_sandbox_experiment_scenarios(
+    scenario_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    """Evaluate all or selected sandbox gate fixtures without real actions."""
 
-    scenario_names = names if names is not None else sandbox_evaluation_scenario_names()
-    scenarios = [evaluate_sandbox_experiment_scenario(name) for name in scenario_names]
+    selected_ids = scenario_ids if scenario_ids is not None else sandbox_evaluation_scenario_names()
+    scenarios = [evaluate_sandbox_experiment_scenario(scenario_id) for scenario_id in selected_ids]
     return {
         "report_type": "sandbox_experiment_evaluation",
         "phase": "phase8_1",
@@ -77,86 +83,96 @@ def evaluate_sandbox_experiment_scenarios(names: list[str] | None = None) -> dic
         "external_llm_calls": False,
         "real_desktop_actions": False,
         "scenario_count": len(scenarios),
+        "scenario_ids": [scenario["scenario_id"] for scenario in scenarios],
         "summary": _summary(scenarios),
         "report_notes": [
-            "Phase 8.1 evaluates sandbox gate behavior only.",
-            "Dry-run remains the default and real_action_enabled remains false by default.",
-            "No scenario calls real desktop actuation or changes execution permissions.",
+            "Phase 8.1 evaluates dry-run sandbox gate behavior only.",
+            "Sandbox evaluation is not execution permission.",
+            "No scenario observes the live desktop or calls an execution path.",
         ],
         "scenarios": scenarios,
     }
 
 
-def evaluate_sandbox_experiment_scenario(name: str) -> dict[str, Any]:
-    """Evaluate one deterministic dry-run sandbox experiment fixture."""
+def evaluate_sandbox_experiment_scenario(scenario_id: str) -> dict[str, Any]:
+    """Evaluate one deterministic sandbox gate fixture."""
 
-    scenario = sandbox_evaluation_scenario_input(name)
-    result = run_sandbox_experiment(scenario["config"], scenario["request"])
-    actual = _actual_outcome(result)
-    expectation = _expectation_report(scenario["expected"], actual)
+    definition = sandbox_evaluation_scenario_input(scenario_id)
+    result = run_sandbox_experiment(definition["config"], definition["request"])
+    actual_outcome = _actual_outcome(result, definition["request"])
+    expectation = _expectation_report(definition["expected_outcome"], actual_outcome)
 
     return {
-        "scenario": scenario["scenario"],
-        "description": scenario["description"],
-        "expected": scenario["expected"],
-        "actual": actual,
+        "scenario_id": definition["scenario_id"],
+        "scenario_name": definition["scenario_name"],
+        "scenario": definition["scenario_id"],
+        "expected_outcome": definition["expected_outcome"],
+        "expected": definition["expected_outcome"],
+        "actual_outcome": actual_outcome,
+        "actual": actual_outcome,
         "passed": expectation["passed"],
         "pass_fail": "pass" if expectation["passed"] else "fail",
         "expectation": expectation,
-        "gate_passed": result.gate_passed,
-        "failure_reasons": list(result.failure_reasons),
-        "audit_event_names": _audit_event_names(result),
-        "dry_run": result.dry_run,
-        "real_action_enabled": result.real_action_enabled,
-        "real_action_skipped": actual["real_action_skipped"],
-        "post_action_verification_planned": actual["post_action_verification_planned"],
-        "trace": _trace(scenario, result, actual),
+        "gate_passed": actual_outcome["gate_passed"],
+        "dry_run": actual_outcome["dry_run"],
+        "real_action_enabled": actual_outcome["real_action_enabled"],
+        "real_action_skipped": actual_outcome["real_action_skipped"],
+        "failure_reason_codes": actual_outcome["failure_reason_codes"],
+        "failure_reasons": actual_outcome["failure_reason_codes"],
+        "blocker_codes": actual_outcome["blocker_codes"],
+        "audit_event_names": actual_outcome["audit_event_names"],
+        "post_action_verification_planned": actual_outcome["post_action_verification_planned"],
+        "target_risk_hint": actual_outcome["target_risk_hint"],
+        "target_confidence": actual_outcome["target_confidence"],
+        "readiness_ready": actual_outcome["readiness_ready"],
+        "action_type": actual_outcome["action_type"],
+        "notes": list(definition["notes"]),
+        "trace": _trace(definition, result, actual_outcome),
     }
 
 
 def _scenario(
-    name: str,
-    description: str,
-    expected: dict[str, Any],
+    scenario_id: str,
+    scenario_name: str,
+    expected_outcome: dict[str, Any],
+    *,
     config: SandboxExperimentConfig | None = None,
     request: SandboxExperimentRequest | None = None,
+    notes: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
-        "scenario": name,
-        "description": description,
+        "scenario_id": scenario_id,
+        "scenario_name": scenario_name,
         "config": config or _config(),
         "request": request or _request(),
-        "expected": expected,
+        "expected_outcome": expected_outcome,
+        "notes": list(notes or []),
     }
 
 
-def _sandbox_dry_run_success() -> dict[str, Any]:
+def _dry_run_success_all_gates_pass() -> dict[str, Any]:
     return _scenario(
-        "sandbox_dry_run_success",
-        "All Phase 7 gates are satisfied and the experiment completes as dry-run.",
-        _expected(
+        "dry_run_success_all_gates_pass",
+        "Dry-run success with all Phase 7 gates satisfied",
+        _expected_outcome(
             status="dry_run_completed",
             gate_passed=True,
-            audit_event_names=[
-                EVENT_SANDBOX_EXPERIMENT_REQUESTED,
-                EVENT_SANDBOX_GATE_PASSED,
-                EVENT_SANDBOX_POST_ACTION_VERIFICATION_PLANNED,
-                EVENT_SANDBOX_DRY_RUN_COMPLETED,
-            ],
+            audit_event_names=_dry_run_success_events(),
             post_action_verification_planned=True,
         ),
+        notes=["All gate inputs are deterministic fixtures."],
     )
 
 
-def _real_action_disabled_skip() -> dict[str, Any]:
+def _real_action_disabled_skips_non_dry_run() -> dict[str, Any]:
     return _scenario(
-        "real_action_disabled_skip",
-        "A non-dry-run request reaches the framework while real_action_enabled is false.",
-        _expected(
+        "real_action_disabled_skips_non_dry_run",
+        "Non-dry-run request safely skips because real actions are disabled",
+        _expected_outcome(
             status="real_action_skipped",
             gate_passed=True,
             dry_run=False,
-            failure_reasons=[FAILURE_REAL_ACTION_DISABLED],
+            failure_reason_codes=[FAILURE_REAL_ACTION_DISABLED],
             audit_event_names=[
                 EVENT_SANDBOX_EXPERIMENT_REQUESTED,
                 EVENT_SANDBOX_GATE_PASSED,
@@ -167,151 +183,223 @@ def _real_action_disabled_skip() -> dict[str, Any]:
             post_action_verification_planned=True,
         ),
         config=_config(dry_run=False, real_action_enabled=False),
+        notes=["The framework returns a skipped result instead of attempting action."],
     )
 
 
-def _missing_user_approval() -> dict[str, Any]:
+def _missing_user_approval_blocks() -> dict[str, Any]:
     return _blocked_scenario(
-        "missing_user_approval",
-        "The request does not carry an explicit user approval flag.",
+        "missing_user_approval_blocks",
+        "Missing user approval blocks",
         [FAILURE_MISSING_USER_APPROVAL],
         request=_request(user_approved=False),
     )
 
 
-def _stale_observation() -> dict[str, Any]:
+def _stale_observation_blocks() -> dict[str, Any]:
     stale_timestamp = (SANDBOX_EVALUATION_NOW - timedelta(seconds=30)).isoformat().replace(
         "+00:00",
         "Z",
     )
     return _blocked_scenario(
-        "stale_observation",
-        "The observation timestamp is older than the configured freshness window.",
+        "stale_observation_blocks",
+        "Stale observation blocks",
         [FAILURE_STALE_OBSERVATION],
-        request=_request(observation_timestamp=stale_timestamp),
+        ["stale_observation"],
+        config=_config(expected_readiness_blocker_codes=("stale_observation",)),
+        request=_request(
+            observation_timestamp=stale_timestamp,
+            click_readiness=_blocked_readiness("stale_observation"),
+        ),
     )
 
 
-def _high_risk_target() -> dict[str, Any]:
+def _high_risk_target_blocks() -> dict[str, Any]:
     return _blocked_scenario(
-        "high_risk_target",
-        "The target is marked high-risk by visible_elements and action contract metadata.",
+        "high_risk_target_blocks",
+        "High-risk target blocks",
         [FAILURE_HIGH_RISK_TARGET],
+        ["high_risk_requires_approval"],
+        config=_config(expected_readiness_blocker_codes=("high_risk_requires_approval",)),
         request=_request(
             action_contract=_contract(risk="high", target_risk_hint="high_risk"),
+            click_readiness=_blocked_readiness("high_risk_requires_approval"),
             visible_elements=[_visible_element(risk_hint="high_risk")],
             safety_decision={"decision": "needs_approval", "risk": "high"},
         ),
     )
 
 
-def _unknown_risk_target() -> dict[str, Any]:
+def _unknown_risk_target_blocks() -> dict[str, Any]:
     return _blocked_scenario(
-        "unknown_risk_target",
-        "The target carries unknown risk metadata and must not become actionable.",
+        "unknown_risk_target_blocks",
+        "Unknown-risk target blocks",
         [FAILURE_HIGH_RISK_TARGET],
+        ["unknown_risk_target"],
+        config=_config(expected_readiness_blocker_codes=("unknown_risk_target",)),
         request=_request(
             action_contract=_contract(target_risk_hint="unknown"),
+            click_readiness=_blocked_readiness("unknown_risk_target"),
             visible_elements=[_visible_element(risk_hint="unknown")],
         ),
     )
 
 
-def _low_confidence_target() -> dict[str, Any]:
+def _low_confidence_target_blocks() -> dict[str, Any]:
     return _blocked_scenario(
-        "low_confidence_target",
-        "The target confidence is below the sandbox readiness threshold.",
-        [FAILURE_LOW_CONFIDENCE_TARGET, FAILURE_READINESS_NOT_READY],
+        "low_confidence_target_blocks",
+        "Low-confidence target blocks",
+        [FAILURE_LOW_CONFIDENCE_TARGET],
+        ["low_confidence_target"],
+        config=_config(expected_readiness_blocker_codes=("low_confidence_target",)),
         request=_request(
             action_contract=_contract(target_confidence=0.2),
-            click_readiness={
-                "ready": False,
-                "status": "blocked",
-                "blocker_codes": ["low_confidence_target"],
-            },
+            click_readiness=_blocked_readiness("low_confidence_target"),
             visible_elements=[_visible_element(confidence=0.2)],
         ),
     )
 
 
-def _invalid_geometry() -> dict[str, Any]:
+def _invalid_bbox_blocks() -> dict[str, Any]:
     return _blocked_scenario(
-        "invalid_bbox_center",
-        "The target center does not match the declared bbox.",
+        "invalid_bbox_blocks",
+        "Invalid bbox blocks",
         [FAILURE_INVALID_TARGET_GEOMETRY],
-        request=_request(action_contract=_contract(center={"x": 99, "y": 99})),
+        ["invalid_bbox"],
+        config=_config(expected_readiness_blocker_codes=("invalid_bbox",)),
+        request=_request(
+            action_contract=_contract(bbox={"x": 10, "y": 20, "width": 0, "height": 24}),
+            click_readiness=_blocked_readiness("invalid_bbox"),
+        ),
     )
 
 
-def _missing_post_action_verification() -> dict[str, Any]:
+def _bbox_center_mismatch_blocks() -> dict[str, Any]:
     return _blocked_scenario(
-        "missing_post_action_verification",
-        "No post-action verification plan is present.",
+        "bbox_center_mismatch_blocks",
+        "BBox center mismatch blocks",
+        [FAILURE_INVALID_TARGET_GEOMETRY],
+        ["bbox_center_mismatch"],
+        config=_config(expected_readiness_blocker_codes=("bbox_center_mismatch",)),
+        request=_request(
+            action_contract=_contract(center={"x": 99, "y": 99}),
+            click_readiness=_blocked_readiness("bbox_center_mismatch"),
+        ),
+    )
+
+
+def _missing_viewport_or_coordinate_space_blocks() -> dict[str, Any]:
+    return _blocked_scenario(
+        "missing_viewport_or_coordinate_space_blocks",
+        "Missing viewport or coordinate space blocks",
+        [FAILURE_INVALID_TARGET_GEOMETRY],
+        ["coordinate_space_unknown", "dpi_uncertain"],
+        config=_config(
+            expected_readiness_blocker_codes=("coordinate_space_unknown", "dpi_uncertain")
+        ),
+        request=_request(
+            screen={"width": 200, "height": 120},
+            click_readiness=_blocked_readiness("coordinate_space_unknown", "dpi_uncertain"),
+        ),
+    )
+
+
+def _missing_post_action_verification_blocks() -> dict[str, Any]:
+    return _blocked_scenario(
+        "missing_post_action_verification_blocks",
+        "Missing post-action verification blocks",
         [FAILURE_MISSING_POST_ACTION_VERIFICATION],
         request=_request(post_action_verification_plan=None),
     )
 
 
-def _forbidden_action_type() -> dict[str, Any]:
+def _forbidden_action_type_blocks() -> dict[str, Any]:
     return _blocked_scenario(
-        "forbidden_action_type",
-        "The action type is outside the one-action sandbox scope and is forbidden.",
+        "forbidden_action_type_blocks",
+        "Forbidden action type blocks",
         [FAILURE_FORBIDDEN_ACTION_TYPE, FAILURE_OUTSIDE_SANDBOX_SCOPE],
         request=_request(action_contract=_contract(action_type="switch_app")),
     )
 
 
-def _outside_sandbox_scope() -> dict[str, Any]:
+def _outside_sandbox_scope_blocks() -> dict[str, Any]:
     return _blocked_scenario(
-        "outside_sandbox_scope",
-        "The target does not match the single allowed sandbox target.",
+        "outside_sandbox_scope_blocks",
+        "Target outside sandbox scope blocks",
         [FAILURE_OUTSIDE_SANDBOX_SCOPE],
         config=_config(allowed_target_id="other_sandbox_target"),
     )
 
 
-def _readiness_not_ready() -> dict[str, Any]:
+def _readiness_not_ready_blocks() -> dict[str, Any]:
     return _blocked_scenario(
-        "readiness_not_ready",
-        "Click readiness returns a blocker that was not declared as expected dry-run behavior.",
+        "readiness_not_ready_blocks",
+        "Unexpected readiness blocker blocks",
         [FAILURE_READINESS_NOT_READY],
-        request=_request(
-            click_readiness={
-                "ready": False,
-                "status": "blocked",
-                "blocker_codes": ["preview_only_contract"],
-            }
-        ),
+        ["preview_only_contract"],
+        request=_request(click_readiness=_blocked_readiness("preview_only_contract")),
     )
 
 
-def _missing_emergency_stop() -> dict[str, Any]:
+def _missing_emergency_stop_blocks() -> dict[str, Any]:
     return _blocked_scenario(
-        "missing_emergency_stop",
-        "The experiment does not expose the required emergency stop gate.",
-        [FAILURE_OUTSIDE_SANDBOX_SCOPE],
+        "missing_emergency_stop_blocks",
+        "Missing emergency stop blocks",
+        [FAILURE_MISSING_EMERGENCY_STOP],
         config=_config(emergency_stop_available=False),
     )
 
 
+def _missing_audit_plan_blocks() -> dict[str, Any]:
+    return _blocked_scenario(
+        "missing_audit_plan_blocks",
+        "Missing audit plan blocks",
+        [FAILURE_MISSING_AUDIT_PLAN],
+        config=_config(audit_events_required=False),
+    )
+
+
+def _missing_action_contract_blocks() -> dict[str, Any]:
+    return _blocked_scenario(
+        "missing_action_contract_blocks",
+        "Missing action contract blocks",
+        [FAILURE_MISSING_ACTION_CONTRACT],
+        request=_request(action_contract=None),
+    )
+
+
+def _missing_target_blocks() -> dict[str, Any]:
+    return _blocked_scenario(
+        "missing_target_blocks",
+        "Missing target blocks",
+        [FAILURE_MISSING_TARGET],
+        ["missing_target"],
+        config=_config(expected_readiness_blocker_codes=("missing_target",)),
+        request=_request(
+            visible_elements=[],
+            click_readiness=_blocked_readiness("missing_target"),
+        ),
+    )
+
+
 def _blocked_scenario(
-    name: str,
-    description: str,
-    failure_reasons: list[str],
+    scenario_id: str,
+    scenario_name: str,
+    failure_reason_codes: list[str],
+    blocker_codes: list[str] | None = None,
+    *,
     config: SandboxExperimentConfig | None = None,
     request: SandboxExperimentRequest | None = None,
 ) -> dict[str, Any]:
     return _scenario(
-        name,
-        description,
-        _expected(
+        scenario_id,
+        scenario_name,
+        _expected_outcome(
             status="blocked",
             gate_passed=False,
-            failure_reasons=failure_reasons,
-            audit_event_names=[
-                EVENT_SANDBOX_EXPERIMENT_REQUESTED,
-                EVENT_SANDBOX_GATE_BLOCKED,
-            ],
+            failure_reason_codes=failure_reason_codes,
+            blocker_codes=blocker_codes or [],
+            audit_event_names=_blocked_events(),
         ),
         config=config,
         request=request,
@@ -319,59 +407,76 @@ def _blocked_scenario(
 
 
 _SCENARIO_BUILDERS = {
-    "sandbox_dry_run_success": _sandbox_dry_run_success,
-    "real_action_disabled_skip": _real_action_disabled_skip,
-    "missing_user_approval": _missing_user_approval,
-    "stale_observation": _stale_observation,
-    "high_risk_target": _high_risk_target,
-    "unknown_risk_target": _unknown_risk_target,
-    "low_confidence_target": _low_confidence_target,
-    "invalid_bbox_center": _invalid_geometry,
-    "missing_post_action_verification": _missing_post_action_verification,
-    "forbidden_action_type": _forbidden_action_type,
-    "outside_sandbox_scope": _outside_sandbox_scope,
-    "readiness_not_ready": _readiness_not_ready,
-    "missing_emergency_stop": _missing_emergency_stop,
+    "dry_run_success_all_gates_pass": _dry_run_success_all_gates_pass,
+    "real_action_disabled_skips_non_dry_run": _real_action_disabled_skips_non_dry_run,
+    "missing_user_approval_blocks": _missing_user_approval_blocks,
+    "stale_observation_blocks": _stale_observation_blocks,
+    "high_risk_target_blocks": _high_risk_target_blocks,
+    "unknown_risk_target_blocks": _unknown_risk_target_blocks,
+    "low_confidence_target_blocks": _low_confidence_target_blocks,
+    "invalid_bbox_blocks": _invalid_bbox_blocks,
+    "bbox_center_mismatch_blocks": _bbox_center_mismatch_blocks,
+    "missing_viewport_or_coordinate_space_blocks": _missing_viewport_or_coordinate_space_blocks,
+    "missing_post_action_verification_blocks": _missing_post_action_verification_blocks,
+    "forbidden_action_type_blocks": _forbidden_action_type_blocks,
+    "outside_sandbox_scope_blocks": _outside_sandbox_scope_blocks,
+    "readiness_not_ready_blocks": _readiness_not_ready_blocks,
+    "missing_emergency_stop_blocks": _missing_emergency_stop_blocks,
+    "missing_audit_plan_blocks": _missing_audit_plan_blocks,
+    "missing_action_contract_blocks": _missing_action_contract_blocks,
+    "missing_target_blocks": _missing_target_blocks,
 }
 
 
-def _expected(
+def _expected_outcome(
     *,
     status: str,
     gate_passed: bool,
     dry_run: bool = True,
     real_action_enabled: bool = False,
-    failure_reasons: list[str] | None = None,
-    audit_event_names: list[str],
     real_action_skipped: bool = False,
+    failure_reason_codes: list[str] | None = None,
+    blocker_codes: list[str] | None = None,
+    audit_event_names: list[str],
     post_action_verification_planned: bool = False,
+    real_action_attempted: bool = False,
 ) -> dict[str, Any]:
     return {
         "status": status,
         "gate_passed": gate_passed,
         "dry_run": dry_run,
         "real_action_enabled": real_action_enabled,
-        "failure_reasons": list(failure_reasons or []),
-        "audit_event_names": list(audit_event_names),
         "real_action_skipped": real_action_skipped,
+        "failure_reason_codes": list(failure_reason_codes or []),
+        "blocker_codes": list(blocker_codes or []),
+        "audit_event_names": list(audit_event_names),
         "post_action_verification_planned": post_action_verification_planned,
-        "real_action_attempted": False,
+        "real_action_attempted": real_action_attempted,
     }
 
 
-def _actual_outcome(result: SandboxExperimentResult) -> dict[str, Any]:
+def _actual_outcome(
+    result: SandboxExperimentResult,
+    request: SandboxExperimentRequest,
+) -> dict[str, Any]:
     audit_event_names = _audit_event_names(result)
+    readiness = request.click_readiness if isinstance(request.click_readiness, dict) else {}
     return {
         "status": result.status,
         "gate_passed": result.gate_passed,
         "dry_run": result.dry_run,
         "real_action_enabled": result.real_action_enabled,
-        "failure_reasons": list(result.failure_reasons),
-        "audit_event_names": audit_event_names,
         "real_action_skipped": EVENT_SANDBOX_REAL_ACTION_SKIPPED in audit_event_names,
+        "failure_reason_codes": list(result.failure_reasons),
+        "blocker_codes": _readiness_blocker_codes(readiness),
+        "audit_event_names": audit_event_names,
         "post_action_verification_planned": (
             EVENT_SANDBOX_POST_ACTION_VERIFICATION_PLANNED in audit_event_names
         ),
+        "target_risk_hint": _target_risk_hint(request),
+        "target_confidence": _target_confidence(request),
+        "readiness_ready": bool(readiness.get("ready")) if readiness else False,
+        "action_type": _action_type(request),
         "real_action_attempted": result.real_action_attempted,
     }
 
@@ -385,6 +490,9 @@ def _expectation_report(expected: dict[str, Any], actual: dict[str, Any]) -> dic
         "dry_run",
         "real_action_enabled",
         "real_action_skipped",
+        "failure_reason_codes",
+        "blocker_codes",
+        "audit_event_names",
         "post_action_verification_planned",
         "real_action_attempted",
     ]:
@@ -393,32 +501,14 @@ def _expectation_report(expected: dict[str, Any], actual: dict[str, Any]) -> dic
                 f"{field} expected {expected.get(field)!r} but got {actual.get(field)!r}"
             )
 
-    expected_reasons = [str(reason) for reason in expected.get("failure_reasons", [])]
-    actual_reasons = [str(reason) for reason in actual.get("failure_reasons", [])]
-    if expected_reasons:
-        missing_reasons = [reason for reason in expected_reasons if reason not in actual_reasons]
-        if missing_reasons:
-            failures.append(
-                f"failure_reasons missing {missing_reasons!r} from {actual_reasons!r}"
-            )
-    elif actual_reasons:
-        failures.append(f"failure_reasons expected [] but got {actual_reasons!r}")
-
-    expected_events = [str(event) for event in expected.get("audit_event_names", [])]
-    actual_events = [str(event) for event in actual.get("audit_event_names", [])]
-    if expected_events != actual_events:
-        failures.append(
-            f"audit_event_names expected {expected_events!r} but got {actual_events!r}"
-        )
-
     if actual.get("real_action_attempted") is True:
         failures.append("real_action_attempted must remain false")
 
     return {
         "passed": not failures,
         "failures": failures,
-        "expected": expected,
-        "actual": actual,
+        "expected_outcome": expected,
+        "actual_outcome": actual,
     }
 
 
@@ -428,41 +518,42 @@ def _summary(scenarios: list[dict[str, Any]]) -> dict[str, Any]:
         "total_scenario_count": len(scenarios),
         "passed_scenario_count": len(scenarios) - len(failed),
         "failed_scenario_count": len(failed),
-        "scenarios_with_failures": [scenario["scenario"] for scenario in failed],
+        "scenarios_with_failures": [scenario["scenario_id"] for scenario in failed],
         "all_expected_outcomes_passed": not failed,
         "gate_passed_count": sum(1 for scenario in scenarios if scenario["gate_passed"]),
         "gate_blocked_count": sum(1 for scenario in scenarios if not scenario["gate_passed"]),
         "dry_run_scenario_count": sum(1 for scenario in scenarios if scenario["dry_run"]),
         "real_action_enabled_count": sum(1 for scenario in scenarios if scenario["real_action_enabled"]),
-        "real_action_skipped_count": sum(
-            1 for scenario in scenarios if scenario["real_action_skipped"]
-        ),
+        "real_action_skipped_count": sum(1 for scenario in scenarios if scenario["real_action_skipped"]),
         "real_action_attempted_count": sum(
-            1 for scenario in scenarios if scenario["actual"]["real_action_attempted"]
+            1 for scenario in scenarios if scenario["actual_outcome"]["real_action_attempted"]
         ),
         "post_action_verification_planned_count": sum(
             1 for scenario in scenarios if scenario["post_action_verification_planned"]
         ),
-        "failure_reason_codes": _failure_reason_summary(scenarios),
-        "audit_event_names": _audit_event_summary(scenarios),
+        "failure_reason_codes": _code_summary(scenarios, "failure_reason_codes"),
+        "blocker_codes": _code_summary(scenarios, "blocker_codes"),
+        "audit_event_names": _code_summary(scenarios, "audit_event_names"),
     }
 
 
 def _trace(
-    scenario: dict[str, Any],
+    definition: dict[str, Any],
     result: SandboxExperimentResult,
-    actual: dict[str, Any],
+    actual_outcome: dict[str, Any],
 ) -> dict[str, Any]:
     return {
-        "scenario": scenario["scenario"],
+        "scenario_id": definition["scenario_id"],
+        "scenario_name": definition["scenario_name"],
         "result_status": result.status,
         "gate_passed": result.gate_passed,
         "dry_run": result.dry_run,
         "real_action_enabled": result.real_action_enabled,
-        "real_action_skipped": actual["real_action_skipped"],
-        "post_action_verification_planned": actual["post_action_verification_planned"],
-        "failure_reasons": list(result.failure_reasons),
+        "real_action_skipped": actual_outcome["real_action_skipped"],
+        "failure_reason_codes": list(result.failure_reasons),
+        "blocker_codes": list(actual_outcome["blocker_codes"]),
         "audit_event_names": _audit_event_names(result),
+        "post_action_verification_planned": actual_outcome["post_action_verification_planned"],
         "validation_checks": _validation_checks(result.validation),
     }
 
@@ -491,32 +582,92 @@ def _audit_event_names(result: SandboxExperimentResult) -> list[str]:
     ]
 
 
-def _failure_reason_summary(scenarios: list[dict[str, Any]]) -> dict[str, list[str]]:
+def _readiness_blocker_codes(readiness: dict[str, Any]) -> list[str]:
+    codes = readiness.get("blocker_codes")
+    if not isinstance(codes, list):
+        return []
+    return [str(code) for code in codes if str(code)]
+
+
+def _target_risk_hint(request: SandboxExperimentRequest) -> str:
+    contract = request.action_contract if isinstance(request.action_contract, dict) else {}
+    risk_hint = str(contract.get("target_risk_hint") or "").strip()
+    if risk_hint:
+        return risk_hint
+
+    element = _first_visible_element(request)
+    return str(element.get("risk_hint") or "") if element else ""
+
+
+def _target_confidence(request: SandboxExperimentRequest) -> float | None:
+    contract = request.action_contract if isinstance(request.action_contract, dict) else {}
+    value = _finite_float(contract.get("target_confidence"))
+    if value is not None:
+        return value
+
+    element = _first_visible_element(request)
+    return _finite_float(element.get("confidence")) if element else None
+
+
+def _action_type(request: SandboxExperimentRequest) -> str:
+    contract = request.action_contract if isinstance(request.action_contract, dict) else {}
+    return str(contract.get("type") or "")
+
+
+def _first_visible_element(request: SandboxExperimentRequest) -> dict[str, Any] | None:
+    for element in request.visible_elements:
+        if isinstance(element, dict):
+            return element
+    return None
+
+
+def _finite_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number
+
+
+def _code_summary(scenarios: list[dict[str, Any]], field: str) -> dict[str, list[str]]:
     summary: dict[str, list[str]] = {}
     for scenario in scenarios:
-        scenario_name = str(scenario.get("scenario") or "")
-        for reason in scenario.get("failure_reasons", []):
-            reason_text = str(reason or "")
-            if not reason_text:
+        scenario_id = str(scenario.get("scenario_id") or "")
+        values = scenario.get(field)
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            text = str(value or "")
+            if not text:
                 continue
-            summary.setdefault(reason_text, [])
-            if scenario_name and scenario_name not in summary[reason_text]:
-                summary[reason_text].append(scenario_name)
+            summary.setdefault(text, [])
+            if scenario_id and scenario_id not in summary[text]:
+                summary[text].append(scenario_id)
     return summary
 
 
-def _audit_event_summary(scenarios: list[dict[str, Any]]) -> dict[str, list[str]]:
-    summary: dict[str, list[str]] = {}
-    for scenario in scenarios:
-        scenario_name = str(scenario.get("scenario") or "")
-        for event_name in scenario.get("audit_event_names", []):
-            event_text = str(event_name or "")
-            if not event_text:
-                continue
-            summary.setdefault(event_text, [])
-            if scenario_name and scenario_name not in summary[event_text]:
-                summary[event_text].append(scenario_name)
-    return summary
+def _dry_run_success_events() -> list[str]:
+    return [
+        EVENT_SANDBOX_EXPERIMENT_REQUESTED,
+        EVENT_SANDBOX_GATE_PASSED,
+        EVENT_SANDBOX_POST_ACTION_VERIFICATION_PLANNED,
+        EVENT_SANDBOX_DRY_RUN_COMPLETED,
+    ]
+
+
+def _blocked_events() -> list[str]:
+    return [
+        EVENT_SANDBOX_EXPERIMENT_REQUESTED,
+        EVENT_SANDBOX_GATE_BLOCKED,
+    ]
+
+
+def _blocked_readiness(*blocker_codes: str) -> dict[str, Any]:
+    return {
+        "ready": False,
+        "status": "blocked",
+        "blocker_codes": list(blocker_codes),
+    }
 
 
 def _config(**overrides: Any) -> SandboxExperimentConfig:
