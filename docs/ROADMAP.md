@@ -24,6 +24,10 @@ pre-execution diagnostics. It adds stable blocker codes and stricter coordinate,
 freshness, confidence, risk, and ambiguity checks while real clicks remain
 disabled.
 
+Phase 7 is a design-only sandbox action gate. It records the requirements for
+any future minimal real-action experiment, but it does not implement or enable
+real desktop actions.
+
 ## Completed
 
 - Observation / Understanding
@@ -40,6 +44,7 @@ disabled.
 - Action Contract
 - Click Readiness Policy
 - Click Readiness Hardening
+- Phase 7 Sandbox Action Design Gate
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -167,28 +172,48 @@ real click experiment.
 - Keep real click disabled by default.
 - Keep click readiness as a blocker, not a permission grant.
 
-## Phase 7: Click Readiness Hardening Follow-ups
+## Phase 7: Sandboxed Real Action Experiment Design Gate
 
-Goal: continue tightening readiness diagnostics before any sandboxed action
-experiment.
+Status: design-only gate documented in
+`docs/PHASE_7_SANDBOX_ACTION_DESIGN.md`.
 
-- Improve live coordinate-space and DPI metadata collection without adding
-  actuation APIs.
-- Add richer stale-observation reporting for live observations.
-- Keep all readiness outputs read-only and preview-only.
+Goal: define the minimum safety, permission, approval, audit, verification, and
+rollback requirements before any real-action experiment can be implemented.
+
+- Do not implement real click/type/hotkey/scroll/switch_app execution.
+- Do not enable any new Capability Registry, Permission Profile, or Execution
+  Policy permission.
+- Require one test window, one test target, one low-risk action, and dry-run as
+  the default.
+- Require explicit user approval tied to one action contract.
+- Require visible target confirmation, fresh observation, valid bbox/center,
+  viewport, coordinate-space, DPI, confidence, risk, and ambiguity checks.
+- Require audit events before and after any future action.
+- Require post-action screenshot or state verification.
+- Require emergency stop behavior and rollback/reset expectations.
+- Block Phase 8 until the Phase 7 checklist is satisfied.
 
 ## Phase 8: Sandboxed Real-action Experiment
 
-Goal: design a tightly bounded experiment before any limited real desktop
-action exists.
+Status: future implementation, blocked until the Phase 7 checklist is
+satisfied and explicitly approved.
 
-- Start only after explicit design approval.
-- Prefer an internal or local safe target first.
-- Keep the experiment behind Capability Registry, Permission Profile, explicit
-  user approval, and Execution Policy.
+Goal: implement the smallest possible sandbox action experiment after the
+design gate is satisfied.
+
+- Keep the default product behavior wait-only and dry-run.
+- Use one deterministic local fixture or mocked target first.
+- Limit scope to one visible test window and one explicitly marked test target.
+- Keep system settings, file deletion, shell execution, credential fields,
+  external websites, destructive actions, and hidden/background actions out of
+  scope.
+- Keep the experiment behind Safety Gate, Action Contract, Click Readiness,
+  Capability Registry, Permission Profile, explicit user approval, and
+  Execution Policy.
 - Require post-action observation and verification.
-- Record audit events for every request, block, execution, and verification.
-- Do not broaden the default product behavior.
+- Record audit events for every request, block, approval, execution,
+  verification, rollback, and emergency stop.
+- Do not broaden default product behavior.
 
 ## Phase 9: Limited Desktop Control
 

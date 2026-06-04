@@ -118,6 +118,10 @@ Action Contract converts some proposals into future-facing contracts:
 - `no_op` produces no contract
 
 Current contracts from planning are `preview_only` and are never executable.
+An Action Contract describes a possible future action shape; it is not
+execution permission. Execution eligibility is determined only after separate
+Safety Gate, Readiness, Capability Registry, Permission Profile, Execution
+Policy, user approval, audit, and verification requirements are satisfied.
 
 ### Capability Registry
 
@@ -153,6 +157,11 @@ Click Readiness Policy decides whether a click contract could ever become eligib
 It also blocks high-risk labels such as `send`, `submit`, `delete`, `pay`, `confirm`, `password`, `login`, `发送`, `删除`, `支付`, `确认`, `密码`, and `登录`.
 
 Readiness consumes the same target schema fields carried by the preview contract. It checks bbox shape, screen bounds, center consistency, observation freshness, disabled click capability, permission profile, Safety Gate result, and high-risk labels or `target_risk_hint`. A passing readiness diagnostic still would not execute in v0.3 because click capability and permission remain disabled.
+
+Readiness is theoretical pre-execution diagnostics. It can explain or block a
+future action, but it does not grant execution permission and it does not
+override Action Contract status, Capability Registry, Permission Profile, or
+Execution Policy.
 
 ### Actuation
 
@@ -218,6 +227,19 @@ Current limits:
 
 Cleanup only scans the current run directory, deletes old `obs_XXXX.png` and `obs_XXXX.json` pairs, and never deletes `events.jsonl`.
 
+### Phase 7 Sandbox Design Gate
+
+Phase 7 is documentation and design only. It defines the required gates for a
+future minimal sandbox action experiment, including explicit approval, visible
+target confirmation, structured readiness blockers, audit events, post-action
+verification, rollback expectations, emergency stop behavior, and a one-window
+one-target sandbox scope.
+
+Phase 7 does not implement real desktop control and does not change Capability
+Registry, Permission Profile, Execution Policy, or any permission matrix.
+Phase 8 remains blocked until the Phase 7 checklist in
+`docs/PHASE_7_SANDBOX_ACTION_DESIGN.md` is satisfied and separately approved.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -225,6 +247,8 @@ The current safety boundaries are intentionally narrow:
 - `wait` is the only executable action.
 - `click`, `type`, `type_text`, `hotkey`, `press`, `scroll`, and `switch_app` are disabled.
 - Click readiness exists, but real click readiness is blocked in v0.3.
+- Click readiness is not execution permission.
+- Action Contract and Execution Policy remain separate gates.
 - `preview_only` contracts are never executable.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
