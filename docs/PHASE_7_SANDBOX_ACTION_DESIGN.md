@@ -7,7 +7,7 @@ does not change the current wait-only execution model.
 ## Purpose
 
 Define the minimum safety requirements that must exist before any future
-Phase 8 sandbox action experiment can be implemented.
+Phase 8 sandbox action experiment can perform real desktop input.
 
 The design covers:
 
@@ -128,7 +128,7 @@ Approval must:
 
 ## Required Audit Events
 
-The following audit events must exist before Phase 8 implementation:
+The following audit events must exist before any Phase 8 real-action adapter:
 
 - `sandbox_action.proposed`
 - `sandbox_action.readiness_checked`
@@ -234,7 +234,7 @@ Emergency stop must:
 
 ## Exit Criteria Before Implementation
 
-Phase 8 implementation may not begin until all of these are true:
+Phase 8 real-action implementation may not begin until all of these are true:
 
 - This design is reviewed and accepted.
 - The allowed sandbox target is specified.
@@ -249,9 +249,21 @@ Phase 8 implementation may not begin until all of these are true:
 - CI safety scan still forbids broad desktop-control imports.
 - Dry-run remains the default mode.
 
-## Checklist Before Any Phase 8 Experiment
+## Phase 8 Dry-run Skeleton Note
 
-Before implementing a minimal sandbox action experiment:
+Phase 8 may introduce a dry-run-only framework that validates this gate before
+any real desktop input exists. That framework must keep `dry_run` true by
+default, keep `real_action_enabled` false by default, emit structured
+`sandbox_experiment_*` audit events, and skip any non-dry-run request while no
+separately approved adapter exists.
+
+The dry-run skeleton is not a permission change. It does not satisfy the
+real-action exit criteria by itself, and it must not import or call desktop
+control APIs.
+
+## Checklist Before Any Phase 8 Real-action Experiment
+
+Before implementing real actuation inside a minimal sandbox experiment:
 
 - [ ] Confirm no real actions are enabled in the default profile.
 - [ ] Confirm the experiment uses one test window only.
@@ -277,5 +289,5 @@ Before implementing a minimal sandbox action experiment:
 ## Design Verdict
 
 Phase 7 is only a gate. It authorizes no implementation and no permission
-change. Phase 8 remains blocked until the checklist above is satisfied and a
-separate implementation proposal is approved.
+change. Phase 8 real-action behavior remains blocked until the checklist above
+is satisfied and a separate implementation proposal is approved.

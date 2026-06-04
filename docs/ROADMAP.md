@@ -28,6 +28,10 @@ Phase 7 is a design-only sandbox action gate. It records the requirements for
 any future minimal real-action experiment, but it does not implement or enable
 real desktop actions.
 
+Phase 8 now has a dry-run sandbox experiment framework. It validates the
+Phase 7 gate shape, records structured audit events, and skips any non-dry-run
+request because no real-action adapter exists.
+
 ## Completed
 
 - Observation / Understanding
@@ -45,6 +49,7 @@ real desktop actions.
 - Click Readiness Policy
 - Click Readiness Hardening
 - Phase 7 Sandbox Action Design Gate
+- Phase 8 Dry-run Sandbox Experiment Framework
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -68,6 +73,7 @@ real desktop actions.
 - Unsafe or invalid AI output becomes safe `no_op`.
 - `/proposal` is inspectable but never executes desktop input.
 - `/execute` remains wait-only.
+- Phase 8 sandbox experiments are dry-run or skipped only.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -191,17 +197,26 @@ rollback requirements before any real-action experiment can be implemented.
 - Require audit events before and after any future action.
 - Require post-action screenshot or state verification.
 - Require emergency stop behavior and rollback/reset expectations.
-- Block Phase 8 until the Phase 7 checklist is satisfied.
+- Block any real-action Phase 8 adapter until the Phase 7 checklist is
+  satisfied and separately approved.
 
 ## Phase 8: Sandboxed Real-action Experiment
 
-Status: future implementation, blocked until the Phase 7 checklist is
-satisfied and explicitly approved.
+Status: dry-run skeleton implemented; real-action adapter still blocked until
+the Phase 7 checklist is satisfied and explicitly approved.
 
-Goal: implement the smallest possible sandbox action experiment after the
-design gate is satisfied.
+Goal: validate the smallest possible sandbox experiment shape before adding
+any real desktop action adapter.
 
 - Keep the default product behavior wait-only and dry-run.
+- Define `SandboxExperimentConfig`, `SandboxExperimentRequest`,
+  `SandboxExperimentResult`, `validate_phase7_gate(...)`, and
+  `run_sandbox_experiment(...)`.
+- Treat `dry_run = true` and `real_action_enabled = false` as the default
+  safety posture.
+- Return simulated dry-run results when all gates pass.
+- Return `sandbox_real_action_skipped` for non-dry-run requests while no
+  separately approved adapter exists.
 - Use one deterministic local fixture or mocked target first.
 - Limit scope to one visible test window and one explicitly marked test target.
 - Keep system settings, file deletion, shell execution, credential fields,
@@ -213,11 +228,13 @@ design gate is satisfied.
 - Require post-action observation and verification.
 - Record audit events for every request, block, approval, execution,
   verification, rollback, and emergency stop.
-- Do not broaden default product behavior.
+- Do not broaden default product behavior or enable click/type/hotkey/scroll/
+  switch_app in production.
 
 ## Phase 9: Limited Desktop Control
 
-Goal: consider narrow desktop control only after Phase 7 is reliable.
+Goal: consider narrow desktop control only after the Phase 8 dry-run framework
+is reliable and the Phase 7 real-action checklist is satisfied.
 
 - Enable click, type, hotkey, and scroll only as individually gated
   capabilities.

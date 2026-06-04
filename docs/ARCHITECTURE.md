@@ -237,8 +237,29 @@ one-target sandbox scope.
 
 Phase 7 does not implement real desktop control and does not change Capability
 Registry, Permission Profile, Execution Policy, or any permission matrix.
-Phase 8 remains blocked until the Phase 7 checklist in
+Any real-action Phase 8 adapter remains blocked until the Phase 7 checklist in
 `docs/PHASE_7_SANDBOX_ACTION_DESIGN.md` is satisfied and separately approved.
+
+### Phase 8 Sandbox Experiment Framework
+
+Phase 8 adds `sandbox_experiment.py` as a dry-run framework, not an actuation
+layer. It defines a named sandbox experiment request/result shape, validates
+the Phase 7 gate inputs, records structured audit event payloads, and returns
+simulated outcomes.
+
+The framework requires an explicit experiment name, user approval flag, target
+from normalized `visible_elements`, fresh observation timestamp, low-risk
+target, valid bbox/center/viewport geometry, click readiness or explicitly
+expected dry-run blocker behavior, an action contract, post-action
+verification plan, emergency stop availability, and a one-window/one-target
+sandbox scope.
+
+`dry_run` is true by default and `real_action_enabled` is false by default.
+When a non-dry-run request reaches the framework, it emits
+`sandbox_real_action_skipped` and sets `real_action_attempted: false` because no
+real desktop adapter exists. This framework does not call `/execute`, does not
+change Capability Registry, Permission Profile, or Execution Policy, and does
+not import any desktop control API.
 
 ## Safety boundaries
 
@@ -250,6 +271,8 @@ The current safety boundaries are intentionally narrow:
 - Click readiness is not execution permission.
 - Action Contract and Execution Policy remain separate gates.
 - `preview_only` contracts are never executable.
+- Phase 8 sandbox experiments are dry-run or explicitly skipped; they are not
+  execution permission.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.
