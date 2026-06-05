@@ -326,6 +326,21 @@ do not call `/execute`, do not record approvals, do not change
 Execution Policy, Action Contract behavior, or Click Readiness, and do not
 import any desktop control API.
 
+### Phase 8.4 Sandbox Trace UX Polish
+
+Phase 8.4 keeps the Phase 8.1 report format and Phase 8.2 cockpit endpoint
+stable, then improves only cockpit readability. The sandbox trace panel now
+uses clearer status chips, blocker severity styling, inline blocker
+descriptions, compact summary cards, clearer filter-empty states, and more
+legible audit event chips.
+
+Phase 8.4 is still read-only/debug-only. The polish helpers operate on the
+already loaded deterministic report in the browser. They do not call
+`/execute`, do not record approvals, do not expose real-action toggles, do not
+change `real_action_enabled`, do not mutate Capability Registry, Permission
+Profile, Execution Policy, Action Contract behavior, or Click Readiness, and
+do not import any desktop control API.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -344,6 +359,8 @@ The current safety boundaries are intentionally narrow:
   execution path.
 - Phase 8.3 sandbox trace filters and detail controls are read-only display
   controls, not execution controls.
+- Phase 8.4 sandbox trace readability polish is read-only display logic, not
+  execution permission.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

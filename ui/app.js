@@ -133,6 +133,38 @@ const detailError = document.querySelector("#detailError");
 
 const DEFAULT_AGENT_NAME = "Mirai";
 const EXECUTION_POLICY_ACTIONS = ["wait", "click", "type", "hotkey", "scroll", "switch_app"];
+const SANDBOX_BLOCKER_DESCRIPTIONS = {
+  stale_observation: "Observation freshness failed before the sandbox gate.",
+  high_risk_requires_approval: "High-risk target is approval-gated and blocked for sandbox evaluation.",
+  unknown_risk_target: "Target risk is unknown, so the sandbox gate stays conservative.",
+  low_confidence_target: "Target confidence is below the sandbox threshold.",
+  invalid_bbox: "Target bounding box is missing, malformed, or out of bounds.",
+  bbox_center_mismatch: "Target center does not match the normalized bounding box.",
+  coordinate_space_unknown: "Viewport or coordinate-space metadata is missing.",
+  dpi_uncertain: "DPI or scale metadata is uncertain.",
+  preview_only_contract: "Action contract remains preview-only and cannot execute.",
+  missing_target: "No normalized visible element target is available.",
+};
+const SANDBOX_BLOCKER_SEVERITY = {
+  stale_observation: "medium",
+  high_risk_requires_approval: "critical",
+  unknown_risk_target: "critical",
+  low_confidence_target: "high",
+  invalid_bbox: "critical",
+  bbox_center_mismatch: "high",
+  coordinate_space_unknown: "high",
+  dpi_uncertain: "medium",
+  preview_only_contract: "medium",
+  missing_target: "critical",
+};
+const SANDBOX_AUDIT_EVENT_LABELS = {
+  sandbox_experiment_requested: "requested",
+  sandbox_gate_passed: "gate passed",
+  sandbox_gate_blocked: "gate blocked",
+  sandbox_post_action_verification_planned: "verification planned",
+  sandbox_dry_run_completed: "dry-run complete",
+  sandbox_real_action_skipped: "real action skipped",
+};
 const DEMO_SCENARIOS = {
   browser_search: {
     defaultTask: "Search",
@@ -1734,7 +1766,7 @@ function renderSandboxEvaluation(report = null) {
 
   if (!filteredScenarios.length) {
     sandboxEvaluationResults.appendChild(
-      plannerEvaluationEmptyState("No sandbox scenarios match the active filters.")
+      sandboxEvaluationEmptyState("No sandbox scenarios match the active filters.", filters)
     );
     return;
   }
@@ -1818,6 +1850,7 @@ function sandboxEvaluationScenarioCard(scenario) {
     scenario.expected_outcome?.status || "unknown"
   } / actual ${actualStatus}`;
   badges.className = "sandbox-evaluation-badges";
+  badges.appendChild(sandboxEvaluationPrimaryStatusChip(scenario));
   for (const [label, value, tone] of sandboxEvaluationBadges(scenario, scenarioType)) {
     badges.appendChild(sandboxEvaluationBadge(label, value, tone));
   }
@@ -1832,7 +1865,12 @@ function sandboxEvaluationScenarioCard(scenario) {
     facts.appendChild(plannerEvaluationFact(label, value));
   }
 
-  details.append(detailsSummary, facts, sandboxEvaluationAuditTimeline(scenario));
+  details.append(
+    detailsSummary,
+    facts,
+    sandboxEvaluationBlockerDetails(scenario),
+    sandboxEvaluationAuditTimeline(scenario)
+  );
 
   if (scenario.trace) {
     details.appendChild(sandboxEvaluationTraceDetails(scenario));
@@ -1882,7 +1920,6 @@ function sandboxEvaluationRows(scenario) {
 
 function sandboxEvaluationBadges(scenario, scenarioType) {
   return [
-    ["result", scenario.passed === true ? "pass" : "fail", scenario.passed === true ? "ok" : "risk"],
     ["actual", scenario.actual_outcome?.status || "unknown", "neutral"],
     ["type", displaySandboxScenarioType(scenarioType), "neutral"],
     ["dry_run", formatSandboxBool(scenario.dry_run), scenario.dry_run === true ? "ok" : "neutral"],
@@ -1899,6 +1936,43 @@ function sandboxEvaluationBadges(scenario, scenarioType) {
   ];
 }
 
+function sandboxEvaluationPrimaryStatusChip(scenario) {
+  const status = sandboxEvaluationStatusKind(scenario);
+  const chip = document.createElement("span");
+
+  chip.className = "sandbox-evaluation-status-chip";
+  chip.dataset.status = status;
+  chip.textContent = sandboxEvaluationStatusLabel(status);
+  return chip;
+}
+
+function sandboxEvaluationStatusKind(scenario) {
+  if (scenario.passed !== true) {
+    return "fail";
+  }
+
+  if (scenario.real_action_skipped === true) {
+    return "skipped";
+  }
+
+  if (scenario.actual_outcome?.status === "blocked" || scenario.gate_passed === false) {
+    return "blocked";
+  }
+
+  return "pass";
+}
+
+function sandboxEvaluationStatusLabel(status) {
+  const labels = {
+    pass: "pass",
+    fail: "fail",
+    skipped: "skipped",
+    blocked: "blocked",
+  };
+
+  return labels[status] || "unknown";
+}
+
 function sandboxEvaluationBadge(label, value, tone = "neutral") {
   const badge = document.createElement("span");
   badge.className = "sandbox-evaluation-badge";
@@ -1909,15 +1983,58 @@ function sandboxEvaluationBadge(label, value, tone = "neutral") {
 
 function sandboxEvaluationCompactLine(scenario) {
   const line = document.createElement("p");
+  const blockerCodes = sandboxCodes(scenario.blocker_codes);
+
   line.className = "sandbox-evaluation-compact-line";
   line.textContent = [
     `failure_reason_codes ${formatSandboxCodeList(scenario.failure_reason_codes, 3)}`,
-    `blocker_codes ${formatSandboxCodeList(scenario.blocker_codes, 3)}`,
+    `blocker_codes ${formatSandboxCodeList(blockerCodes, 3)}`,
     `risk ${scenario.target_risk_hint || "none"}/${formatSandboxConfidence(scenario.target_confidence)}`,
     `readiness ${scenario.readiness_ready === true ? "ready" : "blocked or unknown"}`,
     `action ${scenario.action_type || "unknown"}`,
   ].join("; ");
   return line;
+}
+
+function sandboxEvaluationBlockerDetails(scenario) {
+  const container = document.createElement("div");
+  const title = document.createElement("p");
+  const list = document.createElement("ul");
+  const blockerCodes = sandboxCodes(scenario.blocker_codes);
+
+  container.className = "sandbox-evaluation-blocker-details";
+  title.className = "sandbox-evaluation-blocker-title";
+  title.textContent = "Blocker details";
+  list.className = "sandbox-evaluation-blocker-list";
+
+  if (!blockerCodes.length) {
+    const item = document.createElement("li");
+    item.className = "sandbox-evaluation-blocker-empty";
+    item.textContent = "No blocker codes reported for this scenario.";
+    list.appendChild(item);
+  } else {
+    for (const blockerCode of blockerCodes) {
+      const item = document.createElement("li");
+      const chip = document.createElement("span");
+      const description = document.createElement("span");
+      const severity = sandboxBlockerSeverity(blockerCode);
+
+      item.className = "sandbox-evaluation-blocker-item";
+      item.dataset.blockerCode = blockerCode;
+      item.dataset.severity = severity;
+      chip.className = "sandbox-evaluation-blocker-chip";
+      chip.dataset.severity = severity;
+      chip.title = sandboxBlockerDescription(blockerCode);
+      chip.textContent = blockerCode;
+      description.className = "sandbox-evaluation-blocker-description";
+      description.textContent = sandboxBlockerDescription(blockerCode);
+      item.append(chip, description);
+      list.appendChild(item);
+    }
+  }
+
+  container.append(title, list);
+  return container;
 }
 
 function sandboxEvaluationTraceDetails(scenario) {
@@ -1958,8 +2075,18 @@ function sandboxEvaluationAuditTimeline(scenario) {
   } else {
     auditEvents.forEach((eventName, index) => {
       const item = document.createElement("li");
+      const step = document.createElement("span");
+      const event = document.createElement("span");
+
       item.dataset.auditEventName = eventName;
-      item.textContent = `${index + 1}. ${eventName}`;
+      item.dataset.auditTone = sandboxAuditEventTone(eventName);
+      step.className = "sandbox-evaluation-audit-step";
+      step.textContent = String(index + 1);
+      event.className = "sandbox-evaluation-event-chip";
+      event.dataset.tone = sandboxAuditEventTone(eventName);
+      event.title = eventName;
+      event.textContent = sandboxAuditEventLabel(eventName);
+      item.append(step, event);
       list.appendChild(item);
     });
   }
@@ -1983,9 +2110,22 @@ function renderSandboxEvaluationTimeline(scenarios) {
     const auditEvents = sandboxCodes(scenario.audit_event_names);
     auditEvents.forEach((eventName, index) => {
       const item = document.createElement("li");
+      const scenarioId = document.createElement("span");
+      const step = document.createElement("span");
+      const event = document.createElement("span");
+
       item.dataset.scenarioId = scenario.scenario_id || "";
       item.dataset.auditEventName = eventName;
-      item.textContent = `${scenario.scenario_id || "unknown"} / ${index + 1} / ${eventName}`;
+      item.dataset.auditTone = sandboxAuditEventTone(eventName);
+      scenarioId.className = "sandbox-evaluation-timeline-scenario";
+      scenarioId.textContent = scenario.scenario_id || "unknown";
+      step.className = "sandbox-evaluation-audit-step";
+      step.textContent = String(index + 1);
+      event.className = "sandbox-evaluation-event-chip";
+      event.dataset.tone = sandboxAuditEventTone(eventName);
+      event.title = eventName;
+      event.textContent = sandboxAuditEventLabel(eventName);
+      item.append(scenarioId, step, event);
       list.appendChild(item);
     });
   }
@@ -2009,11 +2149,20 @@ function renderSandboxEvaluationCounts(summary, totalScenarioCount) {
     ["passed", String(summary.passed), "ok"],
     ["failed", String(summary.failed), summary.failed > 0 ? "risk" : "neutral"],
     ["skipped", String(summary.skipped), summary.skipped > 0 ? "warn" : "neutral"],
+    ["blocked", String(summary.blocked), summary.blocked > 0 ? "risk" : "neutral"],
   ]) {
-    const chip = document.createElement("span");
+    const chip = document.createElement("div");
+    const countValue = document.createElement("span");
+    const countLabel = document.createElement("span");
+
     chip.className = "sandbox-evaluation-count";
+    chip.dataset.countKey = label;
     chip.dataset.tone = tone;
-    chip.textContent = `${label}: ${value}`;
+    countValue.className = "sandbox-evaluation-count-value";
+    countValue.textContent = value;
+    countLabel.className = "sandbox-evaluation-count-label";
+    countLabel.textContent = label;
+    chip.append(countValue, countLabel);
     sandboxEvaluationCounts.appendChild(chip);
   }
 }
@@ -2134,6 +2283,9 @@ function summarizeSandboxScenarios(scenarios) {
     passed: safeScenarios.filter((scenario) => scenario.passed === true).length,
     failed: safeScenarios.filter((scenario) => scenario.passed !== true).length,
     skipped: safeScenarios.filter((scenario) => scenario.real_action_skipped === true).length,
+    blocked: safeScenarios.filter(
+      (scenario) => scenario.actual_outcome?.status === "blocked" || scenario.gate_passed === false
+    ).length,
   };
 }
 
@@ -2218,6 +2370,61 @@ function uniqueSortedValues(values) {
 
 function sandboxCodes(values) {
   return Array.isArray(values) ? values.map((value) => String(value)) : [];
+}
+
+function sandboxBlockerDescription(blockerCode) {
+  return SANDBOX_BLOCKER_DESCRIPTIONS[blockerCode] || "Conservative sandbox blocker.";
+}
+
+function sandboxBlockerSeverity(blockerCode) {
+  return SANDBOX_BLOCKER_SEVERITY[blockerCode] || "medium";
+}
+
+function sandboxAuditEventLabel(eventName) {
+  return SANDBOX_AUDIT_EVENT_LABELS[eventName] || eventName || "audit event";
+}
+
+function sandboxAuditEventTone(eventName) {
+  if (eventName === "sandbox_gate_blocked") {
+    return "risk";
+  }
+
+  if (eventName === "sandbox_real_action_skipped") {
+    return "warn";
+  }
+
+  if (
+    eventName === "sandbox_gate_passed" ||
+    eventName === "sandbox_dry_run_completed" ||
+    eventName === "sandbox_post_action_verification_planned"
+  ) {
+    return "ok";
+  }
+
+  return "neutral";
+}
+
+function sandboxEvaluationEmptyState(message, filters) {
+  const container = document.createElement("div");
+  const title = document.createElement("p");
+  const detail = document.createElement("p");
+
+  container.className = "sandbox-evaluation-empty-state";
+  title.className = "sandbox-evaluation-empty-title";
+  title.textContent = message;
+  detail.className = "sandbox-evaluation-empty-detail";
+  detail.textContent = `Active filters: ${sandboxActiveFilterDescription(filters)}.`;
+  container.append(title, detail);
+  return container;
+}
+
+function sandboxActiveFilterDescription(filters = {}) {
+  return [
+    `fixture ${filters.fixtureSet || "all"}`,
+    `result ${filters.passFail || "all"}`,
+    `type ${filters.scenarioType || "all"}`,
+    `blocker ${filters.blocker || "all"}`,
+  ].join("; ");
 }
 
 function formatSandboxOutcome(outcome = {}) {

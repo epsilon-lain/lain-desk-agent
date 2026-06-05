@@ -509,6 +509,72 @@ class SandboxEvaluationTests(unittest.TestCase):
                 else:
                     self.assertNotIn(forbidden_fragment, sandbox_ui_source)
 
+    def test_cockpit_ui_sandbox_status_chips_and_classes_exist(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = UI_STYLES_CSS.read_text(encoding="utf-8")
+
+        self.assertIn("function sandboxEvaluationPrimaryStatusChip", source)
+        self.assertIn("function sandboxEvaluationStatusKind", source)
+        self.assertIn("sandbox-evaluation-status-chip", source)
+        for status in ["pass", "fail", "skipped", "blocked"]:
+            with self.subTest(status=status):
+                self.assertIn(f"{status}: \"{status}\"", source)
+                self.assertIn(f'[data-status="{status}"]', styles)
+
+    def test_cockpit_ui_sandbox_blocker_description_mapping_exists(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = UI_STYLES_CSS.read_text(encoding="utf-8")
+
+        self.assertIn("SANDBOX_BLOCKER_DESCRIPTIONS", source)
+        self.assertIn("SANDBOX_BLOCKER_SEVERITY", source)
+        for blocker_code in [
+            "stale_observation",
+            "high_risk_requires_approval",
+            "low_confidence_target",
+            "invalid_bbox",
+            "bbox_center_mismatch",
+            "coordinate_space_unknown",
+            "dpi_uncertain",
+            "preview_only_contract",
+            "missing_target",
+        ]:
+            with self.subTest(blocker_code=blocker_code):
+                self.assertIn(f"{blocker_code}:", source)
+
+        self.assertIn("function sandboxEvaluationBlockerDetails", source)
+        self.assertIn("sandbox-evaluation-blocker-chip", source)
+        self.assertIn(".sandbox-evaluation-blocker-chip[data-severity=\"critical\"]", styles)
+        self.assertIn(".sandbox-evaluation-blocker-chip[data-severity=\"high\"]", styles)
+
+    def test_cockpit_ui_sandbox_summary_cards_and_empty_state_exist(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = UI_STYLES_CSS.read_text(encoding="utf-8")
+
+        self.assertIn("function renderSandboxEvaluationCounts", source)
+        self.assertIn("chip.dataset.countKey", source)
+        self.assertIn("sandbox-evaluation-count-value", source)
+        self.assertIn("sandbox-evaluation-count-label", source)
+        for count_key in ["total", "visible", "passed", "failed", "skipped", "blocked"]:
+            with self.subTest(count_key=count_key):
+                self.assertIn(f'"{count_key}"', source)
+
+        self.assertIn("function sandboxEvaluationEmptyState", source)
+        self.assertIn("function sandboxActiveFilterDescription", source)
+        self.assertIn("No sandbox scenarios match the active filters.", source)
+        self.assertIn(".sandbox-evaluation-empty-state", styles)
+
+    def test_cockpit_ui_sandbox_audit_timeline_readability_helpers_exist(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = UI_STYLES_CSS.read_text(encoding="utf-8")
+
+        self.assertIn("SANDBOX_AUDIT_EVENT_LABELS", source)
+        self.assertIn("function sandboxAuditEventLabel", source)
+        self.assertIn("function sandboxAuditEventTone", source)
+        self.assertIn("sandbox-evaluation-event-chip", source)
+        self.assertIn(".sandbox-evaluation-event-chip[data-tone=\"ok\"]", styles)
+        self.assertIn(".sandbox-evaluation-event-chip[data-tone=\"warn\"]", styles)
+        self.assertIn(".sandbox-evaluation-event-chip[data-tone=\"risk\"]", styles)
+
 
 if __name__ == "__main__":
     unittest.main()

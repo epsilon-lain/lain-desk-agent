@@ -43,6 +43,10 @@ Phase 8.3 polishes that cockpit trace with read-only filters, fixture-set
 views, summary counts, collapsible scenario details, and audit event sequence
 views. It does not add execution controls or real-action permissions.
 
+Phase 8.4 adds cockpit trace readability polish: clearer status chips, blocker
+severity/descriptions, compact summary cards, improved empty states, and more
+legible audit event chips. It is still read-only/debug-only.
+
 ## Completed
 
 - Observation / Understanding
@@ -64,6 +68,7 @@ views. It does not add execution controls or real-action permissions.
 - Phase 8.1 Sandbox Evaluation Trace
 - Phase 8.2 Sandbox Evaluation Cockpit Trace
 - Phase 8.3 Sandbox Trace Cockpit UX
+- Phase 8.4 Sandbox Trace UX Polish
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -91,6 +96,7 @@ views. It does not add execution controls or real-action permissions.
 - Phase 8.1 sandbox evaluation is fixture-only and performs no actions.
 - Phase 8.2 cockpit trace exposure is read-only/debug-only.
 - Phase 8.3 sandbox trace UX is read-only/debug-only.
+- Phase 8.4 sandbox trace polish is read-only/debug-only.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -315,9 +321,31 @@ adding any execution path.
 - Preserve `real_action_enabled = false` fixture behavior and disabled
   click/type/hotkey/scroll/switch_app permissions.
 
+## Phase 8.4: Sandbox Trace UX Polish
+
+Status: implemented as read-only cockpit readability polish.
+
+Goal: make sandbox evaluation traces easier to scan without changing behavior
+or safety boundaries.
+
+- Add clearer status chips for pass, fail, skipped, and blocked outcomes.
+- Add blocker severity styling and inline descriptions for common blocker
+  codes.
+- Render compact summary cards for total, visible, passed, failed, skipped,
+  and blocked scenarios.
+- Improve empty filter states by showing the active local filters.
+- Improve audit timeline readability with short event labels and tone styling.
+- Keep all data sourced from the existing Phase 8.1/8.2 deterministic report
+  shape; no second trace format is introduced.
+- Keep filters and polish local-only in the browser: no execute button, no
+  approval button, no real-action toggle, no sandbox path to `/execute`, and no
+  desktop control API.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions and
+  `real_action_enabled = false` sandbox behavior.
+
 ## Phase 9: Limited Desktop Control
 
-Goal: consider narrow desktop control only after the Phase 8/8.1/8.2/8.3
+Goal: consider narrow desktop control only after the Phase 8/8.1/8.2/8.3/8.4
 dry-run framework, evaluation, and cockpit trace UX are reliable and the Phase
 7 real-action checklist is satisfied.
 
