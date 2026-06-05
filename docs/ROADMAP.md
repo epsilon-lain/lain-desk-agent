@@ -57,6 +57,11 @@ a tiny deterministic scenario subset, requires Phase 7 gate validation, uses
 mock approval and mock emergency stop hooks, and preserves the Phase 8 report
 shape.
 
+Phase 9.1 implements the first minimal sandbox experiment harness as
+dry-run-only simulation. It reuses the Phase 7 gate through the Phase 8 sandbox
+framework, adds mock approval, mock emergency stop, mock verification, and mock
+rollback checks, and always reports `real_action_attempted = false`.
+
 ## Completed
 
 - Observation / Understanding
@@ -81,6 +86,7 @@ shape.
 - Phase 8.4 Sandbox Trace UX Polish
 - Phase 8.5 Sandbox Trace UX Refinements
 - Phase 9 Minimal Sandbox Experiment Design
+- Phase 9.1 Minimal Sandbox Experiment Harness
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -111,6 +117,8 @@ shape.
 - Phase 8.4 sandbox trace polish is read-only/debug-only.
 - Phase 8.5 sandbox trace refinements are read-only/debug-only.
 - Phase 9 minimal sandbox experiment design is design-only, dry-run-only, and
+  not execution permission.
+- Phase 9.1 minimal sandbox experiment harness is dry-run-only simulation and
   not execution permission.
 
 ## Phase 4: AI Planner Evaluation And Reliability
@@ -413,11 +421,48 @@ the current dry-run-only runtime.
   any permission matrix.
 - Do not implement the real-action adapter yet.
 
+## Phase 9.1: Minimal Sandbox Experiment Harness
+
+Status: implemented as deterministic dry-run harness code.
+
+Goal: execute the Phase 9 specification safely as fixture simulation before any
+real-action adapter is considered.
+
+- Define `Phase9ExperimentConfig`, `Phase9ExperimentRequest`,
+  `Phase9ExperimentResult`, `MockApprovalState`,
+  `MockEmergencyStopState`, `MockPostActionVerificationPlan`, and
+  `MockRollbackPlan`.
+- Keep `dry_run = true`, `real_action_enabled = false`, and
+  `real_action_attempted = false` as the default safety posture.
+- Reuse the Phase 7 gate validation through the existing Phase 8 sandbox
+  framework, then add Phase 9 checks for allowed scenario ID, narrow sandbox
+  scope, approval binding, inactive emergency stop, rollback planning, and
+  disabled real-action state.
+- Return only simulated `dry_run_completed`, `blocked`, or
+  `real_action_skipped` outcomes.
+- Emit deterministic Phase 9 audit events for request, mock approval check,
+  emergency stop check, gate pass/block, verification planning, rollback
+  planning, dry-run completion, and real-action skip.
+- Preserve Phase 8 report fields through `build_phase9_experiment_report(...)`
+  so future cockpit/debug surfaces can inspect expected versus actual outcome,
+  failure reasons, blockers, audit order, dry-run state, skipped state,
+  verification planning, target risk/confidence, readiness state, action type,
+  notes, and trace.
+- Block missing approval, missing emergency stop, active emergency stop,
+  missing verification, missing rollback, missing target, missing action
+  contract, missing audit plan, high-risk or unknown-risk target, stale
+  observation, invalid geometry, low confidence, readiness failure, forbidden
+  action type, broad sandbox scope, and any real-action-enabled request without
+  a future separately approved gate.
+- Do not add a cockpit endpoint, execute button, approval button, real-action
+  toggle, sandbox action trigger, `/execute` call, desktop control dependency,
+  or permission change.
+
 ## Phase 10: Limited Desktop Control
 
 Goal: consider narrow desktop control only after the Phase 7 checklist and
-Phase 9 dry-run design/implementation gates are satisfied and separately
-approved.
+Phase 9 dry-run design plus Phase 9.1 harness gates are satisfied and
+separately approved.
 
 - Enable click, type, hotkey, and scroll only as individually gated
   capabilities.

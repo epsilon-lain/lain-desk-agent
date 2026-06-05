@@ -386,6 +386,36 @@ not add cockpit execute/approval/real-action controls, does not mutate
 Capability Registry, Permission Profile, Execution Policy, Action Contract
 behavior, or Click Readiness, and does not import any desktop control API.
 
+### Phase 9.1 Minimal Sandbox Experiment Harness
+
+Phase 9.1 implements `phase9_experiment.py` as a deterministic dry-run harness
+for the Phase 9 design. It is not a real-action adapter. The harness defines
+`Phase9ExperimentConfig`, `Phase9ExperimentRequest`, `Phase9ExperimentResult`,
+mock approval state, mock emergency stop state, mock post-action verification,
+and mock rollback plans.
+
+The harness reuses the Phase 8 `validate_phase7_gate(...)` implementation for
+Phase 7 checks, then adds Phase 9-specific validation for the minimal scenario
+subset, one-window/one-target sandbox scope, approval binding, inactive
+emergency stop, rollback planning, and disabled real-action state. It returns
+only simulated `dry_run_completed`, `blocked`, or `real_action_skipped`
+outcomes, and it always reports `real_action_attempted: false`.
+
+Phase 9.1 emits Phase 8-compatible scenario report fields through
+`build_phase9_experiment_report(...)`, including expected and actual outcome,
+failure reason codes, blocker codes, audit event names, dry-run state,
+real-action-skipped state, verification planning, target risk/confidence,
+readiness state, action type, notes, and trace. Its audit event names are
+Phase 9-specific debug events such as `phase9_experiment_requested`,
+`phase9_gate_passed`, `phase9_gate_blocked`,
+`phase9_post_action_verification_planned`, `phase9_rollback_plan_recorded`,
+`phase9_dry_run_completed`, and `phase9_real_action_skipped`.
+
+Phase 9.1 does not add a cockpit endpoint, does not add UI controls, does not
+call `/execute`, does not observe the live desktop, does not change Capability
+Registry, Permission Profile, Execution Policy, Action Contract behavior, or
+Click Readiness, and does not import any desktop control API.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -410,6 +440,8 @@ The current safety boundaries are intentionally narrow:
   summary controls are read-only display helpers, not execution permission.
 - Phase 9 minimal sandbox experiment design is dry-run-only and design-only;
   it is not execution permission.
+- Phase 9.1 minimal sandbox experiment harness is dry-run-only simulation;
+  it is not execution permission and it never attempts real desktop action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

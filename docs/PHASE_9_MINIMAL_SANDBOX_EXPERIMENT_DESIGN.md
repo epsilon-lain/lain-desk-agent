@@ -8,6 +8,14 @@ The word "real-action" in this phase name describes the future experiment
 category being designed, not current runtime behavior. The Phase 9 design can
 only be executed as dry-run simulation.
 
+Phase 9.1 implements the first dry-run-only harness for this design in
+`src/lain_desk_agent/phase9_experiment.py`. That harness validates deterministic
+fixtures against the Phase 7 gate, mock approval, mock emergency stop,
+post-action verification planning, and rollback planning. It still does not
+perform any real desktop action, does not call `/execute`, and does not change
+Execution Policy, Permission Profile, Capability Registry, or any permission
+matrix.
+
 ## Purpose
 
 Define a minimal, reviewable sandbox experiment plan that can validate the
@@ -229,26 +237,33 @@ execution.
 
 ## Audit Events
 
-Phase 9 design execution must reuse the existing Phase 8 sandbox experiment
-audit event names for deterministic trace compatibility:
+Phase 9 output must preserve the existing Phase 8 report fields, including the
+`audit_event_names` list, so cockpit/debug consumers can inspect it in the same
+way. Phase 9.1 uses Phase 9-specific event names inside that stable report
+shape:
 
-- `sandbox_experiment_requested`
-- `sandbox_gate_passed`
-- `sandbox_gate_blocked`
-- `sandbox_post_action_verification_planned`
-- `sandbox_dry_run_completed`
-- `sandbox_real_action_skipped`
+- `phase9_experiment_requested`
+- `phase9_mock_approval_checked`
+- `phase9_emergency_stop_checked`
+- `phase9_gate_passed`
+- `phase9_gate_blocked`
+- `phase9_post_action_verification_planned`
+- `phase9_rollback_plan_recorded`
+- `phase9_dry_run_completed`
+- `phase9_real_action_skipped`
 
 Sequential audit requirements:
 
-- Every scenario starts with `sandbox_experiment_requested`.
-- A passing gate records `sandbox_gate_passed`.
-- A blocked gate records `sandbox_gate_blocked` and stops.
+- Every scenario starts with `phase9_experiment_requested`.
+- Mock approval and emergency stop are checked before gate pass/block.
+- A passing gate records `phase9_gate_passed`.
+- A blocked gate records `phase9_gate_blocked` and stops.
 - A passing dry-run with verification planning records
-  `sandbox_post_action_verification_planned`.
-- A completed dry-run records `sandbox_dry_run_completed`.
+  `phase9_post_action_verification_planned`.
+- Rollback planning records `phase9_rollback_plan_recorded` before completion.
+- A completed dry-run records `phase9_dry_run_completed`.
 - A non-dry-run request while real actions are disabled records
-  `sandbox_real_action_skipped`.
+  `phase9_real_action_skipped`.
 
 Audit records must include scenario ID, expected outcome, actual outcome,
 failure reason codes, blocker codes, dry-run state, real-action-enabled state,
@@ -326,6 +341,34 @@ tests that prove:
 - Mock post-action verification planning is recorded.
 - `scripts/safety_scan.py` passes.
 - `scripts/verify.ps1` passes.
+
+Phase 9.1 now covers these requirements with
+`tests/test_phase9_experiment.py`. The tests run the dry-run success path,
+real-action-skipped path, Phase 7 blockers, mock approval binding, emergency
+stop state, rollback planning, report field compatibility, audit ordering, and
+source checks for forbidden execution paths.
+
+## Phase 9.1 Harness Status
+
+Phase 9.1 is implemented as dry-run harness code only:
+
+- `Phase9ExperimentConfig` keeps `dry_run = true` and
+  `real_action_enabled = false` by default.
+- `Phase9ExperimentRequest` carries one deterministic scenario, sandbox scope,
+  normalized visible target data, click readiness, action contract, mock
+  approval, mock emergency stop, mock verification plan, and mock rollback
+  plan.
+- `validate_phase9_gate(...)` reuses `validate_phase7_gate(...)` from the
+  Phase 8 sandbox framework and adds Phase 9 scope, approval binding,
+  emergency-stop, rollback, and real-action-disabled checks.
+- `run_phase9_experiment(...)` returns only simulated `dry_run_completed`,
+  `blocked`, or `real_action_skipped` results. It always keeps
+  `real_action_attempted = false`.
+- `build_phase9_experiment_report(...)` emits the Phase 8-compatible scenario
+  report fields for deterministic inspection.
+
+Phase 9.1 does not expose a cockpit execute control, does not add an endpoint,
+does not observe the live desktop, and does not create a real-action adapter.
 
 ## Implementation Guardrails
 
