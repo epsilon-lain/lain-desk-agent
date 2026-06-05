@@ -51,6 +51,12 @@ Phase 8.5 refines cockpit trace navigation with blocker-group quick filters,
 reset/copy-summary display controls, text mini-bars, and scenario grouping.
 It remains local-only UI behavior over the existing deterministic report.
 
+Phase 9 is now designed as a minimal sandbox real-action experiment plan, but
+it is still design-only, dry-run-only, and not execution permission. It selects
+a tiny deterministic scenario subset, requires Phase 7 gate validation, uses
+mock approval and mock emergency stop hooks, and preserves the Phase 8 report
+shape.
+
 ## Completed
 
 - Observation / Understanding
@@ -74,6 +80,7 @@ It remains local-only UI behavior over the existing deterministic report.
 - Phase 8.3 Sandbox Trace Cockpit UX
 - Phase 8.4 Sandbox Trace UX Polish
 - Phase 8.5 Sandbox Trace UX Refinements
+- Phase 9 Minimal Sandbox Experiment Design
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -103,6 +110,8 @@ It remains local-only UI behavior over the existing deterministic report.
 - Phase 8.3 sandbox trace UX is read-only/debug-only.
 - Phase 8.4 sandbox trace polish is read-only/debug-only.
 - Phase 8.5 sandbox trace refinements are read-only/debug-only.
+- Phase 9 minimal sandbox experiment design is design-only, dry-run-only, and
+  not execution permission.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -374,11 +383,41 @@ existing deterministic report shape and safety boundaries.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions and
   `real_action_enabled = false` sandbox behavior.
 
-## Phase 9: Limited Desktop Control
+## Phase 9: Minimal Sandbox Real-action Experiment Design
 
-Goal: consider narrow desktop control only after the Phase 8/8.1/8.2/8.3/8.4/
-8.5 dry-run framework, evaluation, and cockpit trace UX are reliable and the
-Phase 7 real-action checklist is satisfied.
+Status: design-only gate documented in
+`docs/PHASE_9_MINIMAL_SANDBOX_EXPERIMENT_DESIGN.md`.
+
+Goal: define the smallest future sandbox experiment shape while preserving
+the current dry-run-only runtime.
+
+- Select a very small deterministic subset of Phase 8.1 sandbox scenarios:
+  dry-run success, real-action-disabled skip, missing approval, stale
+  observation, high-risk target, missing audit plan, and missing action
+  contract.
+- Keep `dry_run = true`, `real_action_enabled = false`, and
+  `real_action_attempted = false`.
+- Simulate only a fixture-level low-risk target action. Do not perform real
+  click/type/hotkey/scroll/switch_app and do not call `/execute`.
+- Require Phase 7 gate validation before any simulated outcome.
+- Block missing audit plan, missing action contract, high-risk target, stale
+  observation, missing approval, invalid geometry, missing verification plan,
+  and missing emergency stop.
+- Define mock user approval and mock emergency stop hooks.
+- Define mock post-action verification and mock rollback expectations.
+- Preserve Phase 8 deterministic report fields, scenario fields, and audit
+  event ordering.
+- Require tests for no real desktop API imports, dry-run field completeness,
+  blocker enforcement, Phase 7 gate behavior, and safety scan compatibility.
+- Do not modify Execution Policy, Permission Profile, Capability Registry, or
+  any permission matrix.
+- Do not implement the real-action adapter yet.
+
+## Phase 10: Limited Desktop Control
+
+Goal: consider narrow desktop control only after the Phase 7 checklist and
+Phase 9 dry-run design/implementation gates are satisfied and separately
+approved.
 
 - Enable click, type, hotkey, and scroll only as individually gated
   capabilities.

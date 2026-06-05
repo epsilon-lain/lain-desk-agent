@@ -273,6 +273,26 @@ Phase 8.1 evaluation is not execution permission. A passing sandbox evaluation
 does not enable click/type/hotkey/scroll/switch_app and does not satisfy the
 real-action checklist below by itself.
 
+## Phase 9 Minimal Experiment Design Note
+
+Phase 9 may define a minimal sandbox real-action experiment design, but it must
+remain design-only and dry-run-only until a separate implementation proposal is
+approved. The Phase 9 design may select a tiny deterministic subset of Phase
+8.1 scenarios, require Phase 7 validation, use mock user approval, use mock
+emergency stop, and define mock post-action verification and mock rollback.
+
+Phase 9 design is not execution permission. It must keep `dry_run` true by
+default, keep `real_action_enabled` false, keep `real_action_attempted` false,
+preserve Phase 8 report fields, and block unsafe paths such as missing audit
+plan, missing action contract, high-risk target, stale observation, missing
+approval, invalid geometry, missing verification plan, or missing emergency
+stop.
+
+Phase 9 design must not call `/execute`, must not add action-performing
+endpoints, must not add cockpit execute/approval/real-action controls, must not
+modify Capability Registry, Permission Profile, Execution Policy, or any
+permission matrix, and must not import or call desktop control APIs.
+
 ## Checklist Before Any Phase 8 Real-action Experiment
 
 Before implementing real actuation inside a minimal sandbox experiment:

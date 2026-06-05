@@ -356,6 +356,36 @@ change `real_action_enabled`, do not mutate Capability Registry, Permission
 Profile, Execution Policy, Action Contract behavior, or Click Readiness, and
 do not import any desktop control API.
 
+### Phase 9 Minimal Sandbox Experiment Design
+
+Phase 9 is design-only and documented in
+`docs/PHASE_9_MINIMAL_SANDBOX_EXPERIMENT_DESIGN.md`. It defines the smallest
+future sandbox experiment shape but does not implement real desktop control.
+The design remains dry-run-only: `dry_run` stays true by default,
+`real_action_enabled` stays false, and `real_action_attempted` must remain
+false for every scenario.
+
+The Phase 9 design selects a tiny deterministic subset of existing Phase 8.1
+sandbox scenarios: dry-run success, real-action-disabled skip, missing
+approval, stale observation, high-risk target, missing audit plan, and missing
+action contract. Each scenario must pass through the Phase 7 gate before any
+simulated result is returned. Missing audit plan, missing action contract,
+high-risk target, stale observation, missing approval, invalid geometry,
+missing verification, or missing emergency stop blocks the experiment.
+
+Phase 9 defines mock user approval, mock emergency stop, mock post-action
+verification, and mock rollback only. It preserves the Phase 8 deterministic
+report shape, including scenario ID/name, expected and actual outcome, failure
+reason codes, blocker codes, audit event names, dry-run state,
+real-action-enabled state, real-action-skipped state, post-action verification
+planning, target risk/confidence, readiness state, action type, notes, and
+trace.
+
+Phase 9 does not call `/execute`, does not add action-performing endpoints, does
+not add cockpit execute/approval/real-action controls, does not mutate
+Capability Registry, Permission Profile, Execution Policy, Action Contract
+behavior, or Click Readiness, and does not import any desktop control API.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -378,6 +408,8 @@ The current safety boundaries are intentionally narrow:
   execution permission.
 - Phase 8.5 sandbox trace quick filters, grouping, reset, text bars, and copy
   summary controls are read-only display helpers, not execution permission.
+- Phase 9 minimal sandbox experiment design is dry-run-only and design-only;
+  it is not execution permission.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.
