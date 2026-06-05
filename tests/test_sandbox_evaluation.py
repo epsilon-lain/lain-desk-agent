@@ -575,6 +575,87 @@ class SandboxEvaluationTests(unittest.TestCase):
         self.assertIn(".sandbox-evaluation-event-chip[data-tone=\"warn\"]", styles)
         self.assertIn(".sandbox-evaluation-event-chip[data-tone=\"risk\"]", styles)
 
+    def test_cockpit_ui_sandbox_phase85_controls_are_local_only(self) -> None:
+        html = UI_INDEX_HTML.read_text(encoding="utf-8")
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        start = source.index("async function loadSandboxEvaluation")
+        end = source.index("function setPlannerEvaluationSummary", start)
+        sandbox_ui_source = source[start:end]
+
+        for element_id in [
+            "resetSandboxFilters",
+            "copySandboxSummary",
+            "sandboxEvaluationQuickFilters",
+            "sandboxEvaluationSummaryViz",
+            "sandboxEvaluationCopyStatus",
+        ]:
+            with self.subTest(element_id=element_id):
+                self.assertIn(f'id="{element_id}"', html)
+                self.assertIn(f"#{element_id}", source)
+
+        self.assertIn('resetSandboxFilters.addEventListener("click"', source)
+        self.assertIn('copySandboxSummary.addEventListener("click"', source)
+        self.assertNotIn('fetch("/execute"', sandbox_ui_source)
+        self.assertNotIn('fetch("/approval"', sandbox_ui_source)
+
+        copy_start = source.index("async function copySandboxEvaluationSummary")
+        copy_end = source.index("function buildSandboxVisibleSummaryPayload", copy_start)
+        copy_source = source[copy_start:copy_end]
+        self.assertIn("navigator.clipboard.writeText", copy_source)
+        self.assertNotIn("fetch(", copy_source)
+
+    def test_cockpit_ui_sandbox_quick_filter_groups_exist(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = UI_STYLES_CSS.read_text(encoding="utf-8")
+
+        self.assertIn("SANDBOX_QUICK_FILTER_GROUPS", source)
+        self.assertIn("function renderSandboxQuickFilters", source)
+        self.assertIn("function sandboxScenarioMatchesQuickGroup", source)
+        for group_name in ["geometry", "readiness", "approval", "risk", "scope", "audit"]:
+            with self.subTest(group_name=group_name):
+                self.assertIn(f"{group_name}:", source)
+                self.assertIn(f'label: "{group_name}"', source)
+
+        self.assertIn(".sandbox-evaluation-quick-filter", styles)
+        self.assertIn('[aria-pressed="true"]', styles)
+
+    def test_cockpit_ui_sandbox_summary_visualization_exists(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = UI_STYLES_CSS.read_text(encoding="utf-8")
+
+        self.assertIn("function renderSandboxEvaluationSummaryVisualization", source)
+        self.assertIn("function sandboxTextBar", source)
+        self.assertIn("sandbox-evaluation-bar-row", source)
+        self.assertIn("sandbox-evaluation-text-bar", source)
+        self.assertIn(".sandbox-evaluation-summary-viz", styles)
+        for bar_key in ["passed", "failed", "skipped", "blocked"]:
+            with self.subTest(bar_key=bar_key):
+                self.assertIn(f'"{bar_key}"', source)
+
+    def test_cockpit_ui_sandbox_grouping_and_status_distinction_exist(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = UI_STYLES_CSS.read_text(encoding="utf-8")
+
+        for function_name in [
+            "sandboxEvaluationScenarioGroups",
+            "sandboxEvaluationScenarioGroupKey",
+            "sandboxEvaluationScenarioGroupSection",
+        ]:
+            with self.subTest(function_name=function_name):
+                self.assertIn(f"function {function_name}", source)
+
+        self.assertIn("card.dataset.status", source)
+        self.assertIn(".sandbox-evaluation-scenario-group", styles)
+        for status in ["pass", "skipped", "blocked", "fail"]:
+            with self.subTest(status=status):
+                self.assertIn(f'[data-status="{status}"]', styles)
+
+    def test_cockpit_ui_sandbox_tooltips_include_blocker_descriptions(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+
+        self.assertIn("chip.title = sandboxBlockerDescription(blockerCode)", source)
+        self.assertIn("button.title = group.description", source)
+
 
 if __name__ == "__main__":
     unittest.main()

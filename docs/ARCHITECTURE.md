@@ -341,6 +341,21 @@ change `real_action_enabled`, do not mutate Capability Registry, Permission
 Profile, Execution Policy, Action Contract behavior, or Click Readiness, and
 do not import any desktop control API.
 
+### Phase 8.5 Sandbox Trace UX Refinements
+
+Phase 8.5 keeps the Phase 8.1 report format, Phase 8.2 endpoint, and existing
+`data-*` attributes stable. It refines only the cockpit presentation layer with
+blocker-group quick filters, reset filters, copy visible summary, text mini
+bars, and grouped scenario sections.
+
+All Phase 8.5 behavior is local to the browser after the deterministic report
+has been loaded. Quick filters, reset filters, scenario grouping, text bars,
+and copy summary controls do not call `/execute`, do not record approvals, do
+not call action-performing endpoints, do not expose real-action toggles, do not
+change `real_action_enabled`, do not mutate Capability Registry, Permission
+Profile, Execution Policy, Action Contract behavior, or Click Readiness, and
+do not import any desktop control API.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -361,6 +376,8 @@ The current safety boundaries are intentionally narrow:
   controls, not execution controls.
 - Phase 8.4 sandbox trace readability polish is read-only display logic, not
   execution permission.
+- Phase 8.5 sandbox trace quick filters, grouping, reset, text bars, and copy
+  summary controls are read-only display helpers, not execution permission.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

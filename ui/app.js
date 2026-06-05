@@ -76,7 +76,12 @@ const sandboxEvaluationTypeFilter = document.querySelector("#sandboxEvaluationTy
 const sandboxEvaluationBlockerFilter = document.querySelector("#sandboxEvaluationBlockerFilter");
 const expandSandboxScenarios = document.querySelector("#expandSandboxScenarios");
 const collapseSandboxScenarios = document.querySelector("#collapseSandboxScenarios");
+const resetSandboxFilters = document.querySelector("#resetSandboxFilters");
+const copySandboxSummary = document.querySelector("#copySandboxSummary");
+const sandboxEvaluationQuickFilters = document.querySelector("#sandboxEvaluationQuickFilters");
+const sandboxEvaluationCopyStatus = document.querySelector("#sandboxEvaluationCopyStatus");
 const sandboxEvaluationCounts = document.querySelector("#sandboxEvaluationCounts");
+const sandboxEvaluationSummaryViz = document.querySelector("#sandboxEvaluationSummaryViz");
 const sandboxEvaluationSummary = document.querySelector("#sandboxEvaluationSummary");
 const sandboxEvaluationTimeline = document.querySelector("#sandboxEvaluationTimeline");
 const sandboxEvaluationResults = document.querySelector("#sandboxEvaluationResults");
@@ -165,6 +170,32 @@ const SANDBOX_AUDIT_EVENT_LABELS = {
   sandbox_dry_run_completed: "dry-run complete",
   sandbox_real_action_skipped: "real action skipped",
 };
+const SANDBOX_QUICK_FILTER_GROUPS = {
+  geometry: {
+    label: "geometry",
+    description: "bbox, center, viewport, DPI, freshness, and missing-target blockers",
+  },
+  readiness: {
+    label: "readiness",
+    description: "readiness blockers such as preview-only contracts",
+  },
+  approval: {
+    label: "approval",
+    description: "approval-gated high-risk or unknown-risk targets",
+  },
+  risk: {
+    label: "risk",
+    description: "high-risk, unknown-risk, and low-confidence targets",
+  },
+  scope: {
+    label: "scope",
+    description: "forbidden action type or target outside the sandbox scope",
+  },
+  audit: {
+    label: "audit",
+    description: "missing audit-plan and audit-gate scenarios",
+  },
+};
 const DEMO_SCENARIOS = {
   browser_search: {
     defaultTask: "Search",
@@ -199,6 +230,7 @@ let currentDryRunAction = null;
 let currentUiState = null;
 let currentActionContract = null;
 let currentSandboxEvaluationReport = null;
+let currentSandboxQuickFilterGroup = "all";
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 setDemoScenarioSelectionDefaults();
@@ -327,6 +359,14 @@ expandSandboxScenarios.addEventListener("click", () => {
 
 collapseSandboxScenarios.addEventListener("click", () => {
   setSandboxScenarioDetailsOpen(false);
+});
+
+resetSandboxFilters.addEventListener("click", () => {
+  resetSandboxEvaluationFilters();
+});
+
+copySandboxSummary.addEventListener("click", async () => {
+  await copySandboxEvaluationSummary();
 });
 
 function setDetailsFromUiState(uiState) {
@@ -1664,7 +1704,10 @@ async function loadSandboxEvaluation() {
   loadSandboxEvaluationButton.disabled = true;
   sandboxEvaluationStatus.textContent = "Loading sandbox evaluation trace...";
   sandboxEvaluationControls.hidden = true;
+  sandboxEvaluationQuickFilters.hidden = true;
+  sandboxEvaluationCopyStatus.hidden = true;
   sandboxEvaluationCounts.hidden = true;
+  sandboxEvaluationSummaryViz.hidden = true;
   sandboxEvaluationSummary.hidden = true;
   sandboxEvaluationTimeline.hidden = true;
   sandboxEvaluationResults.replaceChildren();
@@ -1693,7 +1736,9 @@ async function loadSandboxEvaluation() {
 
 function renderSandboxEvaluation(report = null) {
   currentSandboxEvaluationReport = report;
+  sandboxEvaluationQuickFilters.replaceChildren();
   sandboxEvaluationSummary.replaceChildren();
+  sandboxEvaluationSummaryViz.replaceChildren();
   sandboxEvaluationTimeline.replaceChildren();
   sandboxEvaluationResults.replaceChildren();
 
@@ -1701,7 +1746,10 @@ function renderSandboxEvaluation(report = null) {
     sandboxEvaluationPanel.dataset.state = "empty";
     sandboxEvaluationStatus.textContent = "Not loaded yet.";
     sandboxEvaluationControls.hidden = true;
+    sandboxEvaluationQuickFilters.hidden = true;
+    sandboxEvaluationCopyStatus.hidden = true;
     sandboxEvaluationCounts.hidden = true;
+    sandboxEvaluationSummaryViz.hidden = true;
     sandboxEvaluationSummary.hidden = true;
     sandboxEvaluationTimeline.hidden = true;
     sandboxEvaluationResults.appendChild(
@@ -1726,7 +1774,10 @@ function renderSandboxEvaluation(report = null) {
   sandboxEvaluationStatus.textContent =
     "Phase 8.1 deterministic sandbox trace loaded. This is debug output, not execution permission.";
   sandboxEvaluationControls.hidden = false;
+  renderSandboxQuickFilters(filters);
+  sandboxEvaluationQuickFilters.hidden = false;
   renderSandboxEvaluationCounts(filteredSummary, totalScenarioCount);
+  renderSandboxEvaluationSummaryVisualization(filteredSummary);
   sandboxEvaluationSummary.hidden = false;
   sandboxEvaluationTimeline.hidden = false;
   setSandboxEvaluationSummary([
@@ -1771,8 +1822,8 @@ function renderSandboxEvaluation(report = null) {
     return;
   }
 
-  for (const scenario of filteredScenarios) {
-    sandboxEvaluationResults.appendChild(sandboxEvaluationScenarioCard(scenario));
+  for (const group of sandboxEvaluationScenarioGroups(filteredScenarios, filters)) {
+    sandboxEvaluationResults.appendChild(sandboxEvaluationScenarioGroupSection(group));
   }
 }
 
@@ -1781,9 +1832,13 @@ function renderSandboxEvaluationError(error) {
   sandboxEvaluationStatus.textContent = "Sandbox evaluation trace could not be loaded.";
   currentSandboxEvaluationReport = null;
   sandboxEvaluationControls.hidden = true;
+  sandboxEvaluationQuickFilters.hidden = true;
+  sandboxEvaluationCopyStatus.hidden = true;
   sandboxEvaluationCounts.hidden = true;
+  sandboxEvaluationSummaryViz.hidden = true;
   sandboxEvaluationSummary.hidden = true;
   sandboxEvaluationTimeline.hidden = true;
+  sandboxEvaluationSummaryViz.replaceChildren();
   sandboxEvaluationSummary.replaceChildren();
   sandboxEvaluationTimeline.replaceChildren();
   sandboxEvaluationResults.replaceChildren(
@@ -1797,6 +1852,59 @@ function setSandboxEvaluationSummary(rows) {
   for (const [label, value] of rows) {
     sandboxEvaluationSummary.appendChild(plannerEvaluationFact(label, value));
   }
+}
+
+function sandboxEvaluationScenarioGroups(scenarios, filters) {
+  const groups = new Map();
+
+  for (const scenario of scenarios) {
+    const key = sandboxEvaluationScenarioGroupKey(scenario, filters);
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        title: sandboxEvaluationScenarioGroupTitle(scenario, filters),
+        scenarios: [],
+      });
+    }
+
+    groups.get(key).scenarios.push(scenario);
+  }
+
+  return Array.from(groups.values());
+}
+
+function sandboxEvaluationScenarioGroupKey(scenario, filters) {
+  if ((filters.scenarioType || "all") === "all") {
+    return `type:${sandboxScenarioType(scenario)}`;
+  }
+
+  return `outcome:${sandboxEvaluationStatusKind(scenario)}`;
+}
+
+function sandboxEvaluationScenarioGroupTitle(scenario, filters) {
+  if ((filters.scenarioType || "all") === "all") {
+    return displaySandboxScenarioType(sandboxScenarioType(scenario));
+  }
+
+  return sandboxEvaluationStatusLabel(sandboxEvaluationStatusKind(scenario));
+}
+
+function sandboxEvaluationScenarioGroupSection(group) {
+  const section = document.createElement("section");
+  const title = document.createElement("p");
+
+  section.className = "sandbox-evaluation-scenario-group";
+  section.dataset.groupKey = group.key;
+  title.className = "sandbox-evaluation-scenario-group-title";
+  title.textContent = `${group.title} (${group.scenarios.length})`;
+  section.appendChild(title);
+
+  for (const scenario of group.scenarios) {
+    section.appendChild(sandboxEvaluationScenarioCard(scenario));
+  }
+
+  return section;
 }
 
 function sandboxEvaluationScenarioCard(scenario) {
@@ -1839,6 +1947,7 @@ function sandboxEvaluationScenarioCard(scenario) {
   card.dataset.readinessReady = String(scenario.readiness_ready === true);
   card.dataset.actionType = scenario.action_type || "";
   card.dataset.scenarioType = scenarioType;
+  card.dataset.status = sandboxEvaluationStatusKind(scenario);
   card.dataset.different = String(!passed || failureReasons.length > 0 || scenario.real_action_skipped === true);
   card.dataset.risk = String(targetRisk === "high_risk" || targetRisk === "unknown");
   header.className = "sandbox-evaluation-card-header";
@@ -2167,12 +2276,150 @@ function renderSandboxEvaluationCounts(summary, totalScenarioCount) {
   }
 }
 
+function renderSandboxEvaluationSummaryVisualization(summary) {
+  sandboxEvaluationSummaryViz.replaceChildren();
+  sandboxEvaluationSummaryViz.hidden = false;
+
+  const rows = [
+    ["passed", summary.passed, "ok"],
+    ["failed", summary.failed, "risk"],
+    ["skipped", summary.skipped, "warn"],
+    ["blocked", summary.blocked, "risk"],
+  ];
+
+  for (const [label, value, tone] of rows) {
+    const row = document.createElement("div");
+    const labelNode = document.createElement("span");
+    const bar = document.createElement("span");
+    const valueNode = document.createElement("span");
+
+    row.className = "sandbox-evaluation-bar-row";
+    row.dataset.barKey = label;
+    row.dataset.tone = tone;
+    labelNode.className = "sandbox-evaluation-bar-label";
+    labelNode.textContent = label;
+    bar.className = "sandbox-evaluation-text-bar";
+    bar.textContent = sandboxTextBar(value, summary.total);
+    valueNode.className = "sandbox-evaluation-bar-value";
+    valueNode.textContent = String(value);
+    row.append(labelNode, bar, valueNode);
+    sandboxEvaluationSummaryViz.appendChild(row);
+  }
+}
+
+function sandboxTextBar(value, total) {
+  const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0;
+  const safeTotal = Number.isFinite(total) ? Math.max(0, total) : 0;
+  const width = 10;
+
+  if (safeTotal <= 0) {
+    return "----------";
+  }
+
+  const filled = Math.max(0, Math.min(width, Math.round((safeValue / safeTotal) * width)));
+  return `${"#".repeat(filled)}${"-".repeat(width - filled)}`;
+}
+
+function renderSandboxQuickFilters(filters) {
+  sandboxEvaluationQuickFilters.replaceChildren();
+
+  for (const [groupKey, group] of Object.entries(SANDBOX_QUICK_FILTER_GROUPS)) {
+    const button = document.createElement("button");
+
+    button.type = "button";
+    button.className = "sandbox-evaluation-quick-filter";
+    button.dataset.filterGroup = groupKey;
+    button.title = group.description;
+    button.setAttribute("aria-pressed", String(filters.quickGroup === groupKey));
+    button.textContent = group.label;
+    button.addEventListener("click", () => {
+      currentSandboxQuickFilterGroup =
+        currentSandboxQuickFilterGroup === groupKey ? "all" : groupKey;
+      renderSandboxEvaluation(currentSandboxEvaluationReport);
+    });
+    sandboxEvaluationQuickFilters.appendChild(button);
+  }
+}
+
+function resetSandboxEvaluationFilters() {
+  sandboxEvaluationFixtureSet.value = "all";
+  sandboxEvaluationResultFilter.value = "all";
+  sandboxEvaluationTypeFilter.value = "all";
+  sandboxEvaluationBlockerFilter.value = "all";
+  currentSandboxQuickFilterGroup = "all";
+  sandboxEvaluationCopyStatus.hidden = true;
+  renderSandboxEvaluation(currentSandboxEvaluationReport);
+}
+
+async function copySandboxEvaluationSummary() {
+  const payload = buildSandboxVisibleSummaryPayload();
+
+  sandboxEvaluationCopyStatus.hidden = false;
+
+  if (!payload) {
+    sandboxEvaluationCopyStatus.textContent = "No sandbox trace loaded.";
+    return;
+  }
+
+  if (!navigator.clipboard?.writeText) {
+    sandboxEvaluationCopyStatus.textContent = "Clipboard unavailable in this browser.";
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+    sandboxEvaluationCopyStatus.textContent = "Visible sandbox summary copied.";
+  } catch (error) {
+    sandboxEvaluationCopyStatus.textContent = `Copy failed: ${error.message || String(error)}`;
+  }
+}
+
+function buildSandboxVisibleSummaryPayload() {
+  const report = currentSandboxEvaluationReport;
+
+  if (!report) {
+    return null;
+  }
+
+  const scenarios = Array.isArray(report.scenarios) ? report.scenarios : [];
+  const filters = currentSandboxEvaluationFilters();
+  const visibleScenarios = sandboxEvaluationFilteredScenarios(scenarios, filters);
+
+  return {
+    report_type: report.report_type,
+    phase: report.phase,
+    source: report.source,
+    filters,
+    counts: summarizeSandboxScenarios(visibleScenarios),
+    scenario_ids: visibleScenarios.map((scenario) => scenario.scenario_id),
+    scenarios: visibleScenarios.map((scenario) => ({
+      scenario_id: scenario.scenario_id,
+      scenario_name: scenario.scenario_name,
+      expected_outcome: scenario.expected_outcome,
+      actual_outcome: scenario.actual_outcome,
+      passed: scenario.passed,
+      gate_passed: scenario.gate_passed,
+      failure_reason_codes: sandboxCodes(scenario.failure_reason_codes),
+      blocker_codes: sandboxCodes(scenario.blocker_codes),
+      audit_event_names: sandboxCodes(scenario.audit_event_names),
+      dry_run: scenario.dry_run,
+      real_action_skipped: scenario.real_action_skipped,
+      post_action_verification_planned: scenario.post_action_verification_planned,
+      target_risk_hint: scenario.target_risk_hint,
+      target_confidence: scenario.target_confidence,
+      readiness_ready: scenario.readiness_ready,
+      action_type: scenario.action_type,
+    })),
+  };
+}
+
 function currentSandboxEvaluationFilters() {
   return {
     fixtureSet: sandboxEvaluationFixtureSet.value || "all",
     passFail: sandboxEvaluationResultFilter.value || "all",
     scenarioType: sandboxEvaluationTypeFilter.value || "all",
     blocker: sandboxEvaluationBlockerFilter.value || "all",
+    quickGroup: currentSandboxQuickFilterGroup || "all",
   };
 }
 
@@ -2238,7 +2485,11 @@ function sandboxScenarioMatchesFilters(scenario, filters = {}) {
     return false;
   }
 
-  return sandboxScenarioMatchesFixtureSet(scenario, fixtureSet);
+  if (!sandboxScenarioMatchesFixtureSet(scenario, fixtureSet)) {
+    return false;
+  }
+
+  return sandboxScenarioMatchesQuickGroup(scenario, filters.quickGroup || "all");
 }
 
 function sandboxScenarioMatchesFixtureSet(scenario, fixtureSet) {
@@ -2273,6 +2524,68 @@ function sandboxFixtureSetExists(fixtureSet) {
   return ["all", "gate_passed", "blocked", "skipped", "risk_confidence", "geometry"].includes(
     fixtureSet
   );
+}
+
+function sandboxScenarioMatchesQuickGroup(scenario, quickGroup) {
+  if (!quickGroup || quickGroup === "all") {
+    return true;
+  }
+
+  const scenarioType = sandboxScenarioType(scenario);
+  const blockerCodes = sandboxCodes(scenario.blocker_codes);
+  const failureReasons = sandboxCodes(scenario.failure_reason_codes);
+
+  if (quickGroup === "geometry") {
+    return (
+      scenarioType === "geometry" ||
+      blockerCodes.some((code) =>
+        [
+          "invalid_bbox",
+          "bbox_center_mismatch",
+          "coordinate_space_unknown",
+          "dpi_uncertain",
+          "stale_observation",
+          "missing_target",
+        ].includes(code)
+      )
+    );
+  }
+
+  if (quickGroup === "readiness") {
+    return scenarioType === "readiness_blocker" || blockerCodes.includes("preview_only_contract");
+  }
+
+  if (quickGroup === "approval") {
+    return (
+      blockerCodes.includes("high_risk_requires_approval") ||
+      blockerCodes.includes("unknown_risk_target") ||
+      failureReasons.includes("high_risk_target")
+    );
+  }
+
+  if (quickGroup === "risk") {
+    return (
+      scenarioType === "risk_confidence" ||
+      failureReasons.includes("high_risk_target") ||
+      failureReasons.includes("low_confidence_target") ||
+      scenario.target_risk_hint === "high_risk" ||
+      scenario.target_risk_hint === "unknown"
+    );
+  }
+
+  if (quickGroup === "scope") {
+    return (
+      scenarioType === "sandbox_scope" ||
+      failureReasons.includes("forbidden_action_type") ||
+      failureReasons.includes("outside_sandbox_scope")
+    );
+  }
+
+  if (quickGroup === "audit") {
+    return failureReasons.includes("missing_audit_plan");
+  }
+
+  return true;
 }
 
 function summarizeSandboxScenarios(scenarios) {
@@ -2424,6 +2737,7 @@ function sandboxActiveFilterDescription(filters = {}) {
     `result ${filters.passFail || "all"}`,
     `type ${filters.scenarioType || "all"}`,
     `blocker ${filters.blocker || "all"}`,
+    `quick group ${filters.quickGroup || "all"}`,
   ].join("; ");
 }
 

@@ -47,6 +47,10 @@ Phase 8.4 adds cockpit trace readability polish: clearer status chips, blocker
 severity/descriptions, compact summary cards, improved empty states, and more
 legible audit event chips. It is still read-only/debug-only.
 
+Phase 8.5 refines cockpit trace navigation with blocker-group quick filters,
+reset/copy-summary display controls, text mini-bars, and scenario grouping.
+It remains local-only UI behavior over the existing deterministic report.
+
 ## Completed
 
 - Observation / Understanding
@@ -69,6 +73,7 @@ legible audit event chips. It is still read-only/debug-only.
 - Phase 8.2 Sandbox Evaluation Cockpit Trace
 - Phase 8.3 Sandbox Trace Cockpit UX
 - Phase 8.4 Sandbox Trace UX Polish
+- Phase 8.5 Sandbox Trace UX Refinements
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -97,6 +102,7 @@ legible audit event chips. It is still read-only/debug-only.
 - Phase 8.2 cockpit trace exposure is read-only/debug-only.
 - Phase 8.3 sandbox trace UX is read-only/debug-only.
 - Phase 8.4 sandbox trace polish is read-only/debug-only.
+- Phase 8.5 sandbox trace refinements are read-only/debug-only.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -343,11 +349,36 @@ or safety boundaries.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions and
   `real_action_enabled = false` sandbox behavior.
 
+## Phase 8.5: Sandbox Trace UX Refinements
+
+Status: implemented as read-only cockpit navigation refinements.
+
+Goal: make sandbox evaluation traces easier to navigate while preserving the
+existing deterministic report shape and safety boundaries.
+
+- Add local-only quick filter chips for geometry, readiness, approval, risk,
+  scope, and audit-related sandbox blockers.
+- Add a reset filters control that only resets browser-side filter state.
+- Add a copy summary control that copies the currently visible deterministic
+  sandbox summary JSON/debug text; it does not call backend endpoints.
+- Add lightweight text bars for passed, failed, skipped, and blocked counts.
+- Group visible scenarios by scenario type or outcome to improve scanning.
+- Strengthen visual distinction between passed dry-runs, skipped non-dry-run
+  requests, blocked gates, and failed expectations.
+- Keep all fields sourced from the existing Phase 8.1/8.2 report; no second
+  sandbox trace format is introduced and existing `data-*` attributes remain
+  stable.
+- Keep every control local-only in the browser: no execute button, no approval
+  button, no real-action toggle, no sandbox path to `/execute`, and no desktop
+  control API.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions and
+  `real_action_enabled = false` sandbox behavior.
+
 ## Phase 9: Limited Desktop Control
 
-Goal: consider narrow desktop control only after the Phase 8/8.1/8.2/8.3/8.4
-dry-run framework, evaluation, and cockpit trace UX are reliable and the Phase
-7 real-action checklist is satisfied.
+Goal: consider narrow desktop control only after the Phase 8/8.1/8.2/8.3/8.4/
+8.5 dry-run framework, evaluation, and cockpit trace UX are reliable and the
+Phase 7 real-action checklist is satisfied.
 
 - Enable click, type, hotkey, and scroll only as individually gated
   capabilities.
