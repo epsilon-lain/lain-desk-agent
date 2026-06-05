@@ -287,7 +287,50 @@
                 </button>
               </div>
               <p class="planner-evaluation-status" id="sandboxEvaluationStatus">Not loaded yet.</p>
+              <div class="sandbox-evaluation-controls" id="sandboxEvaluationControls" hidden>
+                <label>
+                  Fixture set
+                  <select id="sandboxEvaluationFixtureSet">
+                    <option value="all">all deterministic fixtures</option>
+                    <option value="gate_passed">gate passed fixtures</option>
+                    <option value="blocked">blocked fixtures</option>
+                    <option value="skipped">real-action skipped fixture</option>
+                    <option value="risk_confidence">risk/confidence blockers</option>
+                    <option value="geometry">geometry blockers</option>
+                  </select>
+                </label>
+                <label>
+                  Result
+                  <select id="sandboxEvaluationResultFilter">
+                    <option value="all">all pass/fail states</option>
+                    <option value="pass">pass only</option>
+                    <option value="fail">fail only</option>
+                  </select>
+                </label>
+                <label>
+                  Scenario type
+                  <select id="sandboxEvaluationTypeFilter">
+                    <option value="all">all scenario types</option>
+                  </select>
+                </label>
+                <label>
+                  Blocker
+                  <select id="sandboxEvaluationBlockerFilter">
+                    <option value="all">all blockers</option>
+                  </select>
+                </label>
+                <div class="sandbox-evaluation-detail-actions" aria-label="Scenario detail controls">
+                  <button class="planner-evaluation-button" id="expandSandboxScenarios" type="button">
+                    Expand
+                  </button>
+                  <button class="planner-evaluation-button" id="collapseSandboxScenarios" type="button">
+                    Collapse
+                  </button>
+                </div>
+              </div>
+              <div class="sandbox-evaluation-counts" id="sandboxEvaluationCounts" hidden></div>
               <dl class="planner-evaluation-summary" id="sandboxEvaluationSummary" hidden></dl>
+              <div class="sandbox-evaluation-timeline" id="sandboxEvaluationTimeline" hidden></div>
               <div class="planner-evaluation-results" id="sandboxEvaluationResults" aria-live="polite"></div>
             </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">

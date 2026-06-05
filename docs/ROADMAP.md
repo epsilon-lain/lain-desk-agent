@@ -39,6 +39,10 @@ failure reasons and audit event ordering.
 Phase 8.2 exposes that sandbox evaluation trace in the cockpit as read-only
 debug output. It does not add execution controls or real-action permissions.
 
+Phase 8.3 polishes that cockpit trace with read-only filters, fixture-set
+views, summary counts, collapsible scenario details, and audit event sequence
+views. It does not add execution controls or real-action permissions.
+
 ## Completed
 
 - Observation / Understanding
@@ -59,6 +63,7 @@ debug output. It does not add execution controls or real-action permissions.
 - Phase 8 Dry-run Sandbox Experiment Framework
 - Phase 8.1 Sandbox Evaluation Trace
 - Phase 8.2 Sandbox Evaluation Cockpit Trace
+- Phase 8.3 Sandbox Trace Cockpit UX
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -85,6 +90,7 @@ debug output. It does not add execution controls or real-action permissions.
 - Phase 8 sandbox experiments are dry-run or skipped only.
 - Phase 8.1 sandbox evaluation is fixture-only and performs no actions.
 - Phase 8.2 cockpit trace exposure is read-only/debug-only.
+- Phase 8.3 sandbox trace UX is read-only/debug-only.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -286,11 +292,34 @@ without adding any real-action path.
   observation, no actuation, and no desktop control API.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions.
 
+## Phase 8.3: Sandbox Trace Cockpit UX
+
+Status: implemented as read-only cockpit UX polish.
+
+Goal: make deterministic sandbox evaluation traces easier to inspect without
+adding any execution path.
+
+- Add cockpit filters for pass/fail, fixture set, scenario type, and blocker
+  code.
+- Show summary counts for total, visible, passed, failed, and real-action
+  skipped scenarios.
+- Render scenario cards with stable trace fields for expected versus actual
+  outcome, failure reason codes, blocker codes, audit event names, dry-run
+  state, real-action-skipped state, post-action verification planning, target
+  risk/confidence, readiness state, and action type.
+- Add read-only expand/collapse controls for scenario details.
+- Add per-scenario and visible-scenario audit event sequence views.
+- Keep all controls local to deterministic report display: no execute button,
+  no approval button, no real-action toggle, no sandbox path to `/execute`, and
+  no desktop control API.
+- Preserve `real_action_enabled = false` fixture behavior and disabled
+  click/type/hotkey/scroll/switch_app permissions.
+
 ## Phase 9: Limited Desktop Control
 
-Goal: consider narrow desktop control only after the Phase 8/8.1/8.2 dry-run
-framework, evaluation, and cockpit trace are reliable and the Phase 7
-real-action checklist is satisfied.
+Goal: consider narrow desktop control only after the Phase 8/8.1/8.2/8.3
+dry-run framework, evaluation, and cockpit trace UX are reliable and the Phase
+7 real-action checklist is satisfied.
 
 - Enable click, type, hotkey, and scroll only as individually gated
   capabilities.

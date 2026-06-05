@@ -310,6 +310,22 @@ Permission Profile, Execution Policy, Action Contract behavior, Click
 Readiness, or the Phase 7 gate. It only makes deterministic gate behavior
 inspectable before any future real-action adapter is considered.
 
+### Phase 8.3 Sandbox Trace Cockpit UX
+
+Phase 8.3 keeps the Phase 8.2 cockpit endpoint and Phase 8.1 report format
+unchanged, then improves only the read-only presentation layer. The sandbox
+trace panel filters the deterministic report by fixture set, pass/fail state,
+scenario type, and blocker code. It also shows summary counts, stable
+scenario-level trace fields, collapsible scenario details, and sequential audit
+event views.
+
+All Phase 8.3 controls are local display controls. Filtering, expand/collapse,
+and audit timeline rendering operate on the already loaded JSON report. They
+do not call `/execute`, do not record approvals, do not change
+`real_action_enabled`, do not mutate Capability Registry, Permission Profile,
+Execution Policy, Action Contract behavior, or Click Readiness, and do not
+import any desktop control API.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -326,6 +342,8 @@ The current safety boundaries are intentionally narrow:
   execution path.
 - Phase 8.2 sandbox evaluation cockpit trace is read-only debug output, not an
   execution path.
+- Phase 8.3 sandbox trace filters and detail controls are read-only display
+  controls, not execution controls.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

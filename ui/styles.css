@@ -1302,6 +1302,138 @@ button {
   opacity: 0.6;
 }
 
+.sandbox-evaluation-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+  border-top: 1px solid rgba(134, 184, 220, 0.18);
+  padding-top: 10px;
+}
+
+.sandbox-evaluation-controls[hidden] {
+  display: none;
+}
+
+.sandbox-evaluation-controls label {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  color: var(--blue);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.sandbox-evaluation-controls select {
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid rgba(135, 244, 255, 0.32);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: rgba(5, 13, 22, 0.82);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.sandbox-evaluation-controls select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.sandbox-evaluation-detail-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sandbox-evaluation-detail-actions .planner-evaluation-button {
+  width: 100%;
+  max-width: none;
+}
+
+.sandbox-evaluation-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sandbox-evaluation-counts[hidden] {
+  display: none;
+}
+
+.sandbox-evaluation-count,
+.sandbox-evaluation-badge {
+  display: inline-flex;
+  min-width: 0;
+  border: 1px solid rgba(134, 184, 220, 0.24);
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: rgba(2, 8, 14, 0.3);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.sandbox-evaluation-count[data-tone="ok"],
+.sandbox-evaluation-badge[data-tone="ok"] {
+  border-color: rgba(135, 244, 255, 0.42);
+  color: var(--accent);
+}
+
+.sandbox-evaluation-count[data-tone="warn"],
+.sandbox-evaluation-badge[data-tone="warn"] {
+  border-color: rgba(255, 198, 109, 0.56);
+  color: #ffd89a;
+}
+
+.sandbox-evaluation-count[data-tone="risk"],
+.sandbox-evaluation-badge[data-tone="risk"] {
+  border-color: rgba(255, 115, 95, 0.74);
+  color: #ffd6d0;
+}
+
+.sandbox-evaluation-timeline {
+  min-width: 0;
+  max-height: 160px;
+  margin-top: 10px;
+  border: 1px solid rgba(134, 184, 220, 0.18);
+  border-radius: 8px;
+  padding: 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: rgba(2, 8, 14, 0.18);
+}
+
+.sandbox-evaluation-timeline[hidden] {
+  display: none;
+}
+
+.sandbox-evaluation-timeline-title,
+.sandbox-evaluation-audit-title,
+.sandbox-evaluation-card-subtitle,
+.sandbox-evaluation-compact-line {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.sandbox-evaluation-timeline-list,
+.sandbox-evaluation-audit-list {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .planner-evaluation-summary,
 .planner-evaluation-facts {
   display: grid;
@@ -1379,6 +1511,49 @@ button {
   font-size: 13px;
   line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+.sandbox-evaluation-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+}
+
+.sandbox-evaluation-card-title-block {
+  min-width: 0;
+}
+
+.sandbox-evaluation-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sandbox-evaluation-compact-line {
+  margin-top: 8px;
+}
+
+.sandbox-evaluation-scenario-details {
+  min-width: 0;
+  margin-top: 8px;
+  border-top: 1px solid rgba(134, 184, 220, 0.18);
+  padding-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sandbox-evaluation-scenario-details summary {
+  cursor: pointer;
+  color: var(--blue);
+  line-height: 1.35;
+}
+
+.sandbox-evaluation-audit {
+  min-width: 0;
+  margin-top: 10px;
+  border-top: 1px solid rgba(134, 184, 220, 0.18);
+  padding-top: 10px;
 }
 
 .planner-evaluation-facts div {
@@ -1882,6 +2057,7 @@ button {
   .planner-context-facts div,
   .planner-trace-facts,
   .planner-evaluation-header,
+  .sandbox-evaluation-controls,
   .planner-evaluation-summary,
   .planner-evaluation-facts div,
   .click-readiness-check {

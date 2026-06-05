@@ -83,7 +83,9 @@ REQUIRED_RESULT_FIELDS = {
 }
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+UI_INDEX_HTML = PROJECT_ROOT / "ui" / "index.html"
 UI_APP_JS = PROJECT_ROOT / "ui" / "app.js"
+UI_STYLES_CSS = PROJECT_ROOT / "ui" / "styles.css"
 
 
 class SandboxEvaluationTests(unittest.TestCase):
@@ -403,6 +405,109 @@ class SandboxEvaluationTests(unittest.TestCase):
         ]:
             with self.subTest(fragment=forbidden_fragment):
                 self.assertNotIn(forbidden_fragment, sandbox_ui_source)
+
+    def test_cockpit_ui_sandbox_trace_has_phase83_controls(self) -> None:
+        html = UI_INDEX_HTML.read_text(encoding="utf-8")
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = UI_STYLES_CSS.read_text(encoding="utf-8")
+
+        for element_id in [
+            "sandboxEvaluationFixtureSet",
+            "sandboxEvaluationResultFilter",
+            "sandboxEvaluationTypeFilter",
+            "sandboxEvaluationBlockerFilter",
+            "expandSandboxScenarios",
+            "collapseSandboxScenarios",
+            "sandboxEvaluationCounts",
+            "sandboxEvaluationTimeline",
+        ]:
+            with self.subTest(element_id=element_id):
+                self.assertIn(f'id="{element_id}"', html)
+                self.assertIn(f"#{element_id}", source)
+
+        for function_name in [
+            "sandboxEvaluationFilteredScenarios",
+            "sandboxScenarioMatchesFilters",
+            "sandboxScenarioMatchesFixtureSet",
+            "renderSandboxEvaluationTimeline",
+            "setSandboxScenarioDetailsOpen",
+        ]:
+            with self.subTest(function_name=function_name):
+                self.assertIn(f"function {function_name}", source)
+
+        self.assertIn(".sandbox-evaluation-controls", styles)
+        self.assertIn(".sandbox-evaluation-scenario-details", styles)
+
+    def test_cockpit_ui_sandbox_trace_exposes_required_dom_fields(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+
+        required_dataset_fields = [
+            "scenarioId",
+            "scenarioName",
+            "passFail",
+            "expectedOutcome",
+            "actualOutcome",
+            "failureReasonCodes",
+            "blockerCodes",
+            "auditEventNames",
+            "dryRun",
+            "realActionSkipped",
+            "postActionVerificationPlanned",
+            "targetRiskHint",
+            "targetConfidence",
+            "readinessReady",
+            "actionType",
+            "scenarioType",
+        ]
+        for field in required_dataset_fields:
+            with self.subTest(field=field):
+                self.assertIn(f"card.dataset.{field}", source)
+
+        for visible_label in [
+            "Failure reasons",
+            "Blockers",
+            "Audit events",
+            "Dry-run",
+            "Real action",
+            "Post verify",
+            "Target",
+            "Readiness",
+        ]:
+            with self.subTest(label=visible_label):
+                self.assertIn(f'"{visible_label}"', source)
+
+    def test_cockpit_ui_sandbox_filters_and_detail_controls_are_read_only(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        start = source.index("async function loadSandboxEvaluation")
+        end = source.index("function setPlannerEvaluationSummary", start)
+        sandbox_ui_source = source[start:end]
+
+        for control in [
+            "sandboxEvaluationFixtureSet",
+            "sandboxEvaluationResultFilter",
+            "sandboxEvaluationTypeFilter",
+            "sandboxEvaluationBlockerFilter",
+        ]:
+            with self.subTest(control=control):
+                self.assertIn(f'{control}.addEventListener("change"', source)
+
+        self.assertIn('expandSandboxScenarios.addEventListener("click"', source)
+        self.assertIn('collapseSandboxScenarios.addEventListener("click"', source)
+        self.assertIn('details[data-sandbox-scenario-details', sandbox_ui_source)
+
+        for forbidden_fragment in [
+            "real_action_enabled = true",
+            "realActionEnabled = true",
+            "click(",
+            "type(",
+            "hotkey",
+            "switch_app",
+        ]:
+            with self.subTest(fragment=forbidden_fragment):
+                if forbidden_fragment in {"click(", "type("}:
+                    self.assertNotIn(f"desktop.{forbidden_fragment}", sandbox_ui_source)
+                else:
+                    self.assertNotIn(forbidden_fragment, sandbox_ui_source)
 
 
 if __name__ == "__main__":
