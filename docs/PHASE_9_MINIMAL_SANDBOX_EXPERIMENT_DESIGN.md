@@ -37,6 +37,12 @@ suspicious sensitive key names, then reconstructs the deterministic audit trace.
 It does not upload bundles, read local files, observe live OS state, execute
 code, call an action-performing endpoint, or mutate runtime state.
 
+Phase 9.6 hardens that import/replay validation path. Imported bundles are
+treated as untrusted input, so validation now records structured errors,
+warnings, unsafe flags, consistency checks, audit-order checks, sensitive-key
+findings, replay eligibility, and recommended debug focus before any read-only
+replay report is considered valid.
+
 ## Purpose
 
 Define a minimal, reviewable sandbox experiment plan that can validate the
@@ -451,6 +457,30 @@ The Phase 9.5 replay path is not execution permission. Invalid, suspicious,
 real-action-enabled, or non-dry-run bundles are blocked. Valid bundles only
 produce debug output that mirrors Phase 9.4 report fields and replay metadata.
 Real desktop actions remain disabled.
+
+## Phase 9.6 Replay Validation Hardening Status
+
+Phase 9.6 is implemented as deeper read-only validation for imported bundles:
+
+- Required bundle fields, report fields, `report_version`, `project_phase`, and
+  safety-boundary text are checked before replay.
+- Dry-run, real-action-disabled, skipped-path, gate/outcome, failure/blocker,
+  readiness/blocker, target risk/confidence, action type, sandbox scope, and
+  approval/emergency/verification/rollback consistency are checked.
+- Audit order checks verify required event presence and the expected order for
+  request, approval, emergency stop, gate result, verification, rollback,
+  completion, blocked, and skipped events.
+- Validation emits stable errors, warnings, unsafe flags, consistency checks,
+  audit-order checks, sensitive-key findings, read-only replay eligibility, and
+  recommended debug focus.
+- The cockpit renders these validation summaries locally for debugging and
+  handoff only.
+
+Phase 9.6 still does not grant execution permission. It does not upload
+bundles, read local files, observe live OS state, execute code, call an
+action-performing endpoint, add approval/execute/real-action controls, or
+change Execution Policy, Permission Profile, Capability Registry, Action
+Contract behavior, Click Readiness, or the Phase 7 gate.
 
 ## Implementation Guardrails
 

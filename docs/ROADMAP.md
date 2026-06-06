@@ -584,6 +584,35 @@ audit timeline without uploading data or changing runtime behavior.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions and
   `real_action_enabled = false` default behavior.
 
+## Phase 9.6: Replay Validation Hardening
+
+Status: implemented as deeper read-only validation for imported Phase 9
+bundles.
+
+Goal: make imported Phase 9 reproducibility bundles safer and more trustworthy
+for debugging, regression testing, reproducibility, and AI-assisted handoff
+without changing runtime behavior.
+
+- Treat imported bundles as untrusted input and keep validation deterministic.
+- Extend the existing Phase 9.5 validation result format with structured
+  warnings, unsafe flags, consistency checks, audit-order checks,
+  sensitive-key findings, read-only replay eligibility, and recommended debug
+  focus.
+- Validate dry-run state, real-action-disabled state, skipped-path consistency,
+  gate/outcome consistency, failure/blocker code relationships, audit event
+  ordering, required audit events, approval/emergency/verification/rollback
+  consistency, target risk/confidence, readiness/blocker consistency, sandbox
+  scope sanity, allowed action type, project phase, report version, and
+  safety-boundary text.
+- Add cockpit read-only validation hardening display for pass/fail, errors,
+  warnings, unsafe flags, audit order status, sensitive key findings,
+  recommended debug focus, and expandable validation details.
+- Keep every control read-only: no execute button, approval button,
+  real-action toggle, sandbox action trigger, `/execute` call, mutation
+  endpoint, upload endpoint, filesystem read, or action-performing endpoint.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions and
+  `real_action_enabled = false` default behavior.
+
 ## Phase 10: Limited Desktop Control
 
 Goal: consider narrow desktop control only after the Phase 7 checklist and

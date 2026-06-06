@@ -694,6 +694,137 @@ class Phase9ExperimentTests(unittest.TestCase):
         self.assertEqual(replay_report["replayed_audit_timeline"], [])
         self.assertFalse(replay_report["safety_boundary_confirmed"])
 
+    def test_phase9_replay_validation_summary_contains_stable_hardening_fields(self) -> None:
+        bundle = build_phase9_reproducibility_bundle(evaluate_phase9_experiment_scenarios())
+        replay_report = replay_phase9_reproducibility_bundle(bundle)
+        summary = replay_report["replay_validation_summary"]
+        validation = replay_report["validation"]
+
+        for field_name in [
+            "validation_passed",
+            "validation_errors",
+            "validation_warnings",
+            "unsafe_flags_detected",
+            "consistency_checks",
+            "audit_order_checks",
+            "sensitive_key_findings",
+            "replay_allowed_as_read_only",
+            "recommended_debug_focus",
+        ]:
+            with self.subTest(field_name=field_name):
+                self.assertIn(field_name, summary)
+                self.assertIn(field_name, validation)
+
+        self.assertTrue(summary["validation_passed"])
+        self.assertTrue(summary["replay_allowed_as_read_only"])
+        self.assertEqual(summary["unsafe_flags_detected"], [])
+        self.assertGreater(len(summary["consistency_checks"]), 0)
+        self.assertGreater(len(summary["audit_order_checks"]), 0)
+
+    def test_phase9_deeper_validation_detects_unsafe_and_inconsistent_bundles(self) -> None:
+        base_bundle = build_phase9_reproducibility_bundle(evaluate_phase9_experiment_scenarios())
+        cases = [
+            (
+                "dry_run_false",
+                lambda bundle: bundle["phase9_report"].update({"dry_run": False}),
+                {"non_dry_run_bundle", "unsafe_bundle_flags"},
+            ),
+            (
+                "real_action_enabled_true",
+                lambda bundle: bundle["phase9_report"].update({"real_action_enabled": True}),
+                {"real_action_enabled_in_bundle", "unsafe_bundle_flags"},
+            ),
+            (
+                "high_risk_gate_passed",
+                lambda bundle: _mutate_phase9_scenario(
+                    bundle,
+                    "dry_run_success_all_gates_pass",
+                    {"target_risk_hint": "high_risk"},
+                ),
+                {"high_risk_marked_gate_passed"},
+            ),
+            (
+                "missing_approval_gate_passed",
+                lambda bundle: _mutate_phase9_scenario(
+                    bundle,
+                    "dry_run_success_all_gates_pass",
+                    {"user_approval_present": False},
+                ),
+                {"approval_missing_but_gate_passed"},
+            ),
+            (
+                "readiness_ready_with_blockers",
+                lambda bundle: _mutate_phase9_scenario(
+                    bundle,
+                    "dry_run_success_all_gates_pass",
+                    {"readiness_ready": True, "blocker_codes": ["stale_observation"]},
+                ),
+                {"readiness_ready_with_blockers"},
+            ),
+            (
+                "unsafe_action_type",
+                lambda bundle: _mutate_phase9_scenario(
+                    bundle,
+                    "dry_run_success_all_gates_pass",
+                    {"action_type": "hotkey"},
+                ),
+                {"unsafe_action_type"},
+            ),
+            (
+                "audit_out_of_order",
+                lambda bundle: _move_phase9_event_to_front(
+                    bundle,
+                    "dry_run_success_all_gates_pass",
+                    EVENT_PHASE9_GATE_PASSED,
+                ),
+                {"inconsistent_audit_order"},
+            ),
+            (
+                "missing_required_audit_event",
+                lambda bundle: _remove_phase9_event(
+                    bundle,
+                    "dry_run_success_all_gates_pass",
+                    EVENT_PHASE9_EXPERIMENT_REQUESTED,
+                ),
+                {"missing_required_audit_event"},
+            ),
+            (
+                "recursive_sensitive_key",
+                lambda bundle: bundle["phase9_report"]["sandbox_scope"].update(
+                    {"nested": {"access_key": "redacted"}}
+                ),
+                {"suspicious_sensitive_key"},
+            ),
+        ]
+
+        for case_name, mutate, expected_codes in cases:
+            with self.subTest(case_name=case_name):
+                bundle = json.loads(json.dumps(base_bundle))
+                mutate(bundle)
+                validation = validate_phase9_reproducibility_bundle(bundle)
+                self.assertFalse(validation["valid"])
+                self.assertTrue(expected_codes.issubset(set(validation["error_codes"])))
+                self.assertFalse(validation["validation_summary"]["replay_allowed_as_read_only"])
+
+    def test_phase9_malformed_bundle_validation_does_not_crash(self) -> None:
+        validation = validate_phase9_reproducibility_bundle(
+            {
+                "bundle_type": "phase9_reproducibility_bundle",
+                "bundle_version": PHASE9_EXPORT_BUNDLE_VERSION,
+                "report_version": PHASE9_EXPORT_REPORT_VERSION,
+                "project_phase": PHASE9_EXPORT_PROJECT_PHASE,
+                "phase9_report": {"audit_timeline": [None]},
+                "ai_readable_summary": "",
+                "minimal_reproduction_metadata": {"audit_event_order": "bad"},
+                "safety_boundary_statement": "",
+            }
+        )
+
+        self.assertFalse(validation["valid"])
+        self.assertIn("malformed_audit_event", validation["error_codes"])
+        self.assertIn("validation_summary", validation)
+        self.assertFalse(validation["validation_summary"]["validation_passed"])
+
     def test_phase9_cockpit_endpoint_is_read_only_and_stable(self) -> None:
         server = create_server("127.0.0.1", 0)
         host, port = server.server_address
@@ -780,8 +911,11 @@ class Phase9ExperimentTests(unittest.TestCase):
             "clearPhase9Bundle",
             "phase9ReplayStatus",
             "phase9ReplayErrors",
+            "phase9ReplayValidationCounts",
             "phase9ReplaySummary",
             "phase9ReplayTimeline",
+            "phase9ReplayValidationDetails",
+            "phase9ReplayValidationJson",
             "phase9QuickFilters",
             "phase9ExportCopyStatus",
             "phase9Counts",
@@ -819,6 +953,7 @@ class Phase9ExperimentTests(unittest.TestCase):
             "Copy replay report",
             "Copy replay AI summary",
             "Clear imported bundle",
+            "Replay validation details",
         ]:
             with self.subTest(visible_label=visible_label):
                 self.assertIn(visible_label, source + html)
@@ -970,6 +1105,16 @@ class Phase9ExperimentTests(unittest.TestCase):
             "renderPhase9ReplayValidation",
             "renderPhase9ReplayReport",
             "renderPhase9ReplayTimeline",
+            "renderPhase9ReplayValidationCounts",
+            "renderPhase9ReplayValidationDetails",
+            "phase9ReplayCheckStatus",
+            "validatePhase9DeepConsistency",
+            "validatePhase9ReportLevelConsistency",
+            "validatePhase9AuditOrderConsistency",
+            "validatePhase9ReportAuditConsistency",
+            "phase9RecordValidationCheck",
+            "phase9UnsafeFlagsDetected",
+            "phase9ValidationDebugFocus",
             "phase9ReplayAuditEventDetails",
             "phase9ReplayAuditEventRows",
             "copyPhase9ReplayPayload",
@@ -990,12 +1135,31 @@ class Phase9ExperimentTests(unittest.TestCase):
             "malformed_audit_event",
             "malformed_blocker_codes",
             "unsupported_bundle_version",
+            "inconsistent_gate_outcome",
+            "inconsistent_real_action_flags",
+            "inconsistent_audit_order",
+            "missing_required_audit_event",
+            "blocker_without_failure_reason",
+            "failure_reason_without_blocker",
+            "readiness_ready_with_blockers",
+            "high_risk_marked_gate_passed",
+            "unknown_risk_marked_gate_passed",
+            "approval_missing_but_gate_passed",
+            "emergency_stop_missing_but_gate_passed",
+            "verification_missing_but_gate_passed",
+            "rollback_missing_but_gate_passed",
+            "unsafe_action_type",
+            "unsafe_bundle_flags",
+            "validation_summary",
+            "recommended_debug_focus",
             "phase9_repro_bundle_v1",
             "phase9_replay_v1",
             "phase_9_5",
             "phase9ReplayTimeline",
             "phase9ReplayEvent",
             "phase9ReplayValidationError",
+            "phase9ReplayValidationCount",
+            "phase9ReplayValidationDetails",
             "phase9ReplayAuditEventDetails",
         ]:
             with self.subTest(required_string=required_string):
@@ -1005,6 +1169,7 @@ class Phase9ExperimentTests(unittest.TestCase):
             ".phase9-replay-panel",
             ".phase9-replay-input",
             ".phase9-replay-errors",
+            ".phase9-replay-validation-details",
         ]:
             with self.subTest(css_selector=css_selector):
                 self.assertIn(css_selector, styles)
@@ -1252,6 +1417,78 @@ def _blocked_readiness(*blocker_codes: str) -> dict[str, object]:
 
 def _phase7_checklist() -> dict[str, bool]:
     return {item: True for item in REQUIRED_PHASE7_CHECKLIST_ITEMS}
+
+
+def _mutate_phase9_scenario(
+    bundle: dict[str, object],
+    scenario_id: str,
+    updates: dict[str, object],
+) -> None:
+    for scenario in bundle["phase9_report"]["scenarios"]:
+        if scenario["scenario_id"] == scenario_id:
+            scenario.update(updates)
+            scenario["actual_outcome"].update(
+                {
+                    key: value
+                    for key, value in updates.items()
+                    if key
+                    in {
+                        "gate_passed",
+                        "dry_run",
+                        "real_action_enabled",
+                        "real_action_skipped",
+                        "failure_reason_codes",
+                        "blocker_codes",
+                    }
+                }
+            )
+            return
+    raise AssertionError(f"Missing Phase 9 scenario {scenario_id}")
+
+
+def _move_phase9_event_to_front(
+    bundle: dict[str, object],
+    scenario_id: str,
+    event_name: str,
+) -> None:
+    scenario = _phase9_scenario_from_bundle(bundle, scenario_id)
+    events = scenario["audit_event_names"]
+    events.remove(event_name)
+    events.insert(0, event_name)
+    scenario["audit_timeline"] = _scenario_timeline_from_event_names(scenario)
+
+
+def _remove_phase9_event(
+    bundle: dict[str, object],
+    scenario_id: str,
+    event_name: str,
+) -> None:
+    scenario = _phase9_scenario_from_bundle(bundle, scenario_id)
+    scenario["audit_event_names"] = [
+        candidate for candidate in scenario["audit_event_names"] if candidate != event_name
+    ]
+    scenario["audit_timeline"] = _scenario_timeline_from_event_names(scenario)
+
+
+def _phase9_scenario_from_bundle(bundle: dict[str, object], scenario_id: str) -> dict[str, object]:
+    for scenario in bundle["phase9_report"]["scenarios"]:
+        if scenario["scenario_id"] == scenario_id:
+            return scenario
+    raise AssertionError(f"Missing Phase 9 scenario {scenario_id}")
+
+
+def _scenario_timeline_from_event_names(scenario: dict[str, object]) -> list[dict[str, object]]:
+    return [
+        {
+            "order": index + 1,
+            "scenario_id": scenario["scenario_id"],
+            "event_name": event_name,
+            "gate_passed": scenario["gate_passed"],
+            "failure_reason_codes": list(scenario["failure_reason_codes"]),
+            "blocker_codes": list(scenario["blocker_codes"]),
+        }
+        for index, event_name in enumerate(scenario["audit_event_names"])
+    ]
 
 
 if __name__ == "__main__":

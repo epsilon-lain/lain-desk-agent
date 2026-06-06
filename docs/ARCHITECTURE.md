@@ -493,6 +493,26 @@ replay report or AI-readable summary from browser memory. The panel does not
 upload bundles, add approval or execute controls, record approvals, mutate
 runtime state, or create a real-action trigger.
 
+### Phase 9.6 Replay Validation Hardening
+
+Phase 9.6 treats imported Phase 9 bundles as untrusted debug input and hardens
+the existing Phase 9.5 validation format instead of creating a second replay
+schema. Validation now includes deeper consistency checks for report version,
+project phase, dry-run state, real-action-disabled state, skipped-state
+consistency, gate/outcome consistency, failure and blocker code relationships,
+audit event ordering, approval/emergency/verification/rollback state, target
+risk and confidence, readiness and blockers, sandbox scope, action type, and
+safety-boundary text.
+
+The validation result includes structured errors, warnings, unsafe flag
+findings, consistency check records, audit-order check records, sensitive-key
+findings, read-only replay eligibility, and a recommended debug focus derived
+only from validation findings and existing blocker/failure codes. The cockpit
+shows these details as read-only chips, counts, and expandable JSON/debug
+details. Phase 9.6 still does not upload bundles, observe the live desktop,
+read local files, execute code, call action-performing endpoints, record
+approvals, or modify any execution policy.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -530,6 +550,9 @@ The current safety boundaries are intentionally narrow:
 - Phase 9.5 Phase 9 bundle import and replay is read-only validation/debug
   output; it is not execution permission and it never attempts real desktop
   action.
+- Phase 9.6 Phase 9 replay validation hardening is read-only validation/debug
+  output for untrusted imported bundles; it is not execution permission and it
+  never attempts real desktop action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

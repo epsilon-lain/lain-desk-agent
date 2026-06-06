@@ -86,6 +86,7 @@ PHASE9_REPORT_FIELDS = (
 DEFAULT_ALLOWED_WINDOW_ID = "sandbox_window"
 DEFAULT_ALLOWED_TARGET_ID = "sandbox_target_button"
 DEFAULT_ALLOWED_ACTION_TYPE = "click"
+PHASE9_REPLAY_ALLOWED_ACTION_TYPES = (DEFAULT_ALLOWED_ACTION_TYPE, "mixed")
 PHASE9_DEMO_NOW = datetime(2026, 1, 1, 0, 0, 5, tzinfo=timezone.utc)
 PHASE9_DEMO_OBSERVATION_TIMESTAMP = "2026-01-01T00:00:00Z"
 PHASE9_DEMO_OBSERVATION_ID = "phase9_observation_0001"
@@ -744,6 +745,8 @@ def validate_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, 
 
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
+    consistency_checks: list[dict[str, Any]] = []
+    audit_order_checks: list[dict[str, Any]] = []
 
     if not isinstance(bundle, dict):
         _phase9_validation_error(
@@ -752,7 +755,9 @@ def validate_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, 
             "bundle",
             "Bundle must be a JSON object.",
         )
-        return _phase9_bundle_validation_result(bundle, errors, warnings)
+        return _phase9_bundle_validation_result(
+            bundle, errors, warnings, consistency_checks, audit_order_checks
+        )
 
     for field_name in PHASE9_BUNDLE_REQUIRED_FIELDS:
         if field_name not in bundle:
@@ -789,7 +794,9 @@ def validate_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, 
             "phase9_report",
             "Bundle must contain a Phase 9 export report object.",
         )
-        return _phase9_bundle_validation_result(bundle, errors, warnings)
+        return _phase9_bundle_validation_result(
+            bundle, errors, warnings, consistency_checks, audit_order_checks
+        )
 
     report_version = str(bundle.get("report_version") or "")
     if report_version != PHASE9_EXPORT_REPORT_VERSION:
@@ -807,6 +814,24 @@ def validate_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, 
             "invalid_report_version",
             "phase9_report.report_version",
             f"Expected {PHASE9_EXPORT_REPORT_VERSION}.",
+        )
+
+    project_phase = str(bundle.get("project_phase") or "")
+    if project_phase and project_phase != PHASE9_EXPORT_PROJECT_PHASE:
+        _phase9_validation_error(
+            errors,
+            "unsupported_project_phase",
+            "project_phase",
+            f"Expected {PHASE9_EXPORT_PROJECT_PHASE}.",
+        )
+
+    report_project_phase = str(phase9_report.get("project_phase") or "")
+    if report_project_phase and report_project_phase != PHASE9_EXPORT_PROJECT_PHASE:
+        _phase9_validation_error(
+            errors,
+            "unsupported_project_phase",
+            "phase9_report.project_phase",
+            f"Expected {PHASE9_EXPORT_PROJECT_PHASE}.",
         )
 
     for field_name in PHASE9_IMPORTED_REPORT_REQUIRED_FIELDS:
@@ -827,6 +852,12 @@ def validate_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, 
             "phase9_report.real_action_enabled",
             "Imported bundles must keep real action disabled.",
         )
+        _phase9_validation_error(
+            errors,
+            "unsafe_bundle_flags",
+            "phase9_report.real_action_enabled",
+            "Unsafe real-action flag detected in imported bundle.",
+        )
 
     actual_outcome = phase9_report.get("actual_outcome")
     if (
@@ -839,6 +870,12 @@ def validate_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, 
             "non_dry_run_bundle",
             "phase9_report.dry_run",
             "Imported bundles must remain dry-run and never show real action attempted.",
+        )
+        _phase9_validation_error(
+            errors,
+            "unsafe_bundle_flags",
+            "phase9_report.dry_run",
+            "Unsafe dry-run or real-action-attempted flag detected in imported bundle.",
         )
 
     if not _is_string_list(phase9_report.get("failure_reason_codes")):
@@ -894,7 +931,18 @@ def validate_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, 
             "Bundle must include the Phase 9 safety boundary statement.",
         )
 
-    return _phase9_bundle_validation_result(bundle, errors, warnings)
+    _validate_phase9_deep_consistency(
+        bundle,
+        phase9_report,
+        errors,
+        warnings,
+        consistency_checks,
+        audit_order_checks,
+    )
+
+    return _phase9_bundle_validation_result(
+        bundle, errors, warnings, consistency_checks, audit_order_checks
+    )
 
 
 def import_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
@@ -959,6 +1007,7 @@ def build_phase9_replay_report(bundle: dict[str, Any]) -> dict[str, Any]:
         "original_audit_event_names": _string_list(phase9_report.get("audit_event_names")),
         "replayed_audit_timeline": audit_timeline,
         "replay_notes": _phase9_replay_notes(validation),
+        "replay_validation_summary": validation.get("validation_summary", {}),
         "safety_boundary_confirmed": safety_confirmed,
         "safety_boundary_statement": safety_boundary,
         "dry_run": phase9_report.get("dry_run") if validation["valid"] else None,
@@ -1117,10 +1166,21 @@ def _phase9_validation_error(
     errors.append({"code": code, "field": field, "detail": detail})
 
 
+def _phase9_validation_warning(
+    warnings: list[dict[str, str]],
+    code: str,
+    field: str,
+    detail: str,
+) -> None:
+    warnings.append({"code": code, "field": field, "detail": detail})
+
+
 def _phase9_bundle_validation_result(
     bundle: Any,
     errors: list[dict[str, str]],
     warnings: list[dict[str, str]],
+    consistency_checks: list[dict[str, Any]] | None = None,
+    audit_order_checks: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     phase9_report = (
         bundle.get("phase9_report")
@@ -1132,6 +1192,30 @@ def _phase9_bundle_validation_result(
     )
     error_codes = _unique([error["code"] for error in errors])
     warning_codes = _unique([warning["code"] for warning in warnings])
+    safe_consistency_checks = list(consistency_checks or [])
+    safe_audit_order_checks = list(audit_order_checks or [])
+    sensitive_key_findings = _phase9_sensitive_key_paths(bundle)
+    unsafe_flags_detected = _phase9_unsafe_flags_detected(
+        error_codes, warning_codes, sensitive_key_findings
+    )
+    recommended_debug_focus = _phase9_validation_debug_focus(
+        error_codes,
+        warning_codes,
+        _string_list(phase9_report.get("failure_reason_codes")),
+        _string_list(phase9_report.get("blocker_codes")),
+    )
+    replay_allowed = not errors
+    validation_summary = {
+        "validation_passed": replay_allowed,
+        "validation_errors": error_codes,
+        "validation_warnings": warning_codes,
+        "unsafe_flags_detected": unsafe_flags_detected,
+        "consistency_checks": safe_consistency_checks,
+        "audit_order_checks": safe_audit_order_checks,
+        "sensitive_key_findings": sensitive_key_findings,
+        "replay_allowed_as_read_only": replay_allowed,
+        "recommended_debug_focus": recommended_debug_focus,
+    }
 
     return {
         "valid": not errors,
@@ -1140,6 +1224,9 @@ def _phase9_bundle_validation_result(
         "errors": errors,
         "warning_codes": warning_codes,
         "warnings": warnings,
+        "validation_passed": replay_allowed,
+        "validation_errors": error_codes,
+        "validation_warnings": warning_codes,
         "bundle_version": str(bundle.get("bundle_version") or "") if isinstance(bundle, dict) else "",
         "report_version": (
             str(bundle.get("report_version") or phase9_report.get("report_version") or "")
@@ -1147,7 +1234,599 @@ def _phase9_bundle_validation_result(
             else ""
         ),
         "safety_boundary_confirmed": bool(safety_boundary.strip()) and not errors,
+        "unsafe_flags_detected": unsafe_flags_detected,
+        "consistency_checks": safe_consistency_checks,
+        "audit_order_checks": safe_audit_order_checks,
+        "sensitive_key_findings": sensitive_key_findings,
+        "replay_allowed_as_read_only": replay_allowed,
+        "recommended_debug_focus": recommended_debug_focus,
+        "validation_summary": validation_summary,
     }
+
+
+def _validate_phase9_deep_consistency(
+    bundle: dict[str, Any],
+    phase9_report: dict[str, Any],
+    errors: list[dict[str, str]],
+    warnings: list[dict[str, str]],
+    consistency_checks: list[dict[str, Any]],
+    audit_order_checks: list[dict[str, Any]],
+) -> None:
+    _validate_phase9_report_level_consistency(
+        bundle,
+        phase9_report,
+        errors,
+        warnings,
+        consistency_checks,
+    )
+
+    for scenario in _phase9_bundle_scenarios(phase9_report):
+        _validate_phase9_report_level_consistency(
+            bundle,
+            scenario,
+            errors,
+            warnings,
+            consistency_checks,
+            field_prefix=f"scenario.{scenario.get('scenario_id') or 'unknown'}",
+        )
+        _validate_phase9_audit_order_consistency(scenario, errors, audit_order_checks)
+
+    _validate_phase9_report_audit_consistency(phase9_report, errors, audit_order_checks)
+
+
+def _validate_phase9_report_level_consistency(
+    bundle: dict[str, Any],
+    report: dict[str, Any],
+    errors: list[dict[str, str]],
+    warnings: list[dict[str, str]],
+    consistency_checks: list[dict[str, Any]],
+    field_prefix: str = "phase9_report",
+) -> None:
+    actual_outcome = report.get("actual_outcome")
+    actual_outcome = actual_outcome if isinstance(actual_outcome, dict) else {}
+    failure_reason_codes = _string_list(report.get("failure_reason_codes"))
+    blocker_codes = _string_list(report.get("blocker_codes"))
+    audit_event_names = _string_list(report.get("audit_event_names"))
+    gate_passed = report.get("gate_passed") is True
+    status = str(actual_outcome.get("status") or "")
+    target_risk_hint = str(report.get("target_risk_hint") or "").lower()
+    target_confidence = _finite_float(report.get("target_confidence"))
+
+    _phase9_record_validation_check(
+        consistency_checks,
+        "action_type_allowed",
+        _phase9_action_type_allowed(report, failure_reason_codes, gate_passed),
+        "unsafe_action_type",
+        f"{field_prefix}.action_type",
+        f"Action type must be one of {_format_codes(list(PHASE9_REPLAY_ALLOWED_ACTION_TYPES))}.",
+        errors,
+    )
+    _phase9_record_validation_check(
+        consistency_checks,
+        "sandbox_scope_sane",
+        _phase9_scope_sane(report.get("sandbox_scope")),
+        "outside_sandbox_scope",
+        f"{field_prefix}.sandbox_scope",
+        "Sandbox scope must remain one-window, one-target, and fixture-bounded.",
+        errors,
+    )
+
+    if "gate_passed" in actual_outcome:
+        _phase9_record_validation_check(
+            consistency_checks,
+            "gate_matches_actual_outcome",
+            actual_outcome.get("gate_passed") is report.get("gate_passed"),
+            "inconsistent_gate_outcome",
+            f"{field_prefix}.actual_outcome.gate_passed",
+            "actual_outcome.gate_passed must match report gate_passed.",
+            errors,
+        )
+
+    if status:
+        _phase9_record_validation_check(
+            consistency_checks,
+            "gate_status_consistent",
+            not (
+                (gate_passed and status == "blocked")
+                or (not gate_passed and status in {"dry_run_completed", "real_action_skipped"})
+            ),
+            "inconsistent_gate_outcome",
+            f"{field_prefix}.actual_outcome.status",
+            "Gate result and actual outcome status disagree.",
+            errors,
+        )
+
+    if "dry_run" in actual_outcome:
+        _phase9_record_validation_check(
+            consistency_checks,
+            "dry_run_flag_matches_actual_outcome",
+            actual_outcome.get("dry_run") is report.get("dry_run"),
+            "inconsistent_real_action_flags",
+            f"{field_prefix}.actual_outcome.dry_run",
+            "actual_outcome.dry_run must match report dry_run.",
+            errors,
+        )
+    if "real_action_enabled" in actual_outcome:
+        _phase9_record_validation_check(
+            consistency_checks,
+            "real_action_enabled_matches_actual_outcome",
+            actual_outcome.get("real_action_enabled") is report.get("real_action_enabled"),
+            "inconsistent_real_action_flags",
+            f"{field_prefix}.actual_outcome.real_action_enabled",
+            "actual_outcome.real_action_enabled must match report real_action_enabled.",
+            errors,
+        )
+    if "real_action_skipped" in actual_outcome:
+        _phase9_record_validation_check(
+            consistency_checks,
+            "real_action_skipped_matches_actual_outcome",
+            actual_outcome.get("real_action_skipped") is report.get("real_action_skipped"),
+            "inconsistent_real_action_flags",
+            f"{field_prefix}.actual_outcome.real_action_skipped",
+            "actual_outcome.real_action_skipped must match report real_action_skipped.",
+            errors,
+        )
+
+    skipped_event_present = EVENT_PHASE9_REAL_ACTION_SKIPPED in audit_event_names
+    _phase9_record_validation_check(
+        consistency_checks,
+        "real_action_skipped_event_consistent",
+        not (
+            skipped_event_present
+            and report.get("real_action_skipped") is not True
+            and "real_action_disabled" not in failure_reason_codes
+        ),
+        "inconsistent_real_action_flags",
+        f"{field_prefix}.audit_event_names",
+        "real-action skipped event must match skipped state or real-action-disabled reason.",
+        errors,
+    )
+
+    if blocker_codes and report.get("readiness_ready") is True:
+        _phase9_record_validation_check(
+            consistency_checks,
+            "readiness_not_ready_when_blockers_present",
+            False,
+            "readiness_ready_with_blockers",
+            f"{field_prefix}.readiness_ready",
+            "readiness_ready cannot be true while blocker codes are present.",
+            errors,
+        )
+
+    if gate_passed:
+        for check_name, passed, code, field_name, detail in [
+            (
+                "approval_present_for_gate_pass",
+                report.get("user_approval_present") is True,
+                "approval_missing_but_gate_passed",
+                "user_approval_present",
+                "Gate-passed scenarios require mock approval presence.",
+            ),
+            (
+                "emergency_stop_available_for_gate_pass",
+                report.get("emergency_stop_available") is True,
+                "emergency_stop_missing_but_gate_passed",
+                "emergency_stop_available",
+                "Gate-passed scenarios require emergency stop availability.",
+            ),
+            (
+                "verification_planned_for_gate_pass",
+                report.get("post_action_verification_planned") is True,
+                "verification_missing_but_gate_passed",
+                "post_action_verification_planned",
+                "Gate-passed scenarios require mock post-action verification planning.",
+            ),
+            (
+                "rollback_recorded_for_gate_pass",
+                report.get("rollback_plan_recorded") is True,
+                "rollback_missing_but_gate_passed",
+                "rollback_plan_recorded",
+                "Gate-passed scenarios require mock rollback planning.",
+            ),
+            (
+                "readiness_ready_for_gate_pass",
+                report.get("readiness_ready") is True,
+                "inconsistent_gate_outcome",
+                "readiness_ready",
+                "Gate-passed scenarios require readiness_ready true.",
+            ),
+        ]:
+            _phase9_record_validation_check(
+                consistency_checks,
+                check_name,
+                passed,
+                code,
+                f"{field_prefix}.{field_name}",
+                detail,
+                errors,
+            )
+
+        if target_risk_hint in {"high", "high_risk"}:
+            _phase9_record_validation_check(
+                consistency_checks,
+                "high_risk_not_gate_passed",
+                False,
+                "high_risk_marked_gate_passed",
+                f"{field_prefix}.target_risk_hint",
+                "High-risk imported targets cannot be marked gate-passed.",
+                errors,
+            )
+        if target_risk_hint == "unknown" or not target_risk_hint:
+            _phase9_record_validation_check(
+                consistency_checks,
+                "unknown_risk_not_gate_passed",
+                False,
+                "unknown_risk_marked_gate_passed",
+                f"{field_prefix}.target_risk_hint",
+                "Unknown-risk imported targets cannot be marked gate-passed.",
+                errors,
+            )
+        if target_confidence is None or target_confidence < 0.75 or target_confidence > 1.0:
+            _phase9_record_validation_check(
+                consistency_checks,
+                "target_confidence_safe_for_gate_pass",
+                False,
+                "unsafe_bundle_flags",
+                f"{field_prefix}.target_confidence",
+                "Gate-passed targets require confidence in the safe deterministic range.",
+                errors,
+            )
+
+    _validate_phase9_code_pair_consistency(
+        failure_reason_codes,
+        blocker_codes,
+        field_prefix,
+        warnings,
+        consistency_checks,
+    )
+
+
+def _validate_phase9_code_pair_consistency(
+    failure_reason_codes: list[str],
+    blocker_codes: list[str],
+    field_prefix: str,
+    warnings: list[dict[str, str]],
+    consistency_checks: list[dict[str, Any]],
+) -> None:
+    for blocker_code in blocker_codes:
+        compatible_failures = _phase9_failure_reasons_for_blocker(blocker_code)
+        passed = not compatible_failures or any(code in failure_reason_codes for code in compatible_failures)
+        _phase9_record_validation_check(
+            consistency_checks,
+            "blocker_has_compatible_failure_reason",
+            passed,
+            "blocker_without_failure_reason",
+            f"{field_prefix}.blocker_codes",
+            f"Blocker {blocker_code} should have a compatible failure reason.",
+            warnings=warnings,
+        )
+
+    for failure_code in failure_reason_codes:
+        required_blockers = _phase9_blockers_for_failure_reason(failure_code)
+        passed = not required_blockers or any(code in blocker_codes for code in required_blockers)
+        _phase9_record_validation_check(
+            consistency_checks,
+            "failure_reason_has_compatible_blocker",
+            passed,
+            "failure_reason_without_blocker",
+            f"{field_prefix}.failure_reason_codes",
+            f"Failure reason {failure_code} should have a compatible blocker.",
+            warnings=warnings,
+        )
+
+
+def _validate_phase9_report_audit_consistency(
+    phase9_report: dict[str, Any],
+    errors: list[dict[str, str]],
+    audit_order_checks: list[dict[str, Any]],
+) -> None:
+    audit_timeline = phase9_report.get("audit_timeline")
+    if not isinstance(audit_timeline, list):
+        return
+    timeline_event_names = [
+        str(event.get("event_name") or "") for event in audit_timeline if isinstance(event, dict)
+    ]
+    unique_timeline_event_names = _unique([event_name for event_name in timeline_event_names if event_name])
+    audit_event_names = _string_list(phase9_report.get("audit_event_names"))
+    _phase9_record_validation_check(
+        audit_order_checks,
+        "audit_event_names_match_timeline",
+        audit_event_names == unique_timeline_event_names,
+        "inconsistent_audit_order",
+        "phase9_report.audit_event_names",
+        "audit_event_names must match the first-seen event order in audit_timeline.",
+        errors,
+    )
+
+
+def _validate_phase9_audit_order_consistency(
+    scenario: dict[str, Any],
+    errors: list[dict[str, str]],
+    audit_order_checks: list[dict[str, Any]],
+) -> None:
+    scenario_id = str(scenario.get("scenario_id") or "unknown")
+    event_names = _string_list(scenario.get("audit_event_names"))
+    event_positions = {event_name: index for index, event_name in enumerate(event_names)}
+    gate_passed = scenario.get("gate_passed") is True
+    completion_events = [EVENT_PHASE9_DRY_RUN_COMPLETED, EVENT_PHASE9_REAL_ACTION_SKIPPED]
+
+    def event_before(left: str, right: str) -> bool:
+        return left in event_positions and right in event_positions and event_positions[left] < event_positions[right]
+
+    def event_present(event_name: str) -> bool:
+        return event_name in event_positions
+
+    field_prefix = f"scenario.{scenario_id}.audit_event_names"
+
+    scenario_timeline = scenario.get("audit_timeline")
+    if isinstance(scenario_timeline, list):
+        scenario_timeline_event_names = [
+            str(event.get("event_name") or "")
+            for event in scenario_timeline
+            if isinstance(event, dict)
+        ]
+        _phase9_record_validation_check(
+            audit_order_checks,
+            "scenario_audit_event_names_match_timeline",
+            event_names == scenario_timeline_event_names,
+            "inconsistent_audit_order",
+            field_prefix,
+            "Scenario audit_event_names must match scenario audit_timeline order.",
+            errors,
+        )
+
+    _phase9_record_validation_check(
+        audit_order_checks,
+        "experiment_requested_present",
+        event_present(EVENT_PHASE9_EXPERIMENT_REQUESTED),
+        "missing_required_audit_event",
+        field_prefix,
+        "Every scenario replay requires experiment-requested audit event.",
+        errors,
+    )
+
+    gate_event = EVENT_PHASE9_GATE_PASSED if gate_passed else EVENT_PHASE9_GATE_BLOCKED
+    _phase9_record_validation_check(
+        audit_order_checks,
+        "gate_result_present",
+        event_present(gate_event),
+        "missing_required_audit_event",
+        field_prefix,
+        "Every scenario replay requires a gate result audit event.",
+        errors,
+    )
+    if event_present(EVENT_PHASE9_EXPERIMENT_REQUESTED) and event_present(gate_event):
+        _phase9_record_validation_check(
+            audit_order_checks,
+            "experiment_requested_before_gate",
+            event_before(EVENT_PHASE9_EXPERIMENT_REQUESTED, gate_event),
+            "inconsistent_audit_order",
+            field_prefix,
+            "Experiment-requested event must occur before gate result.",
+            errors,
+        )
+
+    if gate_passed:
+        for pre_gate_event, check_name in [
+            (EVENT_PHASE9_MOCK_APPROVAL_CHECKED, "approval_checked_before_gate_pass"),
+            (EVENT_PHASE9_EMERGENCY_STOP_CHECKED, "emergency_stop_checked_before_gate_pass"),
+        ]:
+            _phase9_record_validation_check(
+                audit_order_checks,
+                f"{check_name}_present",
+                event_present(pre_gate_event),
+                "missing_required_audit_event",
+                field_prefix,
+                f"{pre_gate_event} is required before a gate-passed event.",
+                errors,
+            )
+            if event_present(pre_gate_event) and event_present(EVENT_PHASE9_GATE_PASSED):
+                _phase9_record_validation_check(
+                    audit_order_checks,
+                    check_name,
+                    event_before(pre_gate_event, EVENT_PHASE9_GATE_PASSED),
+                    "inconsistent_audit_order",
+                    field_prefix,
+                    f"{pre_gate_event} must occur before gate passed.",
+                    errors,
+                )
+
+        for completion_event in completion_events:
+            if event_present(completion_event):
+                _phase9_record_validation_check(
+                    audit_order_checks,
+                    f"gate_passed_before_{completion_event}",
+                    event_before(EVENT_PHASE9_GATE_PASSED, completion_event),
+                    "inconsistent_audit_order",
+                    field_prefix,
+                    f"Gate passed must occur before {completion_event}.",
+                    errors,
+                )
+                for required_event in [
+                    EVENT_PHASE9_POST_ACTION_VERIFICATION_PLANNED,
+                    EVENT_PHASE9_ROLLBACK_PLAN_RECORDED,
+                ]:
+                    _phase9_record_validation_check(
+                        audit_order_checks,
+                        f"{required_event}_present_before_completion",
+                        event_present(required_event),
+                        "missing_required_audit_event",
+                        field_prefix,
+                        f"{required_event} is required before completion.",
+                        errors,
+                    )
+                    if event_present(required_event):
+                        _phase9_record_validation_check(
+                            audit_order_checks,
+                            f"{required_event}_before_completion",
+                            event_before(required_event, completion_event),
+                            "inconsistent_audit_order",
+                            field_prefix,
+                            f"{required_event} must occur before completion.",
+                            errors,
+                        )
+
+    if event_present(EVENT_PHASE9_GATE_BLOCKED):
+        for completion_event in completion_events:
+            _phase9_record_validation_check(
+                audit_order_checks,
+                f"gate_blocked_prevents_{completion_event}",
+                not event_present(completion_event),
+                "inconsistent_audit_order",
+                field_prefix,
+                "Gate-blocked scenarios cannot also complete or skip a real action path.",
+                errors,
+            )
+
+    if event_present(EVENT_PHASE9_REAL_ACTION_SKIPPED):
+        represented_skipped_path = (
+            scenario.get("dry_run") is False
+            or scenario.get("real_action_enabled") is True
+            or "real_action_disabled" in _string_list(scenario.get("failure_reason_codes"))
+        )
+        _phase9_record_validation_check(
+            audit_order_checks,
+            "real_action_skipped_event_has_skipped_path",
+            represented_skipped_path,
+            "inconsistent_real_action_flags",
+            field_prefix,
+            "real-action-skipped event requires a represented non-dry-run or disabled-real-action path.",
+            errors,
+        )
+
+
+def _phase9_record_validation_check(
+    checks: list[dict[str, Any]],
+    name: str,
+    passed: bool,
+    code: str,
+    field: str,
+    detail: str,
+    errors: list[dict[str, str]] | None = None,
+    warnings: list[dict[str, str]] | None = None,
+) -> None:
+    checks.append(
+        {
+            "name": name,
+            "passed": bool(passed),
+            "code": "" if passed else code,
+            "field": field,
+            "detail": "" if passed else detail,
+        }
+    )
+    if passed:
+        return
+    if errors is not None:
+        _phase9_validation_error(errors, code, field, detail)
+    elif warnings is not None:
+        _phase9_validation_warning(warnings, code, field, detail)
+
+
+def _phase9_bundle_scenarios(phase9_report: dict[str, Any]) -> list[dict[str, Any]]:
+    scenarios = phase9_report.get("scenarios")
+    if isinstance(scenarios, list):
+        return [scenario for scenario in scenarios if isinstance(scenario, dict)]
+    return []
+
+
+def _phase9_scope_sane(scope: Any) -> bool:
+    if not isinstance(scope, dict):
+        return False
+    if scope.get("scope") == "mixed":
+        return True
+    return (
+        bool(str(scope.get("window_id") or ""))
+        and bool(str(scope.get("target_id") or ""))
+        and scope.get("one_window_only") is True
+        and scope.get("one_target_only") is True
+    )
+
+
+def _phase9_action_type_allowed(
+    report: dict[str, Any],
+    failure_reason_codes: list[str],
+    gate_passed: bool,
+) -> bool:
+    action_type = str(report.get("action_type") or "")
+    if action_type in PHASE9_REPLAY_ALLOWED_ACTION_TYPES:
+        return True
+    return (
+        not action_type
+        and not gate_passed
+        and "missing_action_contract" in failure_reason_codes
+    )
+
+
+def _phase9_failure_reasons_for_blocker(blocker_code: str) -> tuple[str, ...]:
+    return {
+        "stale_observation": ("stale_observation",),
+        "high_risk_requires_approval": ("high_risk_target", "high_risk_requires_approval"),
+        "readiness_not_ready": ("readiness_not_ready",),
+        "invalid_target_geometry": ("invalid_target_geometry",),
+    }.get(blocker_code, ())
+
+
+def _phase9_blockers_for_failure_reason(failure_code: str) -> tuple[str, ...]:
+    return {
+        "stale_observation": ("stale_observation",),
+        "high_risk_target": ("high_risk_requires_approval", "high_risk_target"),
+        "readiness_not_ready": ("readiness_not_ready",),
+        "invalid_target_geometry": ("invalid_target_geometry",),
+    }.get(failure_code, ())
+
+
+def _phase9_unsafe_flags_detected(
+    error_codes: list[str],
+    warning_codes: list[str],
+    sensitive_key_findings: list[str],
+) -> list[str]:
+    unsafe_codes = {
+        "unsafe_bundle_flags",
+        "real_action_enabled_in_bundle",
+        "non_dry_run_bundle",
+        "high_risk_marked_gate_passed",
+        "unknown_risk_marked_gate_passed",
+        "unsafe_action_type",
+        "suspicious_sensitive_key",
+    }
+    flags = [code for code in error_codes + warning_codes if code in unsafe_codes]
+    if sensitive_key_findings and "suspicious_sensitive_key" not in flags:
+        flags.append("suspicious_sensitive_key")
+    return _unique(flags)
+
+
+def _phase9_validation_debug_focus(
+    error_codes: list[str],
+    warning_codes: list[str],
+    failure_reason_codes: list[str],
+    blocker_codes: list[str],
+) -> str:
+    codes = set(error_codes)
+    codes.update(warning_codes)
+    codes.update(failure_reason_codes)
+    codes.update(blocker_codes)
+    focus_rules = [
+        ("suspicious_sensitive_key", "remove private or credential-like fields from the bundle"),
+        ("unsafe_bundle_flags", "inspect dry-run and real-action flags"),
+        ("real_action_enabled_in_bundle", "confirm the exported bundle keeps real action disabled"),
+        ("non_dry_run_bundle", "confirm replay input is dry-run-only"),
+        ("inconsistent_audit_order", "inspect audit event ordering"),
+        ("missing_required_audit_event", "inspect required Phase 9 audit events"),
+        ("inconsistent_gate_outcome", "inspect gate result and actual outcome consistency"),
+        ("high_risk_marked_gate_passed", "inspect target risk classification"),
+        ("unknown_risk_marked_gate_passed", "inspect unknown-risk target handling"),
+        ("approval_missing_but_gate_passed", "inspect mock approval state"),
+        ("emergency_stop_missing_but_gate_passed", "inspect emergency stop state"),
+        ("verification_missing_but_gate_passed", "inspect post-action verification plan"),
+        ("rollback_missing_but_gate_passed", "inspect rollback plan"),
+        ("readiness_ready_with_blockers", "inspect readiness and blocker consistency"),
+        ("unsafe_action_type", "inspect sandbox action type"),
+        ("stale_observation", "inspect observation freshness assumptions"),
+        ("missing_action_contract", "inspect action contract fixture"),
+        ("missing_audit_plan", "inspect audit plan fixture"),
+    ]
+    focus = [recommendation for code, recommendation in focus_rules if code in codes]
+    return "; ".join(focus[:4]) if focus else "review validation summary and audit timeline"
 
 
 def _phase9_sensitive_key_paths(value: Any, path: str = "") -> list[str]:

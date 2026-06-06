@@ -121,8 +121,11 @@ const copyPhase9ReplaySummary = document.querySelector("#copyPhase9ReplaySummary
 const clearPhase9Bundle = document.querySelector("#clearPhase9Bundle");
 const phase9ReplayStatus = document.querySelector("#phase9ReplayStatus");
 const phase9ReplayErrors = document.querySelector("#phase9ReplayErrors");
+const phase9ReplayValidationCounts = document.querySelector("#phase9ReplayValidationCounts");
 const phase9ReplaySummary = document.querySelector("#phase9ReplaySummary");
 const phase9ReplayTimeline = document.querySelector("#phase9ReplayTimeline");
+const phase9ReplayValidationDetails = document.querySelector("#phase9ReplayValidationDetails");
+const phase9ReplayValidationJson = document.querySelector("#phase9ReplayValidationJson");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -2659,15 +2662,21 @@ function clearPhase9BundleReplay() {
   phase9ReplayStatus.textContent = "No bundle imported.";
   phase9ReplayErrors.hidden = true;
   phase9ReplayErrors.replaceChildren();
+  phase9ReplayValidationCounts.hidden = true;
+  phase9ReplayValidationCounts.replaceChildren();
   phase9ReplaySummary.hidden = true;
   phase9ReplaySummary.replaceChildren();
   phase9ReplayTimeline.hidden = true;
   phase9ReplayTimeline.replaceChildren();
+  phase9ReplayValidationDetails.hidden = true;
+  phase9ReplayValidationJson.textContent = "";
 }
 
 function validatePhase9BundleObject(bundle) {
   const errors = [];
   const warnings = [];
+  const consistencyChecks = [];
+  const auditOrderChecks = [];
 
   if (!phase9IsPlainObject(bundle)) {
     phase9ReplayAddValidationError(
@@ -2676,7 +2685,7 @@ function validatePhase9BundleObject(bundle) {
       "bundle",
       "Bundle must be a JSON object."
     );
-    return phase9ReplayValidationResult(bundle, errors, warnings);
+    return phase9ReplayValidationResult(bundle, errors, warnings, consistencyChecks, auditOrderChecks);
   }
 
   for (const fieldName of PHASE9_REPLAY_REQUIRED_BUNDLE_FIELDS) {
@@ -2717,7 +2726,7 @@ function validatePhase9BundleObject(bundle) {
       "phase9_report",
       "Bundle must contain a Phase 9 export report object."
     );
-    return phase9ReplayValidationResult(bundle, errors, warnings);
+    return phase9ReplayValidationResult(bundle, errors, warnings, consistencyChecks, auditOrderChecks);
   }
 
   if (bundle.report_version !== "phase9_export_v1") {
@@ -2726,6 +2735,24 @@ function validatePhase9BundleObject(bundle) {
       "invalid_report_version",
       "report_version",
       "Expected phase9_export_v1."
+    );
+  }
+
+  if (bundle.project_phase && bundle.project_phase !== "phase_9_4") {
+    phase9ReplayAddValidationError(
+      errors,
+      "unsupported_project_phase",
+      "project_phase",
+      "Expected phase_9_4."
+    );
+  }
+
+  if (phase9Report.project_phase && phase9Report.project_phase !== "phase_9_4") {
+    phase9ReplayAddValidationError(
+      errors,
+      "unsupported_project_phase",
+      "phase9_report.project_phase",
+      "Expected phase_9_4."
     );
   }
 
@@ -2756,6 +2783,12 @@ function validatePhase9BundleObject(bundle) {
       "phase9_report.real_action_enabled",
       "Imported bundles must keep real action disabled."
     );
+    phase9ReplayAddValidationError(
+      errors,
+      "unsafe_bundle_flags",
+      "phase9_report.real_action_enabled",
+      "Unsafe real-action flag detected in imported bundle."
+    );
   }
 
   if (phase9Report.dry_run !== true || phase9BundleNestedTrue(phase9Report, "real_action_attempted")) {
@@ -2764,6 +2797,12 @@ function validatePhase9BundleObject(bundle) {
       "non_dry_run_bundle",
       "phase9_report.dry_run",
       "Imported bundles must remain dry-run and never show real action attempted."
+    );
+    phase9ReplayAddValidationError(
+      errors,
+      "unsafe_bundle_flags",
+      "phase9_report.dry_run",
+      "Unsafe dry-run or real-action-attempted flag detected in imported bundle."
     );
   }
 
@@ -2814,7 +2853,9 @@ function validatePhase9BundleObject(bundle) {
     );
   }
 
-  return phase9ReplayValidationResult(bundle, errors, warnings);
+  validatePhase9DeepConsistency(bundle, phase9Report, errors, warnings, consistencyChecks, auditOrderChecks);
+
+  return phase9ReplayValidationResult(bundle, errors, warnings, consistencyChecks, auditOrderChecks);
 }
 
 function importPhase9ReproducibilityBundle(bundle) {
@@ -2867,6 +2908,7 @@ function buildPhase9ReplayReport(imported) {
     original_audit_event_names: sandboxCodes(phase9Report.audit_event_names),
     replayed_audit_timeline: replayedAuditTimeline,
     replay_notes: phase9ReplayNotes(validation),
+    replay_validation_summary: validation.validation_summary || {},
     safety_boundary_confirmed: validation.valid && validation.safety_boundary_confirmed === true,
     safety_boundary_statement: imported?.safety_boundary_statement || "",
     dry_run: validation.valid ? phase9Report.dry_run : null,
@@ -2887,28 +2929,40 @@ function renderPhase9ReplayParseError(error) {
       detail: error.message || String(error),
     },
   ]);
+  phase9ReplayValidationCounts.hidden = true;
+  phase9ReplayValidationCounts.replaceChildren();
   phase9ReplaySummary.hidden = true;
   phase9ReplaySummary.replaceChildren();
   phase9ReplayTimeline.hidden = true;
   phase9ReplayTimeline.replaceChildren();
+  phase9ReplayValidationDetails.hidden = true;
+  phase9ReplayValidationJson.textContent = "";
 }
 
 function renderPhase9ReplayValidation(validation, imported = null) {
+  const summary = validation.validation_summary || {};
+
   phase9ReplayPanel.dataset.state = validation.valid ? "ready" : "warning";
   phase9ReplayStatus.textContent = validation.valid
     ? "Bundle validation passed. Replay remains read-only and dry-run."
     : "Bundle validation blocked replay. Review validation errors below.";
   renderPhase9ReplayErrors(validation.errors || []);
+  renderPhase9ReplayValidationCounts(validation);
   setPhase9ReplaySummary([
     ["Validation", validation.status || "unknown"],
     ["Bundle version", validation.bundle_version || "unknown"],
     ["Report version", validation.report_version || "unknown"],
     ["Errors", formatSandboxCodeList(validation.error_codes)],
     ["Warnings", formatSandboxCodeList(validation.warning_codes)],
+    ["Unsafe flags", formatSandboxCodeList(validation.unsafe_flags_detected)],
+    ["Audit order", phase9ReplayCheckStatus(validation.audit_order_checks)],
+    ["Sensitive keys", formatSandboxCodeList(validation.sensitive_key_findings)],
+    ["Debug focus", summary.recommended_debug_focus || validation.recommended_debug_focus || "none"],
     ["Imported", imported?.import_status || "not imported"],
     ["Safety boundary", formatSandboxBool(validation.safety_boundary_confirmed)],
   ]);
   phase9ReplaySummary.hidden = false;
+  renderPhase9ReplayValidationDetails(validation);
 }
 
 function renderPhase9ReplayReport(report) {
@@ -2930,6 +2984,14 @@ function renderPhase9ReplayReport(report) {
     ["Failure reasons", formatSandboxCodeList(report.original_failure_reason_codes)],
     ["Blockers", formatSandboxCodeList(report.original_blocker_codes)],
     ["Audit events", formatSandboxCodeList(report.original_audit_event_names)],
+    ["Unsafe flags", formatSandboxCodeList(report.replay_validation_summary?.unsafe_flags_detected)],
+    ["Audit order", phase9ReplayCheckStatus(report.replay_validation_summary?.audit_order_checks)],
+    [
+      "Debug focus",
+      report.replay_validation_summary?.recommended_debug_focus ||
+        report.validation?.recommended_debug_focus ||
+        "none",
+    ],
     ["Safety boundary", formatSandboxBool(report.safety_boundary_confirmed)],
     ["Notes", formatEvaluationNotes(report.replay_notes)],
   ]);
@@ -2954,6 +3016,69 @@ function renderPhase9ReplayErrors(errors) {
     }`;
     phase9ReplayErrors.appendChild(item);
   }
+}
+
+function renderPhase9ReplayValidationCounts(validation = {}) {
+  const summary = validation.validation_summary || {};
+  const failedAuditChecks = phase9ReplayFailedChecks(validation.audit_order_checks).length;
+  const rows = [
+    ["validation", validation.valid ? "passed" : "failed", validation.valid ? "ok" : "risk"],
+    ["errors", String(sandboxCodes(validation.error_codes).length), validation.valid ? "neutral" : "risk"],
+    ["warnings", String(sandboxCodes(validation.warning_codes).length), sandboxCodes(validation.warning_codes).length ? "warn" : "neutral"],
+    ["unsafe", String(sandboxCodes(validation.unsafe_flags_detected).length), sandboxCodes(validation.unsafe_flags_detected).length ? "risk" : "neutral"],
+    ["audit", failedAuditChecks ? `${failedAuditChecks} failed` : "ok", failedAuditChecks ? "risk" : "ok"],
+  ];
+
+  phase9ReplayValidationCounts.replaceChildren();
+  phase9ReplayValidationCounts.hidden = false;
+
+  for (const [label, value, tone] of rows) {
+    const chip = document.createElement("div");
+    const countValue = document.createElement("span");
+    const countLabel = document.createElement("span");
+
+    chip.className = "sandbox-evaluation-count";
+    chip.dataset.phase9ReplayValidationCount = label;
+    chip.dataset.tone = tone;
+    chip.title = summary.recommended_debug_focus || validation.recommended_debug_focus || "";
+    countValue.className = "sandbox-evaluation-count-value";
+    countValue.textContent = value;
+    countLabel.className = "sandbox-evaluation-count-label";
+    countLabel.textContent = label;
+    chip.append(countValue, countLabel);
+    phase9ReplayValidationCounts.appendChild(chip);
+  }
+}
+
+function renderPhase9ReplayValidationDetails(validation = {}) {
+  phase9ReplayValidationDetails.hidden = false;
+  phase9ReplayValidationDetails.dataset.phase9ReplayValidationDetails = "true";
+  phase9ReplayValidationJson.textContent = JSON.stringify(
+    {
+      validation_summary: validation.validation_summary || {},
+      errors: validation.errors || [],
+      warnings: validation.warnings || [],
+      failed_consistency_checks: phase9ReplayFailedChecks(validation.consistency_checks),
+      failed_audit_order_checks: phase9ReplayFailedChecks(validation.audit_order_checks),
+      sensitive_key_findings: validation.sensitive_key_findings || [],
+      recommended_debug_focus: validation.recommended_debug_focus || "",
+    },
+    null,
+    2
+  );
+}
+
+function phase9ReplayFailedChecks(checks) {
+  return Array.isArray(checks) ? checks.filter((check) => check && check.passed !== true) : [];
+}
+
+function phase9ReplayCheckStatus(checks) {
+  const safeChecks = Array.isArray(checks) ? checks : [];
+  if (!safeChecks.length) {
+    return "not checked";
+  }
+  const failed = phase9ReplayFailedChecks(safeChecks).length;
+  return failed ? `${failed}/${safeChecks.length} failed` : `${safeChecks.length} passed`;
 }
 
 function setPhase9ReplaySummary(rows) {
@@ -3062,21 +3187,60 @@ function phase9ReplayAddValidationError(errors, code, field, detail) {
   errors.push({ code, field, detail });
 }
 
-function phase9ReplayValidationResult(bundle, errors, warnings) {
+function phase9ReplayValidationResult(
+  bundle,
+  errors,
+  warnings,
+  consistencyChecks = [],
+  auditOrderChecks = []
+) {
   const phase9Report = phase9IsPlainObject(bundle?.phase9_report) ? bundle.phase9_report : {};
   const safetyBoundary = phase9IsPlainObject(bundle) ? String(bundle.safety_boundary_statement || "") : "";
+  const errorCodes = Array.from(new Set(errors.map((error) => error.code)));
+  const warningCodes = Array.from(new Set(warnings.map((warning) => warning.code)));
+  const sensitiveKeyFindings = phase9SensitiveKeyPaths(bundle);
+  const unsafeFlagsDetected = phase9UnsafeFlagsDetected(errorCodes, warningCodes, sensitiveKeyFindings);
+  const recommendedDebugFocus = phase9ValidationDebugFocus(
+    errorCodes,
+    warningCodes,
+    sandboxCodes(phase9Report.failure_reason_codes),
+    sandboxCodes(phase9Report.blocker_codes)
+  );
+  const replayAllowedAsReadOnly = errors.length === 0;
+  const validationSummary = {
+    validation_passed: replayAllowedAsReadOnly,
+    validation_errors: errorCodes,
+    validation_warnings: warningCodes,
+    unsafe_flags_detected: unsafeFlagsDetected,
+    consistency_checks: consistencyChecks,
+    audit_order_checks: auditOrderChecks,
+    sensitive_key_findings: sensitiveKeyFindings,
+    replay_allowed_as_read_only: replayAllowedAsReadOnly,
+    recommended_debug_focus: recommendedDebugFocus,
+  };
+
   return {
-    valid: errors.length === 0,
-    status: errors.length === 0 ? "valid" : "blocked",
-    error_codes: Array.from(new Set(errors.map((error) => error.code))),
+    valid: replayAllowedAsReadOnly,
+    status: replayAllowedAsReadOnly ? "valid" : "blocked",
+    error_codes: errorCodes,
     errors,
-    warning_codes: Array.from(new Set(warnings.map((warning) => warning.code))),
+    warning_codes: warningCodes,
     warnings,
+    validation_passed: replayAllowedAsReadOnly,
+    validation_errors: errorCodes,
+    validation_warnings: warningCodes,
     bundle_version: phase9IsPlainObject(bundle) ? String(bundle.bundle_version || "") : "",
     report_version: phase9IsPlainObject(bundle)
       ? String(bundle.report_version || phase9Report.report_version || "")
       : "",
-    safety_boundary_confirmed: errors.length === 0 && Boolean(safetyBoundary.trim()),
+    safety_boundary_confirmed: replayAllowedAsReadOnly && Boolean(safetyBoundary.trim()),
+    unsafe_flags_detected: unsafeFlagsDetected,
+    consistency_checks: consistencyChecks,
+    audit_order_checks: auditOrderChecks,
+    sensitive_key_findings: sensitiveKeyFindings,
+    replay_allowed_as_read_only: replayAllowedAsReadOnly,
+    recommended_debug_focus: recommendedDebugFocus,
+    validation_summary: validationSummary,
   };
 }
 
@@ -3202,6 +3366,450 @@ function validatePhase9ReplayMetadata(metadata, phase9Report, errors) {
   }
 }
 
+function validatePhase9DeepConsistency(
+  bundle,
+  phase9Report,
+  errors,
+  warnings,
+  consistencyChecks,
+  auditOrderChecks
+) {
+  validatePhase9ReportLevelConsistency(phase9Report, errors, warnings, consistencyChecks);
+
+  const scenarios = Array.isArray(phase9Report.scenarios) ? phase9Report.scenarios : [];
+  for (const scenario of scenarios.filter((item) => phase9IsPlainObject(item))) {
+    const scenarioId = scenario.scenario_id || "unknown";
+    validatePhase9ReportLevelConsistency(
+      scenario,
+      errors,
+      warnings,
+      consistencyChecks,
+      `scenario.${scenarioId}`
+    );
+    validatePhase9AuditOrderConsistency(scenario, errors, auditOrderChecks);
+  }
+
+  validatePhase9ReportAuditConsistency(phase9Report, errors, auditOrderChecks);
+}
+
+function validatePhase9ReportLevelConsistency(
+  report,
+  errors,
+  warnings,
+  consistencyChecks,
+  fieldPrefix = "phase9_report"
+) {
+  const actualOutcome = phase9IsPlainObject(report.actual_outcome) ? report.actual_outcome : {};
+  const failureReasonCodes = sandboxCodes(report.failure_reason_codes);
+  const blockerCodes = sandboxCodes(report.blocker_codes);
+  const auditEventNames = sandboxCodes(report.audit_event_names);
+  const gatePassed = report.gate_passed === true;
+  const status = String(actualOutcome.status || "");
+  const targetRiskHint = String(report.target_risk_hint || "").toLowerCase();
+  const targetConfidence = Number(report.target_confidence);
+
+  phase9RecordValidationCheck(
+    consistencyChecks,
+    "action_type_allowed",
+    phase9ActionTypeAllowed(report, failureReasonCodes, gatePassed),
+    "unsafe_action_type",
+    `${fieldPrefix}.action_type`,
+    "Action type must remain within the Phase 9 replay allowed set.",
+    errors
+  );
+  phase9RecordValidationCheck(
+    consistencyChecks,
+    "sandbox_scope_sane",
+    phase9ScopeSane(report.sandbox_scope),
+    "outside_sandbox_scope",
+    `${fieldPrefix}.sandbox_scope`,
+    "Sandbox scope must remain one-window, one-target, and fixture-bounded.",
+    errors
+  );
+
+  if ("gate_passed" in actualOutcome) {
+    phase9RecordValidationCheck(
+      consistencyChecks,
+      "gate_matches_actual_outcome",
+      actualOutcome.gate_passed === report.gate_passed,
+      "inconsistent_gate_outcome",
+      `${fieldPrefix}.actual_outcome.gate_passed`,
+      "actual_outcome.gate_passed must match report gate_passed.",
+      errors
+    );
+  }
+
+  if (status) {
+    phase9RecordValidationCheck(
+      consistencyChecks,
+      "gate_status_consistent",
+      !((gatePassed && status === "blocked") || (!gatePassed && ["dry_run_completed", "real_action_skipped"].includes(status))),
+      "inconsistent_gate_outcome",
+      `${fieldPrefix}.actual_outcome.status`,
+      "Gate result and actual outcome status disagree.",
+      errors
+    );
+  }
+
+  for (const flagName of ["dry_run", "real_action_enabled", "real_action_skipped"]) {
+    if (flagName in actualOutcome) {
+      phase9RecordValidationCheck(
+        consistencyChecks,
+        `${flagName}_matches_actual_outcome`,
+        actualOutcome[flagName] === report[flagName],
+        "inconsistent_real_action_flags",
+        `${fieldPrefix}.actual_outcome.${flagName}`,
+        `actual_outcome.${flagName} must match report ${flagName}.`,
+        errors
+      );
+    }
+  }
+
+  phase9RecordValidationCheck(
+    consistencyChecks,
+    "real_action_skipped_event_consistent",
+    !(
+      auditEventNames.includes("phase9_real_action_skipped") &&
+      report.real_action_skipped !== true &&
+      !failureReasonCodes.includes("real_action_disabled")
+    ),
+    "inconsistent_real_action_flags",
+    `${fieldPrefix}.audit_event_names`,
+    "real-action skipped event must match skipped state or real-action-disabled reason.",
+    errors
+  );
+
+  if (blockerCodes.length && report.readiness_ready === true) {
+    phase9RecordValidationCheck(
+      consistencyChecks,
+      "readiness_not_ready_when_blockers_present",
+      false,
+      "readiness_ready_with_blockers",
+      `${fieldPrefix}.readiness_ready`,
+      "readiness_ready cannot be true while blocker codes are present.",
+      errors
+    );
+  }
+
+  if (gatePassed) {
+    for (const [checkName, passed, code, fieldName, detail] of [
+      ["approval_present_for_gate_pass", report.user_approval_present === true, "approval_missing_but_gate_passed", "user_approval_present", "Gate-passed scenarios require mock approval presence."],
+      ["emergency_stop_available_for_gate_pass", report.emergency_stop_available === true, "emergency_stop_missing_but_gate_passed", "emergency_stop_available", "Gate-passed scenarios require emergency stop availability."],
+      ["verification_planned_for_gate_pass", report.post_action_verification_planned === true, "verification_missing_but_gate_passed", "post_action_verification_planned", "Gate-passed scenarios require mock verification planning."],
+      ["rollback_recorded_for_gate_pass", report.rollback_plan_recorded === true, "rollback_missing_but_gate_passed", "rollback_plan_recorded", "Gate-passed scenarios require mock rollback planning."],
+      ["readiness_ready_for_gate_pass", report.readiness_ready === true, "inconsistent_gate_outcome", "readiness_ready", "Gate-passed scenarios require readiness_ready true."],
+    ]) {
+      phase9RecordValidationCheck(
+        consistencyChecks,
+        checkName,
+        passed,
+        code,
+        `${fieldPrefix}.${fieldName}`,
+        detail,
+        errors
+      );
+    }
+
+    if (["high", "high_risk"].includes(targetRiskHint)) {
+      phase9RecordValidationCheck(
+        consistencyChecks,
+        "high_risk_not_gate_passed",
+        false,
+        "high_risk_marked_gate_passed",
+        `${fieldPrefix}.target_risk_hint`,
+        "High-risk imported targets cannot be marked gate-passed.",
+        errors
+      );
+    }
+    if (targetRiskHint === "unknown" || !targetRiskHint) {
+      phase9RecordValidationCheck(
+        consistencyChecks,
+        "unknown_risk_not_gate_passed",
+        false,
+        "unknown_risk_marked_gate_passed",
+        `${fieldPrefix}.target_risk_hint`,
+        "Unknown-risk imported targets cannot be marked gate-passed.",
+        errors
+      );
+    }
+    if (!Number.isFinite(targetConfidence) || targetConfidence < 0.75 || targetConfidence > 1) {
+      phase9RecordValidationCheck(
+        consistencyChecks,
+        "target_confidence_safe_for_gate_pass",
+        false,
+        "unsafe_bundle_flags",
+        `${fieldPrefix}.target_confidence`,
+        "Gate-passed targets require confidence in the safe deterministic range.",
+        errors
+      );
+    }
+  }
+
+  validatePhase9CodePairConsistency(
+    failureReasonCodes,
+    blockerCodes,
+    fieldPrefix,
+    warnings,
+    consistencyChecks
+  );
+}
+
+function validatePhase9CodePairConsistency(
+  failureReasonCodes,
+  blockerCodes,
+  fieldPrefix,
+  warnings,
+  consistencyChecks
+) {
+  for (const blockerCode of blockerCodes) {
+    const compatibleFailures = phase9FailureReasonsForBlocker(blockerCode);
+    phase9RecordValidationCheck(
+      consistencyChecks,
+      "blocker_has_compatible_failure_reason",
+      !compatibleFailures.length || compatibleFailures.some((code) => failureReasonCodes.includes(code)),
+      "blocker_without_failure_reason",
+      `${fieldPrefix}.blocker_codes`,
+      `Blocker ${blockerCode} should have a compatible failure reason.`,
+      null,
+      warnings
+    );
+  }
+
+  for (const failureCode of failureReasonCodes) {
+    const requiredBlockers = phase9BlockersForFailureReason(failureCode);
+    phase9RecordValidationCheck(
+      consistencyChecks,
+      "failure_reason_has_compatible_blocker",
+      !requiredBlockers.length || requiredBlockers.some((code) => blockerCodes.includes(code)),
+      "failure_reason_without_blocker",
+      `${fieldPrefix}.failure_reason_codes`,
+      `Failure reason ${failureCode} should have a compatible blocker.`,
+      null,
+      warnings
+    );
+  }
+}
+
+function validatePhase9ReportAuditConsistency(phase9Report, errors, auditOrderChecks) {
+  if (!Array.isArray(phase9Report.audit_timeline)) {
+    return;
+  }
+
+  const timelineEventNames = phase9Report.audit_timeline
+    .filter((event) => phase9IsPlainObject(event))
+    .map((event) => String(event.event_name || ""))
+    .filter((eventName) => eventName);
+  const uniqueTimelineEventNames = Array.from(new Set(timelineEventNames));
+  phase9RecordValidationCheck(
+    auditOrderChecks,
+    "audit_event_names_match_timeline",
+    sandboxCodes(phase9Report.audit_event_names).join("|") === uniqueTimelineEventNames.join("|"),
+    "inconsistent_audit_order",
+    "phase9_report.audit_event_names",
+    "audit_event_names must match the first-seen event order in audit_timeline.",
+    errors
+  );
+}
+
+function validatePhase9AuditOrderConsistency(scenario, errors, auditOrderChecks) {
+  const scenarioId = scenario.scenario_id || "unknown";
+  const eventNames = sandboxCodes(scenario.audit_event_names);
+  const eventPositions = new Map(eventNames.map((eventName, index) => [eventName, index]));
+  const gatePassed = scenario.gate_passed === true;
+  const fieldPrefix = `scenario.${scenarioId}.audit_event_names`;
+  const gateEvent = gatePassed ? "phase9_gate_passed" : "phase9_gate_blocked";
+  const completionEvents = ["phase9_dry_run_completed", "phase9_real_action_skipped"];
+  const eventPresent = (eventName) => eventPositions.has(eventName);
+  const eventBefore = (left, right) =>
+    eventPresent(left) && eventPresent(right) && eventPositions.get(left) < eventPositions.get(right);
+
+  if (Array.isArray(scenario.audit_timeline)) {
+    const timelineEventNames = scenario.audit_timeline
+      .filter((event) => phase9IsPlainObject(event))
+      .map((event) => String(event.event_name || ""));
+    phase9RecordValidationCheck(
+      auditOrderChecks,
+      "scenario_audit_event_names_match_timeline",
+      eventNames.join("|") === timelineEventNames.join("|"),
+      "inconsistent_audit_order",
+      fieldPrefix,
+      "Scenario audit_event_names must match scenario audit_timeline order.",
+      errors
+    );
+  }
+
+  phase9RecordValidationCheck(
+    auditOrderChecks,
+    "experiment_requested_present",
+    eventPresent("phase9_experiment_requested"),
+    "missing_required_audit_event",
+    fieldPrefix,
+    "Every scenario replay requires experiment-requested audit event.",
+    errors
+  );
+  phase9RecordValidationCheck(
+    auditOrderChecks,
+    "gate_result_present",
+    eventPresent(gateEvent),
+    "missing_required_audit_event",
+    fieldPrefix,
+    "Every scenario replay requires a gate result audit event.",
+    errors
+  );
+  if (eventPresent("phase9_experiment_requested") && eventPresent(gateEvent)) {
+    phase9RecordValidationCheck(
+      auditOrderChecks,
+      "experiment_requested_before_gate",
+      eventBefore("phase9_experiment_requested", gateEvent),
+      "inconsistent_audit_order",
+      fieldPrefix,
+      "Experiment-requested event must occur before gate result.",
+      errors
+    );
+  }
+
+  if (gatePassed) {
+    for (const preGateEvent of ["phase9_mock_approval_checked", "phase9_emergency_stop_checked"]) {
+      phase9RecordValidationCheck(
+        auditOrderChecks,
+        `${preGateEvent}_present_before_gate_pass`,
+        eventPresent(preGateEvent),
+        "missing_required_audit_event",
+        fieldPrefix,
+        `${preGateEvent} is required before a gate-passed event.`,
+        errors
+      );
+      if (eventPresent(preGateEvent) && eventPresent("phase9_gate_passed")) {
+        phase9RecordValidationCheck(
+          auditOrderChecks,
+          `${preGateEvent}_before_gate_pass`,
+          eventBefore(preGateEvent, "phase9_gate_passed"),
+          "inconsistent_audit_order",
+          fieldPrefix,
+          `${preGateEvent} must occur before gate passed.`,
+          errors
+        );
+      }
+    }
+
+    for (const completionEvent of completionEvents.filter((eventName) => eventPresent(eventName))) {
+      phase9RecordValidationCheck(
+        auditOrderChecks,
+        `gate_passed_before_${completionEvent}`,
+        eventBefore("phase9_gate_passed", completionEvent),
+        "inconsistent_audit_order",
+        fieldPrefix,
+        `Gate passed must occur before ${completionEvent}.`,
+        errors
+      );
+      for (const requiredEvent of ["phase9_post_action_verification_planned", "phase9_rollback_plan_recorded"]) {
+        phase9RecordValidationCheck(
+          auditOrderChecks,
+          `${requiredEvent}_present_before_completion`,
+          eventPresent(requiredEvent),
+          "missing_required_audit_event",
+          fieldPrefix,
+          `${requiredEvent} is required before completion.`,
+          errors
+        );
+        if (eventPresent(requiredEvent)) {
+          phase9RecordValidationCheck(
+            auditOrderChecks,
+            `${requiredEvent}_before_completion`,
+            eventBefore(requiredEvent, completionEvent),
+            "inconsistent_audit_order",
+            fieldPrefix,
+            `${requiredEvent} must occur before completion.`,
+            errors
+          );
+        }
+      }
+    }
+  }
+
+  if (eventPresent("phase9_gate_blocked")) {
+    for (const completionEvent of completionEvents) {
+      phase9RecordValidationCheck(
+        auditOrderChecks,
+        `gate_blocked_prevents_${completionEvent}`,
+        !eventPresent(completionEvent),
+        "inconsistent_audit_order",
+        fieldPrefix,
+        "Gate-blocked scenarios cannot also complete or skip a real action path.",
+        errors
+      );
+    }
+  }
+
+  if (eventPresent("phase9_real_action_skipped")) {
+    phase9RecordValidationCheck(
+      auditOrderChecks,
+      "real_action_skipped_event_has_skipped_path",
+      scenario.dry_run === false ||
+        scenario.real_action_enabled === true ||
+        sandboxCodes(scenario.failure_reason_codes).includes("real_action_disabled"),
+      "inconsistent_real_action_flags",
+      fieldPrefix,
+      "real-action-skipped event requires a represented non-dry-run or disabled-real-action path.",
+      errors
+    );
+  }
+}
+
+function phase9RecordValidationCheck(checks, name, passed, code, field, detail, errors, warnings) {
+  checks.push({
+    name,
+    passed: Boolean(passed),
+    code: passed ? "" : code,
+    field,
+    detail: passed ? "" : detail,
+  });
+  if (passed) {
+    return;
+  }
+  if (Array.isArray(errors)) {
+    phase9ReplayAddValidationError(errors, code, field, detail);
+  } else if (Array.isArray(warnings)) {
+    warnings.push({ code, field, detail });
+  }
+}
+
+function phase9ActionTypeAllowed(report, failureReasonCodes, gatePassed) {
+  const actionType = String(report.action_type || "");
+  if (["click", "mixed"].includes(actionType)) {
+    return true;
+  }
+  return !actionType && !gatePassed && failureReasonCodes.includes("missing_action_contract");
+}
+
+function phase9ScopeSane(scope) {
+  if (!phase9IsPlainObject(scope)) {
+    return false;
+  }
+  if (scope.scope === "mixed") {
+    return true;
+  }
+  return Boolean(scope.window_id) && Boolean(scope.target_id) && scope.one_window_only === true && scope.one_target_only === true;
+}
+
+function phase9FailureReasonsForBlocker(blockerCode) {
+  return {
+    stale_observation: ["stale_observation"],
+    high_risk_requires_approval: ["high_risk_target", "high_risk_requires_approval"],
+    readiness_not_ready: ["readiness_not_ready"],
+    invalid_target_geometry: ["invalid_target_geometry"],
+  }[blockerCode] || [];
+}
+
+function phase9BlockersForFailureReason(failureCode) {
+  return {
+    stale_observation: ["stale_observation"],
+    high_risk_target: ["high_risk_requires_approval", "high_risk_target"],
+    readiness_not_ready: ["readiness_not_ready"],
+    invalid_target_geometry: ["invalid_target_geometry"],
+  }[failureCode] || [];
+}
+
 function phase9SensitiveKeyPaths(value, path = "") {
   const paths = [];
 
@@ -3243,6 +3851,49 @@ function phase9BundleNestedTrue(value, keyName) {
     }
     return phase9BundleNestedTrue(item, keyName);
   });
+}
+
+function phase9UnsafeFlagsDetected(errorCodes, warningCodes, sensitiveKeyFindings) {
+  const unsafeCodes = new Set([
+    "unsafe_bundle_flags",
+    "real_action_enabled_in_bundle",
+    "non_dry_run_bundle",
+    "high_risk_marked_gate_passed",
+    "unknown_risk_marked_gate_passed",
+    "unsafe_action_type",
+    "suspicious_sensitive_key",
+  ]);
+  const flags = errorCodes.concat(warningCodes).filter((code) => unsafeCodes.has(code));
+  if (sensitiveKeyFindings.length && !flags.includes("suspicious_sensitive_key")) {
+    flags.push("suspicious_sensitive_key");
+  }
+  return Array.from(new Set(flags));
+}
+
+function phase9ValidationDebugFocus(errorCodes, warningCodes, failureReasonCodes, blockerCodes) {
+  const codes = new Set(errorCodes.concat(warningCodes, failureReasonCodes, blockerCodes));
+  const focusRules = [
+    ["suspicious_sensitive_key", "remove private or credential-like fields from the bundle"],
+    ["unsafe_bundle_flags", "inspect dry-run and real-action flags"],
+    ["real_action_enabled_in_bundle", "confirm the exported bundle keeps real action disabled"],
+    ["non_dry_run_bundle", "confirm replay input is dry-run-only"],
+    ["inconsistent_audit_order", "inspect audit event ordering"],
+    ["missing_required_audit_event", "inspect required Phase 9 audit events"],
+    ["inconsistent_gate_outcome", "inspect gate result and actual outcome consistency"],
+    ["high_risk_marked_gate_passed", "inspect target risk classification"],
+    ["unknown_risk_marked_gate_passed", "inspect unknown-risk target handling"],
+    ["approval_missing_but_gate_passed", "inspect mock approval state"],
+    ["emergency_stop_missing_but_gate_passed", "inspect emergency stop state"],
+    ["verification_missing_but_gate_passed", "inspect post-action verification plan"],
+    ["rollback_missing_but_gate_passed", "inspect rollback plan"],
+    ["readiness_ready_with_blockers", "inspect readiness and blocker consistency"],
+    ["unsafe_action_type", "inspect sandbox action type"],
+    ["stale_observation", "inspect observation freshness assumptions"],
+    ["missing_action_contract", "inspect action contract fixture"],
+    ["missing_audit_plan", "inspect audit plan fixture"],
+  ];
+  const focus = focusRules.filter(([code]) => codes.has(code)).map(([, recommendation]) => recommendation);
+  return focus.length ? focus.slice(0, 4).join("; ") : "review validation summary and audit timeline";
 }
 
 function phase9ReplayNotes(validation) {
@@ -3293,9 +3944,15 @@ async function copyPhase9ReplayPayload(payloadKind) {
 
 function buildPhase9ReplayAISummary(report) {
   const validation = report.validation || {};
+  const validationSummary = report.replay_validation_summary || validation.validation_summary || {};
   return [
     "Project phase: phase_9_5 Phase 9 bundle import and replay.",
     `Replay status: ${report.replay_status || "unknown"}; validation=${validation.status || "unknown"}.`,
+    `Validation hardening: errors=${formatSandboxCodeList(
+      validationSummary.validation_errors
+    )}; warnings=${formatSandboxCodeList(
+      validationSummary.validation_warnings
+    )}; unsafe_flags=${formatSandboxCodeList(validationSummary.unsafe_flags_detected)}.`,
     `Original experiment: ${report.original_experiment_id || "unknown"}; gate=${
       report.original_gate_passed === true ? "passed" : "blocked or unknown"
     }.`,
@@ -3306,6 +3963,7 @@ function buildPhase9ReplayAISummary(report) {
       report.original_failure_reason_codes
     )}; blocker_codes=${formatSandboxCodeList(report.original_blocker_codes)}.`,
     `Audit events: ${formatSandboxCodeList(report.original_audit_event_names)}.`,
+    `Recommended debug focus: ${validationSummary.recommended_debug_focus || "none"}.`,
     `Safety boundary confirmed: ${formatSandboxBool(report.safety_boundary_confirmed)}.`,
   ].join("\n");
 }
