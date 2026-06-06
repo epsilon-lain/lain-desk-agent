@@ -29,6 +29,7 @@ from lain_desk_agent.phase9_experiment import (
     PHASE9_EXPORT_PROJECT_PHASE,
     PHASE9_EXPORT_REPORT_VERSION,
     PHASE9_REPORT_FIELDS,
+    PHASE9_REPLAY_REPORT_VERSION,
     MockApprovalState,
     MockEmergencyStopState,
     MockPostActionVerificationPlan,
@@ -38,10 +39,14 @@ from lain_desk_agent.phase9_experiment import (
     build_phase9_ai_readable_summary,
     build_phase9_experiment_report,
     build_phase9_export_report,
+    build_phase9_replay_report,
     build_phase9_reproducibility_bundle,
     evaluate_phase9_experiment_scenarios,
+    import_phase9_reproducibility_bundle,
     phase9_experiment_scenario_ids,
+    replay_phase9_reproducibility_bundle,
     run_phase9_experiment,
+    validate_phase9_reproducibility_bundle,
     validate_phase9_gate,
 )
 from lain_desk_agent.sandbox_experiment import (
@@ -541,6 +546,7 @@ class Phase9ExperimentTests(unittest.TestCase):
 
         self.assertEqual(bundle["bundle_type"], "phase9_reproducibility_bundle")
         self.assertEqual(bundle["bundle_version"], PHASE9_EXPORT_BUNDLE_VERSION)
+        self.assertEqual(bundle["report_version"], PHASE9_EXPORT_REPORT_VERSION)
         self.assertEqual(bundle["project_phase"], PHASE9_EXPORT_PROJECT_PHASE)
         self.assertIn("phase9_report", bundle)
         self.assertIn("ai_readable_summary", bundle)
@@ -551,12 +557,142 @@ class Phase9ExperimentTests(unittest.TestCase):
         self.assertIn("safety_boundary_statement", bundle)
 
         bundle_text = json.dumps(bundle, sort_keys=True).lower()
-        for forbidden_text in ["token", "secret", "api_key", "password", "credential"]:
+        for forbidden_text in [
+            "token",
+            "secret",
+            "api_key",
+            "password",
+            "credential",
+            "private_key",
+            "access_key",
+        ]:
             with self.subTest(forbidden_text=forbidden_text):
                 self.assertNotIn(forbidden_text, bundle_text)
 
         self.assertNotIn("browser_credentials_allowed", bundle_text)
         self.assertIn("real desktop actions remain disabled", bundle_text)
+
+    def test_phase9_reproducibility_bundle_validates_for_replay(self) -> None:
+        bundle = build_phase9_reproducibility_bundle(evaluate_phase9_experiment_scenarios())
+        validation = validate_phase9_reproducibility_bundle(bundle)
+
+        self.assertTrue(validation["valid"])
+        self.assertEqual(validation["status"], "valid")
+        self.assertEqual(validation["error_codes"], [])
+        self.assertEqual(validation["bundle_version"], PHASE9_EXPORT_BUNDLE_VERSION)
+        self.assertEqual(validation["report_version"], PHASE9_EXPORT_REPORT_VERSION)
+        self.assertTrue(validation["safety_boundary_confirmed"])
+
+    def test_phase9_reproducibility_bundle_validation_blocks_unsafe_shapes(self) -> None:
+        base_bundle = build_phase9_reproducibility_bundle(evaluate_phase9_experiment_scenarios())
+        cases = [
+            (
+                "missing_phase9_report",
+                lambda bundle: bundle.pop("phase9_report"),
+                {"missing_phase9_report", "missing_bundle_field"},
+            ),
+            (
+                "unsupported_bundle_version",
+                lambda bundle: bundle.update({"bundle_version": "old_bundle"}),
+                {"unsupported_bundle_version"},
+            ),
+            (
+                "invalid_report_version",
+                lambda bundle: bundle.update({"report_version": "old_report"}),
+                {"invalid_report_version"},
+            ),
+            (
+                "sensitive_key",
+                lambda bundle: bundle["phase9_report"].update({"private_key": "redacted"}),
+                {"suspicious_sensitive_key"},
+            ),
+            (
+                "real_action_enabled",
+                lambda bundle: bundle["phase9_report"].update({"real_action_enabled": True}),
+                {"real_action_enabled_in_bundle"},
+            ),
+            (
+                "non_dry_run",
+                lambda bundle: bundle["phase9_report"].update({"dry_run": False}),
+                {"non_dry_run_bundle"},
+            ),
+            (
+                "missing_safety_boundary",
+                lambda bundle: bundle.pop("safety_boundary_statement"),
+                {"missing_safety_boundary_statement", "missing_bundle_field"},
+            ),
+            (
+                "malformed_blocker_codes",
+                lambda bundle: bundle["phase9_report"].update({"blocker_codes": "stale_observation"}),
+                {"malformed_blocker_codes"},
+            ),
+            (
+                "malformed_audit_event",
+                lambda bundle: bundle["phase9_report"]["audit_timeline"][0].pop("event_name"),
+                {"malformed_audit_event"},
+            ),
+        ]
+
+        for case_name, mutate, expected_codes in cases:
+            with self.subTest(case_name=case_name):
+                bundle = json.loads(json.dumps(base_bundle))
+                mutate(bundle)
+                validation = validate_phase9_reproducibility_bundle(bundle)
+                self.assertFalse(validation["valid"])
+                self.assertTrue(expected_codes.issubset(set(validation["error_codes"])))
+
+    def test_phase9_import_and_replay_report_preserve_audit_order(self) -> None:
+        bundle = build_phase9_reproducibility_bundle(evaluate_phase9_experiment_scenarios())
+        imported = import_phase9_reproducibility_bundle(bundle)
+        replay_report = replay_phase9_reproducibility_bundle(bundle)
+        built_report = build_phase9_replay_report(bundle)
+
+        self.assertEqual(imported["import_status"], "imported")
+        self.assertTrue(imported["valid"])
+        self.assertEqual(replay_report["report_version"], PHASE9_REPLAY_REPORT_VERSION)
+        self.assertEqual(replay_report["project_phase"], "phase_9_5")
+        self.assertEqual(replay_report["replay_status"], "replayed")
+        self.assertEqual(built_report["replay_status"], replay_report["replay_status"])
+        self.assertEqual(
+            replay_report["original_experiment_id"],
+            bundle["phase9_report"]["experiment_id"],
+        )
+        self.assertEqual(
+            replay_report["original_gate_passed"],
+            bundle["phase9_report"]["gate_passed"],
+        )
+        self.assertEqual(
+            replay_report["original_actual_outcome"],
+            bundle["phase9_report"]["actual_outcome"],
+        )
+        self.assertEqual(
+            replay_report["original_failure_reason_codes"],
+            bundle["phase9_report"]["failure_reason_codes"],
+        )
+        self.assertEqual(
+            replay_report["original_blocker_codes"],
+            bundle["phase9_report"]["blocker_codes"],
+        )
+        self.assertEqual(
+            replay_report["original_audit_event_names"],
+            bundle["phase9_report"]["audit_event_names"],
+        )
+        self.assertEqual(
+            replay_report["replayed_audit_timeline"],
+            bundle["phase9_report"]["audit_timeline"],
+        )
+        self.assertTrue(replay_report["safety_boundary_confirmed"])
+        self.assertIs(replay_report["real_action_enabled"], False)
+
+    def test_phase9_replay_blocks_invalid_bundle_without_state_change(self) -> None:
+        bundle = build_phase9_reproducibility_bundle(evaluate_phase9_experiment_scenarios())
+        bundle["phase9_report"]["audit_timeline"] = []
+        replay_report = replay_phase9_reproducibility_bundle(bundle)
+
+        self.assertEqual(replay_report["replay_status"], "blocked")
+        self.assertIn("missing_audit_timeline", replay_report["validation"]["error_codes"])
+        self.assertEqual(replay_report["replayed_audit_timeline"], [])
+        self.assertFalse(replay_report["safety_boundary_confirmed"])
 
     def test_phase9_cockpit_endpoint_is_read_only_and_stable(self) -> None:
         server = create_server("127.0.0.1", 0)
@@ -635,6 +771,17 @@ class Phase9ExperimentTests(unittest.TestCase):
             "copyPhase9AISummary",
             "copyPhase9JsonReport",
             "copyPhase9ReproBundle",
+            "phase9ReplayPanel",
+            "phase9BundleInput",
+            "validatePhase9Bundle",
+            "replayPhase9Bundle",
+            "copyPhase9ReplayReport",
+            "copyPhase9ReplaySummary",
+            "clearPhase9Bundle",
+            "phase9ReplayStatus",
+            "phase9ReplayErrors",
+            "phase9ReplaySummary",
+            "phase9ReplayTimeline",
             "phase9QuickFilters",
             "phase9ExportCopyStatus",
             "phase9Counts",
@@ -666,6 +813,12 @@ class Phase9ExperimentTests(unittest.TestCase):
             "Copy AI summary",
             "Copy JSON report",
             "Copy repro bundle",
+            "Phase 9 bundle replay",
+            "Validate bundle",
+            "Replay bundle",
+            "Copy replay report",
+            "Copy replay AI summary",
+            "Clear imported bundle",
         ]:
             with self.subTest(visible_label=visible_label):
                 self.assertIn(visible_label, source + html)
@@ -800,6 +953,61 @@ class Phase9ExperimentTests(unittest.TestCase):
         self.assertIn('data-phase9-event-kind="warning"', styles)
         self.assertIn('data-phase9-event-kind="blocked"', styles)
         self.assertIn('data-phase9-event-kind="skipped"', styles)
+
+    def test_phase9_cockpit_bundle_import_replay_hooks_exist(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = (PROJECT_ROOT / "ui" / "styles.css").read_text(encoding="utf-8")
+
+        for function_name in [
+            "parsePhase9BundleInput",
+            "validatePhase9BundleFromInput",
+            "replayPhase9BundleFromInput",
+            "clearPhase9BundleReplay",
+            "validatePhase9BundleObject",
+            "importPhase9ReproducibilityBundle",
+            "replayPhase9ReproducibilityBundle",
+            "buildPhase9ReplayReport",
+            "renderPhase9ReplayValidation",
+            "renderPhase9ReplayReport",
+            "renderPhase9ReplayTimeline",
+            "phase9ReplayAuditEventDetails",
+            "phase9ReplayAuditEventRows",
+            "copyPhase9ReplayPayload",
+            "buildPhase9ReplayAISummary",
+        ]:
+            with self.subTest(function_name=function_name):
+                self.assertIn(f"function {function_name}", source)
+
+        for required_string in [
+            "missing_bundle_field",
+            "invalid_report_version",
+            "missing_phase9_report",
+            "missing_audit_timeline",
+            "missing_safety_boundary_statement",
+            "suspicious_sensitive_key",
+            "real_action_enabled_in_bundle",
+            "non_dry_run_bundle",
+            "malformed_audit_event",
+            "malformed_blocker_codes",
+            "unsupported_bundle_version",
+            "phase9_repro_bundle_v1",
+            "phase9_replay_v1",
+            "phase_9_5",
+            "phase9ReplayTimeline",
+            "phase9ReplayEvent",
+            "phase9ReplayValidationError",
+            "phase9ReplayAuditEventDetails",
+        ]:
+            with self.subTest(required_string=required_string):
+                self.assertIn(required_string, source)
+
+        for css_selector in [
+            ".phase9-replay-panel",
+            ".phase9-replay-input",
+            ".phase9-replay-errors",
+        ]:
+            with self.subTest(css_selector=css_selector):
+                self.assertIn(css_selector, styles)
 
     def test_phase9_cockpit_ui_is_read_only(self) -> None:
         source = UI_APP_JS.read_text(encoding="utf-8")

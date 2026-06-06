@@ -112,6 +112,17 @@ const phase9Counts = document.querySelector("#phase9Counts");
 const phase9ExperimentSummary = document.querySelector("#phase9ExperimentSummary");
 const phase9ExperimentTimeline = document.querySelector("#phase9ExperimentTimeline");
 const phase9ExperimentResults = document.querySelector("#phase9ExperimentResults");
+const phase9ReplayPanel = document.querySelector("#phase9ReplayPanel");
+const phase9BundleInput = document.querySelector("#phase9BundleInput");
+const validatePhase9Bundle = document.querySelector("#validatePhase9Bundle");
+const replayPhase9Bundle = document.querySelector("#replayPhase9Bundle");
+const copyPhase9ReplayReport = document.querySelector("#copyPhase9ReplayReport");
+const copyPhase9ReplaySummary = document.querySelector("#copyPhase9ReplaySummary");
+const clearPhase9Bundle = document.querySelector("#clearPhase9Bundle");
+const phase9ReplayStatus = document.querySelector("#phase9ReplayStatus");
+const phase9ReplayErrors = document.querySelector("#phase9ReplayErrors");
+const phase9ReplaySummary = document.querySelector("#phase9ReplaySummary");
+const phase9ReplayTimeline = document.querySelector("#phase9ReplayTimeline");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -273,6 +284,54 @@ const PHASE9_BLOCKER_SEVERITY = {
   missing_rollback_plan: "high",
   low_confidence_target: "high",
 };
+const PHASE9_REPLAY_REQUIRED_BUNDLE_FIELDS = [
+  "bundle_type",
+  "bundle_version",
+  "report_version",
+  "project_phase",
+  "phase9_report",
+  "ai_readable_summary",
+  "minimal_reproduction_metadata",
+  "safety_boundary_statement",
+];
+const PHASE9_REPLAY_REQUIRED_REPORT_FIELDS = [
+  "experiment_id",
+  "dry_run",
+  "real_action_enabled",
+  "real_action_skipped",
+  "gate_passed",
+  "actual_outcome",
+  "failure_reason_codes",
+  "blocker_codes",
+  "audit_event_names",
+  "audit_timeline",
+  "sandbox_scope",
+  "action_type",
+  "target_risk_hint",
+  "target_confidence",
+  "readiness_ready",
+  "user_approval_present",
+  "emergency_stop_available",
+  "post_action_verification_planned",
+  "rollback_plan_recorded",
+];
+const PHASE9_REPLAY_REQUIRED_METADATA_FIELDS = [
+  "scenario_ids",
+  "experiment_id",
+  "audit_event_order",
+  "failure_reason_codes",
+  "blocker_codes",
+];
+const PHASE9_REPLAY_SENSITIVE_KEY_FRAGMENTS = [
+  "token",
+  "secret",
+  "api_key",
+  "apikey",
+  "password",
+  "credential",
+  "private_key",
+  "access_key",
+];
 const DEMO_SCENARIOS = {
   browser_search: {
     defaultTask: "Search",
@@ -310,6 +369,8 @@ let currentSandboxEvaluationReport = null;
 let currentSandboxQuickFilterGroup = "all";
 let currentPhase9ExperimentReport = null;
 let currentPhase9QuickFilterGroup = "all";
+let currentPhase9ImportedBundle = null;
+let currentPhase9ReplayReport = null;
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 setDemoScenarioSelectionDefaults();
@@ -467,6 +528,26 @@ copyPhase9JsonReport.addEventListener("click", async () => {
 
 copyPhase9ReproBundle.addEventListener("click", async () => {
   await copyPhase9ExportPayload("repro_bundle");
+});
+
+validatePhase9Bundle.addEventListener("click", () => {
+  validatePhase9BundleFromInput();
+});
+
+replayPhase9Bundle.addEventListener("click", () => {
+  replayPhase9BundleFromInput();
+});
+
+copyPhase9ReplayReport.addEventListener("click", async () => {
+  await copyPhase9ReplayPayload("report");
+});
+
+copyPhase9ReplaySummary.addEventListener("click", async () => {
+  await copyPhase9ReplayPayload("summary");
+});
+
+clearPhase9Bundle.addEventListener("click", () => {
+  clearPhase9BundleReplay();
 });
 
 sandboxEvaluationFixtureSet.addEventListener("change", () => {
@@ -2527,6 +2608,720 @@ function phase9ExportCopyStatusText(payloadKind) {
   return "Phase 9 reproducibility bundle copied.";
 }
 
+function parsePhase9BundleInput() {
+  const text = phase9BundleInput.value.trim();
+
+  if (!text) {
+    throw new Error("Paste a Phase 9 reproducibility bundle first.");
+  }
+
+  return JSON.parse(text);
+}
+
+function validatePhase9BundleFromInput() {
+  try {
+    const bundle = parsePhase9BundleInput();
+    const imported = importPhase9ReproducibilityBundle(bundle);
+
+    currentPhase9ImportedBundle = imported;
+    currentPhase9ReplayReport = null;
+    renderPhase9ReplayValidation(imported.validation, imported);
+    phase9ReplayTimeline.hidden = true;
+    phase9ReplayTimeline.replaceChildren();
+  } catch (error) {
+    renderPhase9ReplayParseError(error);
+  }
+}
+
+function replayPhase9BundleFromInput() {
+  try {
+    const bundle = parsePhase9BundleInput();
+    const replayReport = replayPhase9ReproducibilityBundle(bundle);
+
+    currentPhase9ReplayReport = replayReport;
+    currentPhase9ImportedBundle = {
+      import_status: replayReport.validation.valid ? "imported" : "blocked",
+      valid: replayReport.validation.valid,
+      validation: replayReport.validation,
+      phase9_report: replayReport.validation.valid ? bundle.phase9_report || {} : {},
+    };
+    renderPhase9ReplayReport(replayReport);
+  } catch (error) {
+    renderPhase9ReplayParseError(error);
+  }
+}
+
+function clearPhase9BundleReplay() {
+  phase9BundleInput.value = "";
+  currentPhase9ImportedBundle = null;
+  currentPhase9ReplayReport = null;
+  phase9ReplayPanel.dataset.state = "empty";
+  phase9ReplayStatus.textContent = "No bundle imported.";
+  phase9ReplayErrors.hidden = true;
+  phase9ReplayErrors.replaceChildren();
+  phase9ReplaySummary.hidden = true;
+  phase9ReplaySummary.replaceChildren();
+  phase9ReplayTimeline.hidden = true;
+  phase9ReplayTimeline.replaceChildren();
+}
+
+function validatePhase9BundleObject(bundle) {
+  const errors = [];
+  const warnings = [];
+
+  if (!phase9IsPlainObject(bundle)) {
+    phase9ReplayAddValidationError(
+      errors,
+      "missing_bundle_field",
+      "bundle",
+      "Bundle must be a JSON object."
+    );
+    return phase9ReplayValidationResult(bundle, errors, warnings);
+  }
+
+  for (const fieldName of PHASE9_REPLAY_REQUIRED_BUNDLE_FIELDS) {
+    if (!(fieldName in bundle)) {
+      phase9ReplayAddValidationError(
+        errors,
+        "missing_bundle_field",
+        fieldName,
+        "Required top-level bundle field is missing."
+      );
+    }
+  }
+
+  const sensitivePaths = phase9SensitiveKeyPaths(bundle);
+  if (sensitivePaths.length) {
+    phase9ReplayAddValidationError(
+      errors,
+      "suspicious_sensitive_key",
+      sensitivePaths.slice(0, 5).join(", "),
+      "Bundle contains key names that look like private material."
+    );
+  }
+
+  if (bundle.bundle_version && bundle.bundle_version !== "phase9_repro_bundle_v1") {
+    phase9ReplayAddValidationError(
+      errors,
+      "unsupported_bundle_version",
+      "bundle_version",
+      `Unsupported bundle version: ${bundle.bundle_version}.`
+    );
+  }
+
+  const phase9Report = phase9IsPlainObject(bundle.phase9_report) ? bundle.phase9_report : null;
+  if (!phase9Report) {
+    phase9ReplayAddValidationError(
+      errors,
+      "missing_phase9_report",
+      "phase9_report",
+      "Bundle must contain a Phase 9 export report object."
+    );
+    return phase9ReplayValidationResult(bundle, errors, warnings);
+  }
+
+  if (bundle.report_version !== "phase9_export_v1") {
+    phase9ReplayAddValidationError(
+      errors,
+      "invalid_report_version",
+      "report_version",
+      "Expected phase9_export_v1."
+    );
+  }
+
+  if (phase9Report.report_version !== "phase9_export_v1") {
+    phase9ReplayAddValidationError(
+      errors,
+      "invalid_report_version",
+      "phase9_report.report_version",
+      "Expected phase9_export_v1."
+    );
+  }
+
+  for (const fieldName of PHASE9_REPLAY_REQUIRED_REPORT_FIELDS) {
+    if (!(fieldName in phase9Report)) {
+      phase9ReplayAddValidationError(
+        errors,
+        "missing_bundle_field",
+        `phase9_report.${fieldName}`,
+        "Required Phase 9 report field is missing."
+      );
+    }
+  }
+
+  if (phase9Report.real_action_enabled === true || phase9BundleNestedTrue(phase9Report, "real_action_enabled")) {
+    phase9ReplayAddValidationError(
+      errors,
+      "real_action_enabled_in_bundle",
+      "phase9_report.real_action_enabled",
+      "Imported bundles must keep real action disabled."
+    );
+  }
+
+  if (phase9Report.dry_run !== true || phase9BundleNestedTrue(phase9Report, "real_action_attempted")) {
+    phase9ReplayAddValidationError(
+      errors,
+      "non_dry_run_bundle",
+      "phase9_report.dry_run",
+      "Imported bundles must remain dry-run and never show real action attempted."
+    );
+  }
+
+  if (!phase9IsStringList(phase9Report.failure_reason_codes)) {
+    phase9ReplayAddValidationError(
+      errors,
+      "malformed_blocker_codes",
+      "phase9_report.failure_reason_codes",
+      "Failure reason codes must be a list of strings."
+    );
+  }
+  if (!phase9IsStringList(phase9Report.blocker_codes)) {
+    phase9ReplayAddValidationError(
+      errors,
+      "malformed_blocker_codes",
+      "phase9_report.blocker_codes",
+      "Blocker codes must be a list of strings."
+    );
+  }
+  if (!phase9IsStringList(phase9Report.audit_event_names)) {
+    phase9ReplayAddValidationError(
+      errors,
+      "malformed_audit_event",
+      "phase9_report.audit_event_names",
+      "Audit event names must be a list of strings."
+    );
+  }
+
+  if (!Array.isArray(phase9Report.audit_timeline) || !phase9Report.audit_timeline.length) {
+    phase9ReplayAddValidationError(
+      errors,
+      "missing_audit_timeline",
+      "phase9_report.audit_timeline",
+      "Phase 9 replay requires a non-empty audit timeline."
+    );
+  } else {
+    validatePhase9AuditTimeline(phase9Report.audit_timeline, errors);
+  }
+
+  validatePhase9ReplayMetadata(bundle.minimal_reproduction_metadata, phase9Report, errors);
+
+  if (typeof bundle.safety_boundary_statement !== "string" || !bundle.safety_boundary_statement.trim()) {
+    phase9ReplayAddValidationError(
+      errors,
+      "missing_safety_boundary_statement",
+      "safety_boundary_statement",
+      "Bundle must include the Phase 9 safety boundary statement."
+    );
+  }
+
+  return phase9ReplayValidationResult(bundle, errors, warnings);
+}
+
+function importPhase9ReproducibilityBundle(bundle) {
+  const validation = validatePhase9BundleObject(bundle);
+  const phase9Report =
+    validation.valid && phase9IsPlainObject(bundle?.phase9_report)
+      ? JSON.parse(JSON.stringify(bundle.phase9_report))
+      : {};
+
+  return {
+    import_status: validation.valid ? "imported" : "blocked",
+    valid: validation.valid,
+    validation,
+    bundle_version: validation.bundle_version,
+    report_version: validation.report_version,
+    phase9_report: phase9Report,
+    safety_boundary_statement: phase9IsPlainObject(bundle)
+      ? String(bundle.safety_boundary_statement || "")
+      : "",
+  };
+}
+
+function replayPhase9ReproducibilityBundle(bundle) {
+  const imported = importPhase9ReproducibilityBundle(bundle);
+  return buildPhase9ReplayReport(imported);
+}
+
+function buildPhase9ReplayReport(imported) {
+  const validation = imported?.validation || phase9ReplayValidationResult({}, [], []);
+  const phase9Report = validation.valid ? imported.phase9_report || {} : {};
+  const replayedAuditTimeline = Array.isArray(phase9Report.audit_timeline)
+    ? JSON.parse(JSON.stringify(phase9Report.audit_timeline))
+    : [];
+
+  // A live system would normally hand off after validation; Phase 9.5 stops here
+  // and only reconstructs deterministic dry-run debug output from pasted JSON.
+  return {
+    report_version: "phase9_replay_v1",
+    generated_at: "deterministic_phase9_fixture",
+    project_phase: "phase_9_5",
+    replay_status: validation.valid ? "replayed" : "blocked",
+    validation,
+    original_experiment_id: phase9Report.experiment_id || "",
+    original_gate_passed: validation.valid ? phase9Report.gate_passed : null,
+    original_actual_outcome: phase9IsPlainObject(phase9Report.actual_outcome)
+      ? phase9Report.actual_outcome
+      : {},
+    original_failure_reason_codes: sandboxCodes(phase9Report.failure_reason_codes),
+    original_blocker_codes: sandboxCodes(phase9Report.blocker_codes),
+    original_audit_event_names: sandboxCodes(phase9Report.audit_event_names),
+    replayed_audit_timeline: replayedAuditTimeline,
+    replay_notes: phase9ReplayNotes(validation),
+    safety_boundary_confirmed: validation.valid && validation.safety_boundary_confirmed === true,
+    safety_boundary_statement: imported?.safety_boundary_statement || "",
+    dry_run: validation.valid ? phase9Report.dry_run : null,
+    real_action_enabled: validation.valid ? phase9Report.real_action_enabled : null,
+    real_action_skipped: validation.valid ? phase9Report.real_action_skipped : null,
+  };
+}
+
+function renderPhase9ReplayParseError(error) {
+  currentPhase9ImportedBundle = null;
+  currentPhase9ReplayReport = null;
+  phase9ReplayPanel.dataset.state = "error";
+  phase9ReplayStatus.textContent = `Bundle parse failed: ${error.message || String(error)}`;
+  renderPhase9ReplayErrors([
+    {
+      code: "missing_bundle_field",
+      field: "bundle_json",
+      detail: error.message || String(error),
+    },
+  ]);
+  phase9ReplaySummary.hidden = true;
+  phase9ReplaySummary.replaceChildren();
+  phase9ReplayTimeline.hidden = true;
+  phase9ReplayTimeline.replaceChildren();
+}
+
+function renderPhase9ReplayValidation(validation, imported = null) {
+  phase9ReplayPanel.dataset.state = validation.valid ? "ready" : "warning";
+  phase9ReplayStatus.textContent = validation.valid
+    ? "Bundle validation passed. Replay remains read-only and dry-run."
+    : "Bundle validation blocked replay. Review validation errors below.";
+  renderPhase9ReplayErrors(validation.errors || []);
+  setPhase9ReplaySummary([
+    ["Validation", validation.status || "unknown"],
+    ["Bundle version", validation.bundle_version || "unknown"],
+    ["Report version", validation.report_version || "unknown"],
+    ["Errors", formatSandboxCodeList(validation.error_codes)],
+    ["Warnings", formatSandboxCodeList(validation.warning_codes)],
+    ["Imported", imported?.import_status || "not imported"],
+    ["Safety boundary", formatSandboxBool(validation.safety_boundary_confirmed)],
+  ]);
+  phase9ReplaySummary.hidden = false;
+}
+
+function renderPhase9ReplayReport(report) {
+  renderPhase9ReplayValidation(report.validation, {
+    import_status: report.validation.valid ? "imported" : "blocked",
+  });
+  phase9ReplayPanel.dataset.state = report.replay_status === "replayed" ? "ready" : "warning";
+  phase9ReplayStatus.textContent =
+    report.replay_status === "replayed"
+      ? "Replay report built from pasted deterministic bundle. No state changes were made."
+      : "Replay report blocked by bundle validation.";
+  setPhase9ReplaySummary([
+    ["Replay status", report.replay_status || "unknown"],
+    ["Original experiment", report.original_experiment_id || "unknown"],
+    ["Gate", report.original_gate_passed === true ? "passed" : "blocked or unknown"],
+    ["Dry-run", formatSandboxBool(report.dry_run)],
+    ["Real action enabled", formatSandboxBool(report.real_action_enabled)],
+    ["Real action skipped", formatSandboxBool(report.real_action_skipped)],
+    ["Failure reasons", formatSandboxCodeList(report.original_failure_reason_codes)],
+    ["Blockers", formatSandboxCodeList(report.original_blocker_codes)],
+    ["Audit events", formatSandboxCodeList(report.original_audit_event_names)],
+    ["Safety boundary", formatSandboxBool(report.safety_boundary_confirmed)],
+    ["Notes", formatEvaluationNotes(report.replay_notes)],
+  ]);
+  phase9ReplaySummary.hidden = false;
+  renderPhase9ReplayTimeline(report.replayed_audit_timeline);
+}
+
+function renderPhase9ReplayErrors(errors) {
+  phase9ReplayErrors.replaceChildren();
+  if (!Array.isArray(errors) || !errors.length) {
+    phase9ReplayErrors.hidden = true;
+    return;
+  }
+
+  phase9ReplayErrors.hidden = false;
+  for (const error of errors) {
+    const item = document.createElement("li");
+    item.dataset.phase9ReplayValidationError = "true";
+    item.dataset.errorCode = error.code || "unknown";
+    item.textContent = `${error.code || "unknown"}: ${error.field || "bundle"} - ${
+      error.detail || "validation failed"
+    }`;
+    phase9ReplayErrors.appendChild(item);
+  }
+}
+
+function setPhase9ReplaySummary(rows) {
+  phase9ReplaySummary.replaceChildren();
+
+  for (const [label, value] of rows) {
+    phase9ReplaySummary.appendChild(plannerEvaluationFact(label, value));
+  }
+}
+
+function renderPhase9ReplayTimeline(auditTimeline) {
+  phase9ReplayTimeline.replaceChildren();
+
+  if (!Array.isArray(auditTimeline) || !auditTimeline.length) {
+    phase9ReplayTimeline.hidden = true;
+    return;
+  }
+
+  const title = document.createElement("p");
+  const list = document.createElement("ol");
+
+  phase9ReplayTimeline.hidden = false;
+  phase9ReplayTimeline.dataset.phase9ReplayTimeline = "true";
+  title.className = "sandbox-evaluation-timeline-title";
+  title.textContent = "Replayed Phase 9 audit order from imported bundle";
+  list.className = "sandbox-evaluation-timeline-list";
+
+  for (const event of auditTimeline) {
+    const item = document.createElement("li");
+    const scenarioId = document.createElement("span");
+    const eventName = String(event.event_name || "");
+    const originalOrder = Number(event.global_order || event.order || 0);
+
+    item.dataset.phase9ReplayEvent = "true";
+    item.dataset.originalOrder = String(originalOrder);
+    item.dataset.scenarioId = event.scenario_id || "";
+    item.dataset.auditEventName = eventName;
+    item.dataset.auditTone = sandboxAuditEventTone(eventName);
+    item.dataset.phase9EventKind = phase9ReplayEventKind(event);
+    scenarioId.className = "sandbox-evaluation-timeline-scenario";
+    scenarioId.textContent = `${originalOrder || "?"}. ${event.scenario_id || "unknown"}`;
+    item.append(scenarioId, phase9ReplayAuditEventDetails(event));
+    list.appendChild(item);
+  }
+
+  phase9ReplayTimeline.append(title, list);
+}
+
+function phase9ReplayAuditEventDetails(event) {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const step = document.createElement("span");
+  const chip = document.createElement("span");
+  const body = document.createElement("dl");
+  const eventName = String(event.event_name || "");
+
+  details.className = "phase9-audit-event-details";
+  details.dataset.phase9ReplayAuditEventDetails = "true";
+  details.dataset.phase9EventKind = phase9ReplayEventKind(event);
+  summary.className = "phase9-audit-event-summary";
+  step.className = "sandbox-evaluation-audit-step";
+  step.textContent = String(event.order || event.global_order || "?");
+  chip.className = "sandbox-evaluation-event-chip";
+  chip.dataset.tone = sandboxAuditEventTone(eventName);
+  chip.dataset.phase9AuditEventChip = "true";
+  chip.dataset.phase9EventKind = phase9ReplayEventKind(event);
+  chip.textContent = sandboxAuditEventLabel(eventName);
+  body.className = "phase9-audit-event-detail-grid";
+
+  for (const [label, value] of phase9ReplayAuditEventRows(event)) {
+    body.appendChild(plannerEvaluationFact(label, value));
+  }
+
+  summary.append(step, chip);
+  details.append(summary, body);
+  return details;
+}
+
+function phase9ReplayAuditEventRows(event) {
+  return [
+    ["Event", event.event_name || "unknown"],
+    ["Scenario ID", event.scenario_id || "unknown"],
+    ["Global order", String(event.global_order || "unknown")],
+    ["Scenario order", String(event.order || event.scenario_order || "unknown")],
+    ["Gate", event.gate_passed === true ? "passed" : "blocked or unknown"],
+    ["Failure reasons", formatSandboxCodeList(event.failure_reason_codes)],
+    ["Blockers", formatSandboxCodeList(event.blocker_codes)],
+  ];
+}
+
+function phase9ReplayEventKind(event) {
+  const eventName = String(event?.event_name || "");
+  if (eventName === "phase9_gate_blocked") {
+    return "blocked";
+  }
+  if (eventName === "phase9_real_action_skipped") {
+    return "skipped";
+  }
+  if (eventName === "phase9_gate_passed" || eventName === "phase9_dry_run_completed") {
+    return "success";
+  }
+  return sandboxAuditEventTone(eventName) === "risk" ? "blocked" : "warning";
+}
+
+function phase9ReplayAddValidationError(errors, code, field, detail) {
+  errors.push({ code, field, detail });
+}
+
+function phase9ReplayValidationResult(bundle, errors, warnings) {
+  const phase9Report = phase9IsPlainObject(bundle?.phase9_report) ? bundle.phase9_report : {};
+  const safetyBoundary = phase9IsPlainObject(bundle) ? String(bundle.safety_boundary_statement || "") : "";
+  return {
+    valid: errors.length === 0,
+    status: errors.length === 0 ? "valid" : "blocked",
+    error_codes: Array.from(new Set(errors.map((error) => error.code))),
+    errors,
+    warning_codes: Array.from(new Set(warnings.map((warning) => warning.code))),
+    warnings,
+    bundle_version: phase9IsPlainObject(bundle) ? String(bundle.bundle_version || "") : "",
+    report_version: phase9IsPlainObject(bundle)
+      ? String(bundle.report_version || phase9Report.report_version || "")
+      : "",
+    safety_boundary_confirmed: errors.length === 0 && Boolean(safetyBoundary.trim()),
+  };
+}
+
+function validatePhase9AuditTimeline(auditTimeline, errors) {
+  const globalOrders = [];
+
+  auditTimeline.forEach((event, index) => {
+    const fieldPath = `phase9_report.audit_timeline[${index}]`;
+    if (!phase9IsPlainObject(event)) {
+      phase9ReplayAddValidationError(
+        errors,
+        "malformed_audit_event",
+        fieldPath,
+        "Audit timeline entries must be objects."
+      );
+      return;
+    }
+
+    if (!event.event_name) {
+      phase9ReplayAddValidationError(errors, "malformed_audit_event", `${fieldPath}.event_name`, "Missing event name.");
+    }
+    if (!event.scenario_id) {
+      phase9ReplayAddValidationError(errors, "malformed_audit_event", `${fieldPath}.scenario_id`, "Missing scenario id.");
+    }
+    if (!phase9IsPositiveInteger(event.order)) {
+      phase9ReplayAddValidationError(
+        errors,
+        "malformed_audit_event",
+        `${fieldPath}.order`,
+        "Scenario order must be a positive integer."
+      );
+    }
+    if (!phase9IsPositiveInteger(event.global_order)) {
+      phase9ReplayAddValidationError(
+        errors,
+        "malformed_audit_event",
+        `${fieldPath}.global_order`,
+        "Global order must be a positive integer."
+      );
+    } else {
+      globalOrders.push(Number(event.global_order));
+    }
+    if (!phase9IsStringList(event.failure_reason_codes) || !phase9IsStringList(event.blocker_codes)) {
+      phase9ReplayAddValidationError(
+        errors,
+        "malformed_blocker_codes",
+        fieldPath,
+        "Audit event blocker and failure codes must be lists of strings."
+      );
+    }
+  });
+
+  if (
+    globalOrders.length &&
+    globalOrders.some((order, index) => order !== index + 1)
+  ) {
+    phase9ReplayAddValidationError(
+      errors,
+      "malformed_audit_event",
+      "phase9_report.audit_timeline",
+      "Audit global order must be deterministic and contiguous."
+    );
+  }
+}
+
+function validatePhase9ReplayMetadata(metadata, phase9Report, errors) {
+  if (!phase9IsPlainObject(metadata)) {
+    phase9ReplayAddValidationError(
+      errors,
+      "missing_bundle_field",
+      "minimal_reproduction_metadata",
+      "Minimal reproduction metadata must be an object."
+    );
+    return;
+  }
+
+  for (const fieldName of PHASE9_REPLAY_REQUIRED_METADATA_FIELDS) {
+    if (!(fieldName in metadata)) {
+      phase9ReplayAddValidationError(
+        errors,
+        "missing_bundle_field",
+        `minimal_reproduction_metadata.${fieldName}`,
+        "Required minimal reproduction metadata is missing."
+      );
+    }
+  }
+
+  if (!phase9IsStringList(metadata.failure_reason_codes) || !phase9IsStringList(metadata.blocker_codes)) {
+    phase9ReplayAddValidationError(
+      errors,
+      "malformed_blocker_codes",
+      "minimal_reproduction_metadata",
+      "Metadata blocker and failure codes must be lists of strings."
+    );
+  }
+
+  if (!Array.isArray(metadata.audit_event_order)) {
+    phase9ReplayAddValidationError(
+      errors,
+      "malformed_audit_event",
+      "minimal_reproduction_metadata.audit_event_order",
+      "Audit event order metadata must be a list."
+    );
+    return;
+  }
+
+  const metadataSequence = metadata.audit_event_order
+    .filter((event) => phase9IsPlainObject(event))
+    .map((event) => String(event.event_name || ""));
+  const reportSequence = Array.isArray(phase9Report.audit_timeline)
+    ? phase9Report.audit_timeline
+        .filter((event) => phase9IsPlainObject(event))
+        .map((event) => String(event.event_name || ""))
+    : [];
+
+  if (metadataSequence.join("|") !== reportSequence.join("|")) {
+    phase9ReplayAddValidationError(
+      errors,
+      "malformed_audit_event",
+      "minimal_reproduction_metadata.audit_event_order",
+      "Metadata audit order must match the Phase 9 report timeline."
+    );
+  }
+}
+
+function phase9SensitiveKeyPaths(value, path = "") {
+  const paths = [];
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      paths.push(...phase9SensitiveKeyPaths(item, path ? `${path}[${index}]` : `[${index}]`));
+    });
+    return paths;
+  }
+
+  if (!phase9IsPlainObject(value)) {
+    return paths;
+  }
+
+  for (const [key, item] of Object.entries(value)) {
+    const currentPath = path ? `${path}.${key}` : key;
+    const normalizedKey = key.toLowerCase();
+    if (PHASE9_REPLAY_SENSITIVE_KEY_FRAGMENTS.some((fragment) => normalizedKey.includes(fragment))) {
+      paths.push(currentPath);
+    }
+    paths.push(...phase9SensitiveKeyPaths(item, currentPath));
+  }
+
+  return paths;
+}
+
+function phase9BundleNestedTrue(value, keyName) {
+  if (Array.isArray(value)) {
+    return value.some((item) => phase9BundleNestedTrue(item, keyName));
+  }
+
+  if (!phase9IsPlainObject(value)) {
+    return false;
+  }
+
+  return Object.entries(value).some(([key, item]) => {
+    if (key === keyName && item === true) {
+      return true;
+    }
+    return phase9BundleNestedTrue(item, keyName);
+  });
+}
+
+function phase9ReplayNotes(validation) {
+  if (validation.valid === true) {
+    return [
+      "Phase 9.5 replay validated the imported reproducibility bundle.",
+      "Replay preserves the original deterministic audit event order.",
+      "Replay is read-only debug output; no action-performing endpoint is called.",
+      "Real desktop actions remain disabled.",
+    ];
+  }
+
+  return [
+    "Phase 9.5 replay was blocked by bundle validation.",
+    `Validation errors: ${formatSandboxCodeList(validation.error_codes)}.`,
+    "No state changes were made.",
+  ];
+}
+
+async function copyPhase9ReplayPayload(payloadKind) {
+  phase9ReplayStatus.textContent = "Preparing replay copy payload...";
+
+  if (!currentPhase9ReplayReport) {
+    phase9ReplayStatus.textContent = "No replay report built yet.";
+    return;
+  }
+
+  if (!navigator.clipboard?.writeText) {
+    phase9ReplayStatus.textContent = "Clipboard unavailable in this browser.";
+    return;
+  }
+
+  const payload =
+    payloadKind === "summary"
+      ? buildPhase9ReplayAISummary(currentPhase9ReplayReport)
+      : currentPhase9ReplayReport;
+
+  try {
+    await navigator.clipboard.writeText(
+      typeof payload === "string" ? payload : JSON.stringify(payload, null, 2)
+    );
+    phase9ReplayStatus.textContent =
+      payloadKind === "summary" ? "Replay AI summary copied." : "Replay report copied.";
+  } catch (error) {
+    phase9ReplayStatus.textContent = `Copy failed: ${error.message || String(error)}`;
+  }
+}
+
+function buildPhase9ReplayAISummary(report) {
+  const validation = report.validation || {};
+  return [
+    "Project phase: phase_9_5 Phase 9 bundle import and replay.",
+    `Replay status: ${report.replay_status || "unknown"}; validation=${validation.status || "unknown"}.`,
+    `Original experiment: ${report.original_experiment_id || "unknown"}; gate=${
+      report.original_gate_passed === true ? "passed" : "blocked or unknown"
+    }.`,
+    `Run mode: dry_run=${formatSandboxBool(report.dry_run)}; real_action_enabled=${formatSandboxBool(
+      report.real_action_enabled
+    )}; real_action_skipped=${formatSandboxBool(report.real_action_skipped)}.`,
+    `Blockers/failure reasons: failure_reason_codes=${formatSandboxCodeList(
+      report.original_failure_reason_codes
+    )}; blocker_codes=${formatSandboxCodeList(report.original_blocker_codes)}.`,
+    `Audit events: ${formatSandboxCodeList(report.original_audit_event_names)}.`,
+    `Safety boundary confirmed: ${formatSandboxBool(report.safety_boundary_confirmed)}.`,
+  ].join("\n");
+}
+
+function phase9IsStringList(value) {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function phase9IsPositiveInteger(value) {
+  return Number.isInteger(value) && value > 0;
+}
+
+function phase9IsPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function phase9ReproducibilityBundle(report) {
   if (report?.phase9_export_bundle && typeof report.phase9_export_bundle === "object") {
     return report.phase9_export_bundle;
@@ -2536,6 +3331,7 @@ function phase9ReproducibilityBundle(report) {
   return {
     bundle_type: "phase9_reproducibility_bundle",
     bundle_version: "phase9_repro_bundle_v1",
+    report_version: "phase9_export_v1",
     generated_at: "deterministic_phase9_fixture",
     project_phase: "phase_9_4",
     phase9_report: phase9Report,
@@ -2577,7 +3373,9 @@ function buildPhase9ClientExportReport(report) {
     project_phase: "phase_9_4",
     source_report_type: report?.report_type || "phase9_minimal_sandbox_experiment",
     source_phase: report?.phase || "phase9_1",
-    dry_run: exportedScenarios.every((scenario) => scenario.dry_run === true),
+    dry_run: !exportedScenarios.some(
+      (scenario) => scenario.actual_outcome?.real_action_attempted === true
+    ),
     real_action_enabled: exportedScenarios.some((scenario) => scenario.real_action_enabled === true),
     real_action_skipped: exportedScenarios.some((scenario) => scenario.real_action_skipped === true),
     experiment_id: phase9CommonValue(exportedScenarios.map((scenario) => scenario.experiment_id)),

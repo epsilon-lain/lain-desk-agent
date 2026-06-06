@@ -558,6 +558,32 @@ execution permission.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions and
   `real_action_enabled = false` default behavior.
 
+## Phase 9.5: Phase 9 Bundle Import And Replay
+
+Status: implemented as read-only bundle validation/replay debug support.
+
+Goal: let a future Codex session or developer paste a Phase 9.4
+reproducibility bundle, validate its safety shape, and replay the deterministic
+audit timeline without uploading data or changing runtime behavior.
+
+- Add pure helper functions for validating, importing, replaying, and reporting
+  Phase 9 reproducibility bundles.
+- Validate required top-level fields, required Phase 9 report fields, minimal
+  reproduction metadata, audit event order, blocker/failure code lists, safety
+  boundary statement, dry-run state, and real-action-disabled state.
+- Reject suspicious sensitive key names such as token, secret, api key,
+  password, credential, private key, and access key.
+- Add a deterministic replay report with original experiment id, gate result,
+  actual outcome, failure reasons, blockers, audit event names, replayed audit
+  timeline, replay notes, and safety boundary confirmation.
+- Add a cockpit import/replay panel with local-only paste, validate, replay,
+  copy replay report, copy replay summary, and clear controls.
+- Keep every control read-only: no execute button, approval button,
+  real-action toggle, sandbox action trigger, `/execute` call, mutation
+  endpoint, upload endpoint, filesystem read, or action-performing endpoint.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions and
+  `real_action_enabled = false` default behavior.
+
 ## Phase 10: Limited Desktop Control
 
 Goal: consider narrow desktop control only after the Phase 7 checklist and

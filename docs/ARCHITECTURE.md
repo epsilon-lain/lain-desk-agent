@@ -471,6 +471,28 @@ not mutate runtime state, do not add real-action toggles, and do not alter
 Capability Registry, Permission Profile, Execution Policy, Action Contract
 behavior, Click Readiness, or the Phase 7 gate.
 
+### Phase 9.5 Phase 9 Bundle Import And Replay
+
+Phase 9.5 adds read-only import validation and replay for Phase 9.4
+reproducibility bundles. Backend helpers validate required bundle/report
+fields, safety-boundary text, audit timeline ordering, blocker/failure code
+shape, dry-run state, real-action-disabled state, and suspicious sensitive-key
+names before producing a deterministic replay report.
+
+Replay is not execution. `validate_phase9_reproducibility_bundle(...)`,
+`import_phase9_reproducibility_bundle(...)`, and
+`replay_phase9_reproducibility_bundle(...)` inspect only the provided JSON-like
+object. They do not read local files, crawl the filesystem, observe live OS
+state, execute code, call action-performing endpoints, or change Capability
+Registry, Permission Profile, Execution Policy, Action Contract behavior, Click
+Readiness, or the Phase 7 gate.
+
+The cockpit import/replay panel is browser-local. Users paste bundle JSON into
+a textarea, validate it, replay the deterministic audit timeline, and copy a
+replay report or AI-readable summary from browser memory. The panel does not
+upload bundles, add approval or execute controls, record approvals, mutate
+runtime state, or create a real-action trigger.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -505,6 +527,9 @@ The current safety boundaries are intentionally narrow:
 - Phase 9.4 Phase 9 report export and reproducibility bundle is read-only
   state-transfer/debug data; it is not execution permission and it never
   attempts real desktop action.
+- Phase 9.5 Phase 9 bundle import and replay is read-only validation/debug
+  output; it is not execution permission and it never attempts real desktop
+  action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

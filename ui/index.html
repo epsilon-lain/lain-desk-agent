@@ -467,6 +467,53 @@
               <dl class="planner-evaluation-summary" id="phase9ExperimentSummary" hidden></dl>
               <div class="sandbox-evaluation-timeline" id="phase9ExperimentTimeline" hidden></div>
               <div class="planner-evaluation-results" id="phase9ExperimentResults" aria-live="polite"></div>
+              <section
+                class="phase9-replay-panel"
+                id="phase9ReplayPanel"
+                aria-label="Phase 9 reproducibility bundle replay"
+              >
+                <div class="phase9-replay-header">
+                  <div>
+                    <p class="planner-evaluation-title">Phase 9 bundle replay</p>
+                    <p class="planner-evaluation-helper">
+                      Paste an exported reproducibility bundle to validate and replay deterministic audit order locally.
+                    </p>
+                  </div>
+                </div>
+                <label class="phase9-replay-input-label" for="phase9BundleInput">
+                  Bundle JSON
+                  <textarea
+                    class="phase9-replay-input"
+                    id="phase9BundleInput"
+                    rows="6"
+                    spellcheck="false"
+                    placeholder="Paste phase9_reproducibility_bundle JSON here"
+                  ></textarea>
+                </label>
+                <div class="sandbox-evaluation-detail-actions" aria-label="Phase 9 replay controls">
+                  <button class="planner-evaluation-button" id="validatePhase9Bundle" type="button">
+                    Validate bundle
+                  </button>
+                  <button class="planner-evaluation-button" id="replayPhase9Bundle" type="button">
+                    Replay bundle
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase9ReplayReport" type="button">
+                    Copy replay report
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase9ReplaySummary" type="button">
+                    Copy replay AI summary
+                  </button>
+                  <button class="planner-evaluation-button" id="clearPhase9Bundle" type="button">
+                    Clear imported bundle
+                  </button>
+                </div>
+                <p class="sandbox-evaluation-copy-status" id="phase9ReplayStatus">
+                  No bundle imported.
+                </p>
+                <ul class="phase9-replay-errors" id="phase9ReplayErrors" hidden></ul>
+                <dl class="planner-evaluation-summary" id="phase9ReplaySummary" hidden></dl>
+                <div class="sandbox-evaluation-timeline" id="phase9ReplayTimeline" hidden></div>
+              </section>
             </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
               <p id="safetyBrakeMessage">No safety decision yet.</p>

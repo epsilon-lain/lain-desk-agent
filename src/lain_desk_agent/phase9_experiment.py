@@ -94,6 +94,8 @@ PHASE9_EXPORT_REPORT_VERSION = "phase9_export_v1"
 PHASE9_EXPORT_GENERATED_AT = "deterministic_phase9_fixture"
 PHASE9_EXPORT_PROJECT_PHASE = "phase_9_4"
 PHASE9_EXPORT_BUNDLE_VERSION = "phase9_repro_bundle_v1"
+PHASE9_REPLAY_PROJECT_PHASE = "phase_9_5"
+PHASE9_REPLAY_REPORT_VERSION = "phase9_replay_v1"
 PHASE9_EXPORT_SAFETY_BOUNDARY = (
     "Phase 9.4 exports deterministic dry-run debug data only. Real desktop "
     "actions remain disabled, and no action-performing endpoint is called."
@@ -105,8 +107,48 @@ _SENSITIVE_KEY_FRAGMENTS = (
     "apikey",
     "password",
     "credential",
+    "private_key",
+    "access_key",
     "environment",
     "env_var",
+)
+PHASE9_BUNDLE_REQUIRED_FIELDS = (
+    "bundle_type",
+    "bundle_version",
+    "report_version",
+    "project_phase",
+    "phase9_report",
+    "ai_readable_summary",
+    "minimal_reproduction_metadata",
+    "safety_boundary_statement",
+)
+PHASE9_BUNDLE_METADATA_REQUIRED_FIELDS = (
+    "scenario_ids",
+    "experiment_id",
+    "audit_event_order",
+    "failure_reason_codes",
+    "blocker_codes",
+)
+PHASE9_IMPORTED_REPORT_REQUIRED_FIELDS = (
+    "experiment_id",
+    "dry_run",
+    "real_action_enabled",
+    "real_action_skipped",
+    "gate_passed",
+    "actual_outcome",
+    "failure_reason_codes",
+    "blocker_codes",
+    "audit_event_names",
+    "audit_timeline",
+    "sandbox_scope",
+    "action_type",
+    "target_risk_hint",
+    "target_confidence",
+    "readiness_ready",
+    "user_approval_present",
+    "emergency_stop_available",
+    "post_action_verification_planned",
+    "rollback_plan_recorded",
 )
 
 
@@ -555,7 +597,11 @@ def build_phase9_export_report(report: dict[str, Any]) -> dict[str, Any]:
         "project_phase": PHASE9_EXPORT_PROJECT_PHASE,
         "source_report_type": source_report.get("report_type", "phase9_minimal_sandbox_experiment"),
         "source_phase": source_report.get("phase", "phase9_1"),
-        "dry_run": all(scenario.get("dry_run") is True for scenario in scenarios),
+        "dry_run": not any(
+            isinstance(scenario.get("actual_outcome"), dict)
+            and scenario["actual_outcome"].get("real_action_attempted") is True
+            for scenario in scenarios
+        ),
         "real_action_enabled": any(
             scenario.get("real_action_enabled") is True for scenario in scenarios
         ),
@@ -659,6 +705,7 @@ def build_phase9_reproducibility_bundle(report: dict[str, Any]) -> dict[str, Any
     bundle = {
         "bundle_type": "phase9_reproducibility_bundle",
         "bundle_version": PHASE9_EXPORT_BUNDLE_VERSION,
+        "report_version": PHASE9_EXPORT_REPORT_VERSION,
         "generated_at": PHASE9_EXPORT_GENERATED_AT,
         "project_phase": PHASE9_EXPORT_PROJECT_PHASE,
         "phase9_report": export_report,
@@ -685,6 +732,243 @@ def build_phase9_reproducibility_bundle(report: dict[str, Any]) -> dict[str, Any
         "safety_boundary_statement": PHASE9_EXPORT_SAFETY_BOUNDARY,
     }
     return _sanitize_export_value(bundle)
+
+
+def validate_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
+    """Validate a Phase 9.4 bundle before read-only Phase 9.5 replay.
+
+    Validation is deliberately conservative. It only inspects the provided
+    object, rejects suspicious sensitive-key names, and refuses bundles that
+    claim real action is enabled or that do not remain dry-run safe.
+    """
+
+    errors: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
+
+    if not isinstance(bundle, dict):
+        _phase9_validation_error(
+            errors,
+            "missing_bundle_field",
+            "bundle",
+            "Bundle must be a JSON object.",
+        )
+        return _phase9_bundle_validation_result(bundle, errors, warnings)
+
+    for field_name in PHASE9_BUNDLE_REQUIRED_FIELDS:
+        if field_name not in bundle:
+            _phase9_validation_error(
+                errors,
+                "missing_bundle_field",
+                field_name,
+                "Required top-level bundle field is missing.",
+            )
+
+    sensitive_paths = _phase9_sensitive_key_paths(bundle)
+    if sensitive_paths:
+        _phase9_validation_error(
+            errors,
+            "suspicious_sensitive_key",
+            ", ".join(sensitive_paths[:5]),
+            "Bundle contains key names that look like private material.",
+        )
+
+    bundle_version = str(bundle.get("bundle_version") or "")
+    if bundle_version and bundle_version != PHASE9_EXPORT_BUNDLE_VERSION:
+        _phase9_validation_error(
+            errors,
+            "unsupported_bundle_version",
+            "bundle_version",
+            f"Unsupported bundle version: {bundle_version}.",
+        )
+
+    phase9_report = bundle.get("phase9_report")
+    if not isinstance(phase9_report, dict):
+        _phase9_validation_error(
+            errors,
+            "missing_phase9_report",
+            "phase9_report",
+            "Bundle must contain a Phase 9 export report object.",
+        )
+        return _phase9_bundle_validation_result(bundle, errors, warnings)
+
+    report_version = str(bundle.get("report_version") or "")
+    if report_version != PHASE9_EXPORT_REPORT_VERSION:
+        _phase9_validation_error(
+            errors,
+            "invalid_report_version",
+            "report_version",
+            f"Expected {PHASE9_EXPORT_REPORT_VERSION}.",
+        )
+
+    nested_report_version = str(phase9_report.get("report_version") or "")
+    if nested_report_version != PHASE9_EXPORT_REPORT_VERSION:
+        _phase9_validation_error(
+            errors,
+            "invalid_report_version",
+            "phase9_report.report_version",
+            f"Expected {PHASE9_EXPORT_REPORT_VERSION}.",
+        )
+
+    for field_name in PHASE9_IMPORTED_REPORT_REQUIRED_FIELDS:
+        if field_name not in phase9_report:
+            _phase9_validation_error(
+                errors,
+                "missing_bundle_field",
+                f"phase9_report.{field_name}",
+                "Required Phase 9 report field is missing.",
+            )
+
+    if phase9_report.get("real_action_enabled") is True or _phase9_nested_true(
+        phase9_report, "real_action_enabled"
+    ):
+        _phase9_validation_error(
+            errors,
+            "real_action_enabled_in_bundle",
+            "phase9_report.real_action_enabled",
+            "Imported bundles must keep real action disabled.",
+        )
+
+    actual_outcome = phase9_report.get("actual_outcome")
+    if (
+        phase9_report.get("dry_run") is not True
+        or (isinstance(actual_outcome, dict) and actual_outcome.get("real_action_attempted") is True)
+        or _phase9_nested_true(phase9_report, "real_action_attempted")
+    ):
+        _phase9_validation_error(
+            errors,
+            "non_dry_run_bundle",
+            "phase9_report.dry_run",
+            "Imported bundles must remain dry-run and never show real action attempted.",
+        )
+
+    if not _is_string_list(phase9_report.get("failure_reason_codes")):
+        _phase9_validation_error(
+            errors,
+            "malformed_blocker_codes",
+            "phase9_report.failure_reason_codes",
+            "Failure reason codes must be a list of strings.",
+        )
+    if not _is_string_list(phase9_report.get("blocker_codes")):
+        _phase9_validation_error(
+            errors,
+            "malformed_blocker_codes",
+            "phase9_report.blocker_codes",
+            "Blocker codes must be a list of strings.",
+        )
+    if not _is_string_list(phase9_report.get("audit_event_names")):
+        _phase9_validation_error(
+            errors,
+            "malformed_audit_event",
+            "phase9_report.audit_event_names",
+            "Audit event names must be a list of strings.",
+        )
+
+    audit_timeline = phase9_report.get("audit_timeline")
+    if not isinstance(audit_timeline, list) or not audit_timeline:
+        _phase9_validation_error(
+            errors,
+            "missing_audit_timeline",
+            "phase9_report.audit_timeline",
+            "Phase 9 replay requires a non-empty audit timeline.",
+        )
+    else:
+        _validate_phase9_audit_timeline(audit_timeline, errors)
+
+    metadata = bundle.get("minimal_reproduction_metadata")
+    if not isinstance(metadata, dict):
+        _phase9_validation_error(
+            errors,
+            "missing_bundle_field",
+            "minimal_reproduction_metadata",
+            "Minimal reproduction metadata must be an object.",
+        )
+    else:
+        _validate_phase9_minimal_reproduction_metadata(metadata, phase9_report, errors)
+
+    safety_boundary = bundle.get("safety_boundary_statement")
+    if not isinstance(safety_boundary, str) or not safety_boundary.strip():
+        _phase9_validation_error(
+            errors,
+            "missing_safety_boundary_statement",
+            "safety_boundary_statement",
+            "Bundle must include the Phase 9 safety boundary statement.",
+        )
+
+    return _phase9_bundle_validation_result(bundle, errors, warnings)
+
+
+def import_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
+    """Import a Phase 9.4 bundle into a read-only replay-ready structure."""
+
+    validation = validate_phase9_reproducibility_bundle(bundle)
+    phase9_report = (
+        _sanitize_export_value(bundle.get("phase9_report"))
+        if validation["valid"] and isinstance(bundle, dict)
+        else {}
+    )
+    return {
+        "import_status": "imported" if validation["valid"] else "blocked",
+        "valid": validation["valid"],
+        "validation": validation,
+        "bundle_version": validation.get("bundle_version", ""),
+        "report_version": validation.get("report_version", ""),
+        "phase9_report": phase9_report,
+        "safety_boundary_statement": (
+            str(bundle.get("safety_boundary_statement") or "") if isinstance(bundle, dict) else ""
+        ),
+    }
+
+
+def replay_phase9_reproducibility_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
+    """Replay a Phase 9.4 bundle as deterministic, read-only debug output."""
+
+    return build_phase9_replay_report(bundle)
+
+
+def build_phase9_replay_report(bundle: dict[str, Any]) -> dict[str, Any]:
+    """Build the Phase 9.5 replay report without executing or mutating state."""
+
+    imported = import_phase9_reproducibility_bundle(bundle)
+    validation = imported["validation"]
+    phase9_report = imported["phase9_report"] if validation["valid"] else {}
+    audit_timeline = (
+        _sanitize_export_value(phase9_report.get("audit_timeline"))
+        if isinstance(phase9_report.get("audit_timeline"), list)
+        else []
+    )
+    safety_boundary = imported.get("safety_boundary_statement", "")
+    safety_confirmed = validation["valid"] and bool(str(safety_boundary).strip())
+
+    return {
+        "report_version": PHASE9_REPLAY_REPORT_VERSION,
+        "generated_at": PHASE9_EXPORT_GENERATED_AT,
+        "project_phase": PHASE9_REPLAY_PROJECT_PHASE,
+        "source_bundle_version": validation.get("bundle_version", ""),
+        "source_report_version": validation.get("report_version", ""),
+        "replay_status": "replayed" if validation["valid"] else "blocked",
+        "validation": validation,
+        "original_experiment_id": str(phase9_report.get("experiment_id") or ""),
+        "original_gate_passed": phase9_report.get("gate_passed") if validation["valid"] else None,
+        "original_actual_outcome": (
+            _sanitize_export_value(phase9_report.get("actual_outcome"))
+            if isinstance(phase9_report.get("actual_outcome"), dict)
+            else {}
+        ),
+        "original_failure_reason_codes": _string_list(phase9_report.get("failure_reason_codes")),
+        "original_blocker_codes": _string_list(phase9_report.get("blocker_codes")),
+        "original_audit_event_names": _string_list(phase9_report.get("audit_event_names")),
+        "replayed_audit_timeline": audit_timeline,
+        "replay_notes": _phase9_replay_notes(validation),
+        "safety_boundary_confirmed": safety_confirmed,
+        "safety_boundary_statement": safety_boundary,
+        "dry_run": phase9_report.get("dry_run") if validation["valid"] else None,
+        "real_action_enabled": (
+            phase9_report.get("real_action_enabled") if validation["valid"] else None
+        ),
+        "real_action_skipped": (
+            phase9_report.get("real_action_skipped") if validation["valid"] else None
+        ),
+    }
 
 
 def _phase9_export_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
@@ -822,6 +1106,220 @@ def _phase9_recommended_focus(report: dict[str, Any]) -> str:
     if not focus:
         return "review gate status, failure codes, and audit ordering"
     return "; ".join(focus[:3])
+
+
+def _phase9_validation_error(
+    errors: list[dict[str, str]],
+    code: str,
+    field: str,
+    detail: str,
+) -> None:
+    errors.append({"code": code, "field": field, "detail": detail})
+
+
+def _phase9_bundle_validation_result(
+    bundle: Any,
+    errors: list[dict[str, str]],
+    warnings: list[dict[str, str]],
+) -> dict[str, Any]:
+    phase9_report = (
+        bundle.get("phase9_report")
+        if isinstance(bundle, dict) and isinstance(bundle.get("phase9_report"), dict)
+        else {}
+    )
+    safety_boundary = (
+        str(bundle.get("safety_boundary_statement") or "") if isinstance(bundle, dict) else ""
+    )
+    error_codes = _unique([error["code"] for error in errors])
+    warning_codes = _unique([warning["code"] for warning in warnings])
+
+    return {
+        "valid": not errors,
+        "status": "valid" if not errors else "blocked",
+        "error_codes": error_codes,
+        "errors": errors,
+        "warning_codes": warning_codes,
+        "warnings": warnings,
+        "bundle_version": str(bundle.get("bundle_version") or "") if isinstance(bundle, dict) else "",
+        "report_version": (
+            str(bundle.get("report_version") or phase9_report.get("report_version") or "")
+            if isinstance(bundle, dict)
+            else ""
+        ),
+        "safety_boundary_confirmed": bool(safety_boundary.strip()) and not errors,
+    }
+
+
+def _phase9_sensitive_key_paths(value: Any, path: str = "") -> list[str]:
+    paths: list[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            text_key = str(key)
+            current_path = f"{path}.{text_key}" if path else text_key
+            if _is_sensitive_export_key(text_key):
+                paths.append(current_path)
+            paths.extend(_phase9_sensitive_key_paths(item, current_path))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            current_path = f"{path}[{index}]" if path else f"[{index}]"
+            paths.extend(_phase9_sensitive_key_paths(item, current_path))
+    return paths
+
+
+def _phase9_nested_true(value: Any, key_name: str) -> bool:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if str(key) == key_name and item is True:
+                return True
+            if _phase9_nested_true(item, key_name):
+                return True
+    if isinstance(value, list):
+        return any(_phase9_nested_true(item, key_name) for item in value)
+    return False
+
+
+def _validate_phase9_audit_timeline(
+    audit_timeline: list[Any],
+    errors: list[dict[str, str]],
+) -> None:
+    global_orders: list[int] = []
+    for index, event in enumerate(audit_timeline):
+        field_path = f"phase9_report.audit_timeline[{index}]"
+        if not isinstance(event, dict):
+            _phase9_validation_error(
+                errors,
+                "malformed_audit_event",
+                field_path,
+                "Audit timeline entries must be objects.",
+            )
+            continue
+
+        if not str(event.get("event_name") or ""):
+            _phase9_validation_error(
+                errors,
+                "malformed_audit_event",
+                f"{field_path}.event_name",
+                "Audit event name is missing.",
+            )
+        if not str(event.get("scenario_id") or ""):
+            _phase9_validation_error(
+                errors,
+                "malformed_audit_event",
+                f"{field_path}.scenario_id",
+                "Audit event scenario_id is missing.",
+            )
+        if not _is_positive_int(event.get("order")):
+            _phase9_validation_error(
+                errors,
+                "malformed_audit_event",
+                f"{field_path}.order",
+                "Audit event scenario order must be a positive integer.",
+            )
+        if not _is_positive_int(event.get("global_order")):
+            _phase9_validation_error(
+                errors,
+                "malformed_audit_event",
+                f"{field_path}.global_order",
+                "Audit event global order must be a positive integer.",
+            )
+        else:
+            global_orders.append(int(event["global_order"]))
+
+        if not _is_string_list(event.get("failure_reason_codes")):
+            _phase9_validation_error(
+                errors,
+                "malformed_blocker_codes",
+                f"{field_path}.failure_reason_codes",
+                "Audit event failure reason codes must be a list of strings.",
+            )
+        if not _is_string_list(event.get("blocker_codes")):
+            _phase9_validation_error(
+                errors,
+                "malformed_blocker_codes",
+                f"{field_path}.blocker_codes",
+                "Audit event blocker codes must be a list of strings.",
+            )
+
+    if global_orders and global_orders != list(range(1, len(audit_timeline) + 1)):
+        _phase9_validation_error(
+            errors,
+            "malformed_audit_event",
+            "phase9_report.audit_timeline",
+            "Audit timeline global order must be deterministic and contiguous.",
+        )
+
+
+def _validate_phase9_minimal_reproduction_metadata(
+    metadata: dict[str, Any],
+    phase9_report: dict[str, Any],
+    errors: list[dict[str, str]],
+) -> None:
+    for field_name in PHASE9_BUNDLE_METADATA_REQUIRED_FIELDS:
+        if field_name not in metadata:
+            _phase9_validation_error(
+                errors,
+                "missing_bundle_field",
+                f"minimal_reproduction_metadata.{field_name}",
+                "Required minimal reproduction metadata is missing.",
+            )
+
+    for code_field in ("failure_reason_codes", "blocker_codes"):
+        if code_field in metadata and not _is_string_list(metadata.get(code_field)):
+            _phase9_validation_error(
+                errors,
+                "malformed_blocker_codes",
+                f"minimal_reproduction_metadata.{code_field}",
+                "Minimal reproduction codes must be a list of strings.",
+            )
+
+    audit_event_order = metadata.get("audit_event_order")
+    if "audit_event_order" in metadata and not isinstance(audit_event_order, list):
+        _phase9_validation_error(
+            errors,
+            "malformed_audit_event",
+            "minimal_reproduction_metadata.audit_event_order",
+            "Audit event order metadata must be a list.",
+        )
+        return
+
+    report_timeline = phase9_report.get("audit_timeline")
+    if isinstance(audit_event_order, list) and isinstance(report_timeline, list):
+        metadata_sequence = [
+            str(event.get("event_name") or "") for event in audit_event_order if isinstance(event, dict)
+        ]
+        report_sequence = [
+            str(event.get("event_name") or "") for event in report_timeline if isinstance(event, dict)
+        ]
+        if metadata_sequence != report_sequence:
+            _phase9_validation_error(
+                errors,
+                "malformed_audit_event",
+                "minimal_reproduction_metadata.audit_event_order",
+                "Metadata audit event order must match the Phase 9 report timeline.",
+            )
+
+
+def _phase9_replay_notes(validation: dict[str, Any]) -> list[str]:
+    if validation.get("valid") is True:
+        return [
+            "Phase 9.5 replay validated the imported reproducibility bundle.",
+            "Replay preserves the original deterministic audit event order.",
+            "Replay is read-only debug output; no action-performing endpoint is called.",
+            "Real desktop actions remain disabled.",
+        ]
+    return [
+        "Phase 9.5 replay was blocked by bundle validation.",
+        f"Validation errors: {_format_codes(_string_list(validation.get('error_codes')))}.",
+        "No state changes were made.",
+    ]
+
+
+def _is_string_list(value: Any) -> bool:
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def _is_positive_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
 def _sanitize_export_value(value: Any) -> Any:

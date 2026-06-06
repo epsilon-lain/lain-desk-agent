@@ -30,6 +30,13 @@ permission, does not add an action-performing endpoint, and does not include
 private auth material, live OS state, broad filesystem dumps, or real desktop
 screenshots outside deterministic fixture data.
 
+Phase 9.5 imports and replays those exported bundles as validation/debug data
+only. It validates required fields, safety-boundary text, dry-run state,
+real-action-disabled state, audit ordering, blocker/failure code shape, and
+suspicious sensitive key names, then reconstructs the deterministic audit trace.
+It does not upload bundles, read local files, observe live OS state, execute
+code, call an action-performing endpoint, or mutate runtime state.
+
 ## Purpose
 
 Define a minimal, reviewable sandbox experiment plan that can validate the
@@ -425,6 +432,25 @@ The Phase 9.4 bundle is not execution permission. It avoids private auth
 material, live OS state, full local filesystem dumps, and real desktop
 screenshots outside deterministic fixture data. Real desktop actions remain
 disabled.
+
+## Phase 9.5 Import And Replay Status
+
+Phase 9.5 is implemented as read-only validation and replay support:
+
+- `validate_phase9_reproducibility_bundle(...)` checks the pasted/imported
+  bundle shape before replay.
+- `import_phase9_reproducibility_bundle(...)` returns an imported or blocked
+  in-memory structure; it does not read files or inspect the host machine.
+- `replay_phase9_reproducibility_bundle(...)` and
+  `build_phase9_replay_report(...)` preserve original audit event ordering and
+  emit a deterministic replay report.
+- The cockpit replay panel parses pasted JSON locally in the browser and can
+  copy the replay report or summary from memory.
+
+The Phase 9.5 replay path is not execution permission. Invalid, suspicious,
+real-action-enabled, or non-dry-run bundles are blocked. Valid bundles only
+produce debug output that mirrors Phase 9.4 report fields and replay metadata.
+Real desktop actions remain disabled.
 
 ## Implementation Guardrails
 
