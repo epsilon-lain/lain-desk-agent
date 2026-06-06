@@ -43,6 +43,12 @@ warnings, unsafe flags, consistency checks, audit-order checks, sensitive-key
 findings, replay eligibility, and recommended debug focus before any read-only
 replay report is considered valid.
 
+Phase 9.7 polishes the cockpit display for that validation data. It adds
+compact validation summary cards, browser-local issue filters, expandable issue
+groups, and copy helpers for validation summary, validation errors, debug focus,
+and replay validation JSON. It does not change replay semantics or the
+underlying validation format.
+
 ## Purpose
 
 Define a minimal, reviewable sandbox experiment plan that can validate the
@@ -481,6 +487,26 @@ bundles, read local files, observe live OS state, execute code, call an
 action-performing endpoint, add approval/execute/real-action controls, or
 change Execution Policy, Permission Profile, Capability Registry, Action
 Contract behavior, Click Readiness, or the Phase 7 gate.
+
+## Phase 9.7 Cockpit UX Polish Status
+
+Phase 9.7 is implemented as replay validation display polish only:
+
+- The cockpit shows compact cards for validation status, errors, warnings,
+  unsafe flags, consistency checks, audit order checks, sensitive key findings,
+  and read-only replay eligibility.
+- Validation details are grouped into expandable sections for errors,
+  warnings, unsafe flags, audit order issues, sensitive key findings,
+  consistency issues, and recommended debug focus.
+- Browser-local quick filters narrow the visible validation groups without
+  calling any endpoint.
+- Copy helpers copy validation summary, validation errors, recommended debug
+  focus, or replay validation JSON from already loaded cockpit data.
+
+Phase 9.7 is not execution permission. It does not upload imported bundles,
+mutate runtime state, record approvals, call an action-performing endpoint, or
+change replay semantics. Imported bundles remain untrusted input, and real
+desktop actions remain disabled.
 
 ## Implementation Guardrails
 

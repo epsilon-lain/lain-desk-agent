@@ -118,11 +118,19 @@ const validatePhase9Bundle = document.querySelector("#validatePhase9Bundle");
 const replayPhase9Bundle = document.querySelector("#replayPhase9Bundle");
 const copyPhase9ReplayReport = document.querySelector("#copyPhase9ReplayReport");
 const copyPhase9ReplaySummary = document.querySelector("#copyPhase9ReplaySummary");
+const copyPhase9ValidationSummary = document.querySelector("#copyPhase9ValidationSummary");
+const copyPhase9ValidationErrors = document.querySelector("#copyPhase9ValidationErrors");
+const copyPhase9DebugFocus = document.querySelector("#copyPhase9DebugFocus");
+const copyPhase9ValidationJson = document.querySelector("#copyPhase9ValidationJson");
+const expandPhase9ValidationGroups = document.querySelector("#expandPhase9ValidationGroups");
+const collapsePhase9ValidationGroups = document.querySelector("#collapsePhase9ValidationGroups");
 const clearPhase9Bundle = document.querySelector("#clearPhase9Bundle");
 const phase9ReplayStatus = document.querySelector("#phase9ReplayStatus");
 const phase9ReplayErrors = document.querySelector("#phase9ReplayErrors");
 const phase9ReplayValidationCounts = document.querySelector("#phase9ReplayValidationCounts");
 const phase9ReplaySummary = document.querySelector("#phase9ReplaySummary");
+const phase9ReplayValidationFilters = document.querySelector("#phase9ReplayValidationFilters");
+const phase9ReplayValidationIssueGroups = document.querySelector("#phase9ReplayValidationIssueGroups");
 const phase9ReplayTimeline = document.querySelector("#phase9ReplayTimeline");
 const phase9ReplayValidationDetails = document.querySelector("#phase9ReplayValidationDetails");
 const phase9ReplayValidationJson = document.querySelector("#phase9ReplayValidationJson");
@@ -335,6 +343,36 @@ const PHASE9_REPLAY_SENSITIVE_KEY_FRAGMENTS = [
   "private_key",
   "access_key",
 ];
+const PHASE9_REPLAY_VALIDATION_FILTERS = {
+  all: {
+    label: "all validation",
+    description: "show every replay validation section",
+  },
+  errors: {
+    label: "errors only",
+    description: "show blocking validation errors",
+  },
+  warnings: {
+    label: "warnings only",
+    description: "show structured validation warnings",
+  },
+  unsafe: {
+    label: "unsafe flags",
+    description: "show unsafe flag findings",
+  },
+  audit: {
+    label: "audit order",
+    description: "show failed audit order checks",
+  },
+  sensitive: {
+    label: "sensitive keys",
+    description: "show sensitive key findings",
+  },
+  consistency: {
+    label: "consistency",
+    description: "show failed consistency checks",
+  },
+};
 const DEMO_SCENARIOS = {
   browser_search: {
     defaultTask: "Search",
@@ -374,6 +412,7 @@ let currentPhase9ExperimentReport = null;
 let currentPhase9QuickFilterGroup = "all";
 let currentPhase9ImportedBundle = null;
 let currentPhase9ReplayReport = null;
+let currentPhase9ReplayValidationFilter = "all";
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 setDemoScenarioSelectionDefaults();
@@ -547,6 +586,30 @@ copyPhase9ReplayReport.addEventListener("click", async () => {
 
 copyPhase9ReplaySummary.addEventListener("click", async () => {
   await copyPhase9ReplayPayload("summary");
+});
+
+copyPhase9ValidationSummary.addEventListener("click", async () => {
+  await copyPhase9ReplayPayload("validation_summary");
+});
+
+copyPhase9ValidationErrors.addEventListener("click", async () => {
+  await copyPhase9ReplayPayload("validation_errors");
+});
+
+copyPhase9DebugFocus.addEventListener("click", async () => {
+  await copyPhase9ReplayPayload("debug_focus");
+});
+
+copyPhase9ValidationJson.addEventListener("click", async () => {
+  await copyPhase9ReplayPayload("validation_json");
+});
+
+expandPhase9ValidationGroups.addEventListener("click", () => {
+  setPhase9ReplayValidationGroupsOpen(true);
+});
+
+collapsePhase9ValidationGroups.addEventListener("click", () => {
+  setPhase9ReplayValidationGroupsOpen(false);
 });
 
 clearPhase9Bundle.addEventListener("click", () => {
@@ -2658,6 +2721,7 @@ function clearPhase9BundleReplay() {
   phase9BundleInput.value = "";
   currentPhase9ImportedBundle = null;
   currentPhase9ReplayReport = null;
+  currentPhase9ReplayValidationFilter = "all";
   phase9ReplayPanel.dataset.state = "empty";
   phase9ReplayStatus.textContent = "No bundle imported.";
   phase9ReplayErrors.hidden = true;
@@ -2666,6 +2730,10 @@ function clearPhase9BundleReplay() {
   phase9ReplayValidationCounts.replaceChildren();
   phase9ReplaySummary.hidden = true;
   phase9ReplaySummary.replaceChildren();
+  phase9ReplayValidationFilters.hidden = true;
+  phase9ReplayValidationFilters.replaceChildren();
+  phase9ReplayValidationIssueGroups.hidden = true;
+  phase9ReplayValidationIssueGroups.replaceChildren();
   phase9ReplayTimeline.hidden = true;
   phase9ReplayTimeline.replaceChildren();
   phase9ReplayValidationDetails.hidden = true;
@@ -2931,6 +2999,10 @@ function renderPhase9ReplayParseError(error) {
   ]);
   phase9ReplayValidationCounts.hidden = true;
   phase9ReplayValidationCounts.replaceChildren();
+  phase9ReplayValidationFilters.hidden = true;
+  phase9ReplayValidationFilters.replaceChildren();
+  phase9ReplayValidationIssueGroups.hidden = true;
+  phase9ReplayValidationIssueGroups.replaceChildren();
   phase9ReplaySummary.hidden = true;
   phase9ReplaySummary.replaceChildren();
   phase9ReplayTimeline.hidden = true;
@@ -2948,6 +3020,8 @@ function renderPhase9ReplayValidation(validation, imported = null) {
     : "Bundle validation blocked replay. Review validation errors below.";
   renderPhase9ReplayErrors(validation.errors || []);
   renderPhase9ReplayValidationCounts(validation);
+  renderPhase9ReplayValidationFilters(validation);
+  renderPhase9ReplayValidationIssueGroups(validation);
   setPhase9ReplaySummary([
     ["Validation", validation.status || "unknown"],
     ["Bundle version", validation.bundle_version || "unknown"],
@@ -3021,12 +3095,17 @@ function renderPhase9ReplayErrors(errors) {
 function renderPhase9ReplayValidationCounts(validation = {}) {
   const summary = validation.validation_summary || {};
   const failedAuditChecks = phase9ReplayFailedChecks(validation.audit_order_checks).length;
+  const failedConsistencyChecks = phase9ReplayFailedChecks(validation.consistency_checks).length;
+  const sensitiveKeyCount = sandboxCodes(validation.sensitive_key_findings).length;
   const rows = [
     ["validation", validation.valid ? "passed" : "failed", validation.valid ? "ok" : "risk"],
     ["errors", String(sandboxCodes(validation.error_codes).length), validation.valid ? "neutral" : "risk"],
     ["warnings", String(sandboxCodes(validation.warning_codes).length), sandboxCodes(validation.warning_codes).length ? "warn" : "neutral"],
     ["unsafe", String(sandboxCodes(validation.unsafe_flags_detected).length), sandboxCodes(validation.unsafe_flags_detected).length ? "risk" : "neutral"],
+    ["consistency", failedConsistencyChecks ? `${failedConsistencyChecks} failed` : "ok", failedConsistencyChecks ? "risk" : "ok"],
     ["audit", failedAuditChecks ? `${failedAuditChecks} failed` : "ok", failedAuditChecks ? "risk" : "ok"],
+    ["sensitive", String(sensitiveKeyCount), sensitiveKeyCount ? "risk" : "neutral"],
+    ["read-only", summary.replay_allowed_as_read_only === true ? "allowed" : "blocked", summary.replay_allowed_as_read_only === true ? "ok" : "risk"],
   ];
 
   phase9ReplayValidationCounts.replaceChildren();
@@ -3048,6 +3127,217 @@ function renderPhase9ReplayValidationCounts(validation = {}) {
     chip.append(countValue, countLabel);
     phase9ReplayValidationCounts.appendChild(chip);
   }
+}
+
+function renderPhase9ReplayValidationFilters(validation = {}) {
+  const sections = phase9ReplayValidationSections(validation);
+  const availableKeys = new Set(sections.map((section) => section.key).concat("all"));
+
+  if (!availableKeys.has(currentPhase9ReplayValidationFilter)) {
+    currentPhase9ReplayValidationFilter = "all";
+  }
+
+  phase9ReplayValidationFilters.replaceChildren();
+  phase9ReplayValidationFilters.hidden = false;
+
+  for (const [filterKey, filter] of Object.entries(PHASE9_REPLAY_VALIDATION_FILTERS)) {
+    const button = document.createElement("button");
+    const matchingCount = filterKey === "all"
+      ? sections.reduce((total, section) => total + section.count, 0)
+      : (sections.find((section) => section.key === filterKey)?.count || 0);
+
+    button.type = "button";
+    button.className = "sandbox-evaluation-quick-filter";
+    button.dataset.phase9ReplayValidationFilter = filterKey;
+    button.title = filter.description;
+    button.setAttribute("aria-pressed", String(currentPhase9ReplayValidationFilter === filterKey));
+    button.textContent = `${filter.label} (${matchingCount})`;
+    button.addEventListener("click", () => {
+      currentPhase9ReplayValidationFilter =
+        currentPhase9ReplayValidationFilter === filterKey ? "all" : filterKey;
+      renderPhase9ReplayValidationIssueGroups(validation);
+      renderPhase9ReplayValidationFilters(validation);
+    });
+    phase9ReplayValidationFilters.appendChild(button);
+  }
+}
+
+function renderPhase9ReplayValidationIssueGroups(validation = {}) {
+  const sections = phase9ReplayValidationSections(validation).filter((section) =>
+    currentPhase9ReplayValidationFilter === "all"
+      ? true
+      : section.key === currentPhase9ReplayValidationFilter
+  );
+
+  phase9ReplayValidationIssueGroups.replaceChildren();
+  phase9ReplayValidationIssueGroups.hidden = false;
+  phase9ReplayValidationIssueGroups.dataset.phase9ReplayValidationIssueGroups = "true";
+  phase9ReplayValidationIssueGroups.dataset.activeFilter = currentPhase9ReplayValidationFilter;
+
+  if (!sections.length) {
+    phase9ReplayValidationIssueGroups.appendChild(
+      phase9ReplayValidationEmptySection("No validation sections match the active filter.")
+    );
+    return;
+  }
+
+  for (const section of sections) {
+    phase9ReplayValidationIssueGroups.appendChild(phase9ReplayValidationIssueSection(section));
+  }
+}
+
+function phase9ReplayValidationSections(validation = {}) {
+  const failedConsistencyChecks = phase9ReplayFailedChecks(validation.consistency_checks);
+  const failedAuditChecks = phase9ReplayFailedChecks(validation.audit_order_checks);
+  const unsafeFlags = sandboxCodes(validation.unsafe_flags_detected);
+  const sensitiveFindings = sandboxCodes(validation.sensitive_key_findings);
+  const debugFocus = String(validation.recommended_debug_focus || validation.validation_summary?.recommended_debug_focus || "");
+
+  return [
+    {
+      key: "errors",
+      title: "Errors",
+      tone: "risk",
+      emptyText: "No blocking validation errors.",
+      items: phase9ReplayIssueItems(validation.errors, "error"),
+    },
+    {
+      key: "warnings",
+      title: "Warnings",
+      tone: "warn",
+      emptyText: "No validation warnings.",
+      items: phase9ReplayIssueItems(validation.warnings, "warning"),
+    },
+    {
+      key: "unsafe",
+      title: "Unsafe flags",
+      tone: unsafeFlags.length ? "risk" : "neutral",
+      emptyText: "No unsafe flags detected.",
+      items: unsafeFlags.map((code) => ({ code, detail: code, field: "unsafe_flags_detected" })),
+    },
+    {
+      key: "audit",
+      title: "Audit order issues",
+      tone: failedAuditChecks.length ? "risk" : "ok",
+      emptyText: "No audit order issues.",
+      items: phase9ReplayCheckItems(failedAuditChecks),
+    },
+    {
+      key: "sensitive",
+      title: "Sensitive key findings",
+      tone: sensitiveFindings.length ? "risk" : "neutral",
+      emptyText: "No sensitive key findings.",
+      items: sensitiveFindings.map((path) => ({
+        code: "sensitive_key",
+        field: path,
+        detail: "Sensitive-looking key path in imported bundle.",
+      })),
+    },
+    {
+      key: "consistency",
+      title: "Consistency issues",
+      tone: failedConsistencyChecks.length ? "risk" : "ok",
+      emptyText: "No consistency issues.",
+      items: phase9ReplayCheckItems(failedConsistencyChecks),
+    },
+    {
+      key: "debug_focus",
+      title: "Recommended debug focus",
+      tone: "neutral",
+      emptyText: "No recommended debug focus.",
+      items: debugFocus ? [{ code: "recommended_debug_focus", field: "validation_summary", detail: debugFocus }] : [],
+    },
+  ].map((section) => ({ ...section, count: section.items.length }));
+}
+
+function phase9ReplayIssueItems(values, fallbackCode) {
+  return Array.isArray(values)
+    ? values.map((item) => ({
+        code: item?.code || fallbackCode,
+        field: item?.field || "validation",
+        detail: item?.detail || String(item || ""),
+      }))
+    : [];
+}
+
+function phase9ReplayCheckItems(checks) {
+  return Array.isArray(checks)
+    ? checks.map((check) => ({
+        code: check?.code || "validation_check_failed",
+        field: check?.field || check?.name || "validation",
+        detail: check?.detail || check?.name || "validation check failed",
+      }))
+    : [];
+}
+
+function phase9ReplayValidationIssueSection(section) {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const chip = document.createElement("span");
+  const list = document.createElement("ul");
+
+  details.className = "phase9-replay-validation-section";
+  details.dataset.phase9ReplayValidationSection = section.key;
+  details.dataset.tone = section.tone;
+  summary.className = "phase9-replay-validation-section-summary";
+  chip.className = "sandbox-evaluation-status-chip";
+  chip.dataset.status = section.tone === "risk" ? "blocked" : section.tone === "warn" ? "skipped" : "pass";
+  chip.textContent = `${section.title}: ${section.count}`;
+  summary.appendChild(chip);
+  list.className = "phase9-replay-validation-list";
+
+  if (!section.items.length) {
+    const item = document.createElement("li");
+    item.className = "phase9-replay-validation-empty";
+    item.textContent = section.emptyText;
+    list.appendChild(item);
+  } else {
+    for (const issue of section.items) {
+      list.appendChild(phase9ReplayValidationIssueItem(issue, section.key));
+    }
+  }
+
+  details.append(summary, list);
+  return details;
+}
+
+function phase9ReplayValidationIssueItem(issue, sectionKey) {
+  const item = document.createElement("li");
+  const code = document.createElement("span");
+  const detail = document.createElement("span");
+
+  item.dataset.phase9ReplayValidationIssue = sectionKey;
+  item.dataset.issueCode = issue.code || "unknown";
+  code.className = "phase9-replay-validation-code";
+  code.textContent = issue.code || "unknown";
+  detail.className = "phase9-replay-validation-detail";
+  detail.textContent = `${issue.field || "validation"} - ${issue.detail || "no detail"}`;
+  item.append(code, detail);
+  return item;
+}
+
+function phase9ReplayValidationEmptySection(message) {
+  const container = document.createElement("div");
+  const title = document.createElement("p");
+  const detail = document.createElement("p");
+
+  container.className = "sandbox-evaluation-empty-state";
+  container.dataset.phase9ReplayValidationEmpty = "true";
+  title.className = "sandbox-evaluation-empty-title";
+  title.textContent = message;
+  detail.className = "sandbox-evaluation-empty-detail";
+  detail.textContent = `Active validation filter: ${currentPhase9ReplayValidationFilter}.`;
+  container.append(title, detail);
+  return container;
+}
+
+function setPhase9ReplayValidationGroupsOpen(open) {
+  const detailsNodes = phase9ReplayValidationIssueGroups.querySelectorAll(
+    "details[data-phase9-replay-validation-section]"
+  );
+  detailsNodes.forEach((details) => {
+    details.open = open;
+  });
 }
 
 function renderPhase9ReplayValidationDetails(validation = {}) {
@@ -3916,8 +4206,12 @@ function phase9ReplayNotes(validation) {
 async function copyPhase9ReplayPayload(payloadKind) {
   phase9ReplayStatus.textContent = "Preparing replay copy payload...";
 
-  if (!currentPhase9ReplayReport) {
-    phase9ReplayStatus.textContent = "No replay report built yet.";
+  const payload = phase9ReplayCopyPayload(payloadKind);
+
+  if (!payload) {
+    phase9ReplayStatus.textContent = payloadKind.startsWith("validation") || payloadKind === "debug_focus"
+      ? "No replay validation summary loaded yet."
+      : "No replay report built yet.";
     return;
   }
 
@@ -3926,20 +4220,65 @@ async function copyPhase9ReplayPayload(payloadKind) {
     return;
   }
 
-  const payload =
-    payloadKind === "summary"
-      ? buildPhase9ReplayAISummary(currentPhase9ReplayReport)
-      : currentPhase9ReplayReport;
-
   try {
     await navigator.clipboard.writeText(
       typeof payload === "string" ? payload : JSON.stringify(payload, null, 2)
     );
-    phase9ReplayStatus.textContent =
-      payloadKind === "summary" ? "Replay AI summary copied." : "Replay report copied.";
+    phase9ReplayStatus.textContent = phase9ReplayCopyStatusText(payloadKind);
   } catch (error) {
     phase9ReplayStatus.textContent = `Copy failed: ${error.message || String(error)}`;
   }
+}
+
+function phase9ReplayCopyPayload(payloadKind) {
+  const validation = phase9CurrentReplayValidation();
+  const validationSummary = validation?.validation_summary || {};
+
+  if (payloadKind === "summary") {
+    return currentPhase9ReplayReport ? buildPhase9ReplayAISummary(currentPhase9ReplayReport) : null;
+  }
+
+  if (payloadKind === "validation_summary") {
+    return validation ? validationSummary : null;
+  }
+
+  if (payloadKind === "validation_errors") {
+    return validation
+      ? {
+          errors: validation.errors || [],
+          error_codes: validation.error_codes || [],
+          warnings: validation.warnings || [],
+          warning_codes: validation.warning_codes || [],
+        }
+      : null;
+  }
+
+  if (payloadKind === "debug_focus") {
+    return validation
+      ? String(validation.recommended_debug_focus || validationSummary.recommended_debug_focus || "none")
+      : null;
+  }
+
+  if (payloadKind === "validation_json") {
+    return validation || null;
+  }
+
+  return currentPhase9ReplayReport;
+}
+
+function phase9CurrentReplayValidation() {
+  return currentPhase9ReplayReport?.validation || currentPhase9ImportedBundle?.validation || null;
+}
+
+function phase9ReplayCopyStatusText(payloadKind) {
+  const labels = {
+    summary: "Replay AI summary copied.",
+    validation_summary: "Replay validation summary copied.",
+    validation_errors: "Replay validation errors copied.",
+    debug_focus: "Recommended debug focus copied.",
+    validation_json: "Replay validation JSON copied.",
+  };
+  return labels[payloadKind] || "Replay report copied.";
 }
 
 function buildPhase9ReplayAISummary(report) {

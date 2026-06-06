@@ -908,11 +908,19 @@ class Phase9ExperimentTests(unittest.TestCase):
             "replayPhase9Bundle",
             "copyPhase9ReplayReport",
             "copyPhase9ReplaySummary",
+            "copyPhase9ValidationSummary",
+            "copyPhase9ValidationErrors",
+            "copyPhase9DebugFocus",
+            "copyPhase9ValidationJson",
+            "expandPhase9ValidationGroups",
+            "collapsePhase9ValidationGroups",
             "clearPhase9Bundle",
             "phase9ReplayStatus",
             "phase9ReplayErrors",
             "phase9ReplayValidationCounts",
             "phase9ReplaySummary",
+            "phase9ReplayValidationFilters",
+            "phase9ReplayValidationIssueGroups",
             "phase9ReplayTimeline",
             "phase9ReplayValidationDetails",
             "phase9ReplayValidationJson",
@@ -952,6 +960,12 @@ class Phase9ExperimentTests(unittest.TestCase):
             "Replay bundle",
             "Copy replay report",
             "Copy replay AI summary",
+            "Copy validation summary",
+            "Copy validation errors",
+            "Copy debug focus",
+            "Copy validation JSON",
+            "Expand validation",
+            "Collapse validation",
             "Clear imported bundle",
             "Replay validation details",
         ]:
@@ -1106,6 +1120,12 @@ class Phase9ExperimentTests(unittest.TestCase):
             "renderPhase9ReplayReport",
             "renderPhase9ReplayTimeline",
             "renderPhase9ReplayValidationCounts",
+            "renderPhase9ReplayValidationFilters",
+            "renderPhase9ReplayValidationIssueGroups",
+            "phase9ReplayValidationSections",
+            "phase9ReplayValidationIssueSection",
+            "phase9ReplayValidationIssueItem",
+            "setPhase9ReplayValidationGroupsOpen",
             "renderPhase9ReplayValidationDetails",
             "phase9ReplayCheckStatus",
             "validatePhase9DeepConsistency",
@@ -1118,6 +1138,9 @@ class Phase9ExperimentTests(unittest.TestCase):
             "phase9ReplayAuditEventDetails",
             "phase9ReplayAuditEventRows",
             "copyPhase9ReplayPayload",
+            "phase9ReplayCopyPayload",
+            "phase9ReplayCopyStatusText",
+            "phase9CurrentReplayValidation",
             "buildPhase9ReplayAISummary",
         ]:
             with self.subTest(function_name=function_name):
@@ -1152,6 +1175,16 @@ class Phase9ExperimentTests(unittest.TestCase):
             "unsafe_bundle_flags",
             "validation_summary",
             "recommended_debug_focus",
+            "PHASE9_REPLAY_VALIDATION_FILTERS",
+            "phase9ReplayValidationFilter",
+            "phase9ReplayValidationIssueGroups",
+            "phase9ReplayValidationSection",
+            "phase9ReplayValidationIssue",
+            "phase9ReplayValidationEmpty",
+            "validation_summary",
+            "validation_errors",
+            "debug_focus",
+            "validation_json",
             "phase9_repro_bundle_v1",
             "phase9_replay_v1",
             "phase_9_5",
@@ -1169,10 +1202,57 @@ class Phase9ExperimentTests(unittest.TestCase):
             ".phase9-replay-panel",
             ".phase9-replay-input",
             ".phase9-replay-errors",
+            ".phase9-replay-validation-groups",
+            ".phase9-replay-validation-section",
+            ".phase9-replay-validation-list",
             ".phase9-replay-validation-details",
         ]:
             with self.subTest(css_selector=css_selector):
                 self.assertIn(css_selector, styles)
+
+    def test_phase9_cockpit_replay_validation_polish_hooks_exist(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        html = UI_INDEX_HTML.read_text(encoding="utf-8")
+
+        for hook in [
+            "phase9ReplayValidationFilters",
+            "phase9ReplayValidationIssueGroups",
+            "phase9ReplayValidationCount",
+            "phase9ReplayValidationFilter",
+            "phase9ReplayValidationSection",
+            "phase9ReplayValidationIssue",
+            "phase9ReplayValidationEmpty",
+            "copyPhase9ValidationSummary",
+            "copyPhase9ValidationErrors",
+            "copyPhase9DebugFocus",
+            "copyPhase9ValidationJson",
+            "expandPhase9ValidationGroups",
+            "collapsePhase9ValidationGroups",
+        ]:
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source + html)
+
+        for label in [
+            "errors only",
+            "warnings only",
+            "unsafe flags",
+            "audit order",
+            "sensitive keys",
+            "consistency",
+            "Errors",
+            "Warnings",
+            "Unsafe flags",
+            "Audit order issues",
+            "Sensitive key findings",
+            "Consistency issues",
+            "Recommended debug focus",
+            "Replay validation summary copied.",
+            "Replay validation errors copied.",
+            "Recommended debug focus copied.",
+            "Replay validation JSON copied.",
+        ]:
+            with self.subTest(label=label):
+                self.assertIn(label, source + html)
 
     def test_phase9_cockpit_ui_is_read_only(self) -> None:
         source = UI_APP_JS.read_text(encoding="utf-8")

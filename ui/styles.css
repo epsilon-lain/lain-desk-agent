@@ -1786,6 +1786,66 @@ button {
   display: none;
 }
 
+.phase9-replay-validation-groups {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin-top: 10px;
+}
+
+.phase9-replay-validation-groups[hidden] {
+  display: none;
+}
+
+.phase9-replay-validation-section {
+  min-width: 0;
+  border: 1px solid rgba(134, 184, 220, 0.18);
+  border-radius: 8px;
+  padding: 7px;
+  background: rgba(2, 8, 14, 0.22);
+}
+
+.phase9-replay-validation-section[data-tone="risk"] {
+  border-color: rgba(255, 115, 95, 0.58);
+}
+
+.phase9-replay-validation-section[data-tone="warn"] {
+  border-color: rgba(255, 198, 109, 0.48);
+}
+
+.phase9-replay-validation-section-summary {
+  cursor: pointer;
+}
+
+.phase9-replay-validation-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.phase9-replay-validation-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.phase9-replay-validation-code {
+  color: var(--blue);
+  overflow-wrap: anywhere;
+}
+
+.phase9-replay-validation-detail,
+.phase9-replay-validation-empty {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .phase9-replay-validation-details {
   min-width: 0;
   margin-top: 6px;
@@ -2570,6 +2630,7 @@ button {
   .sandbox-evaluation-bar-row,
   .sandbox-evaluation-blocker-item,
   .phase9-audit-event-detail-grid div,
+  .phase9-replay-validation-list li,
   .planner-evaluation-summary,
   .planner-evaluation-facts div,
   .click-readiness-check {

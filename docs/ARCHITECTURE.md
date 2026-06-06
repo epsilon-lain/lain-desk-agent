@@ -513,6 +513,22 @@ details. Phase 9.6 still does not upload bundles, observe the live desktop,
 read local files, execute code, call action-performing endpoints, record
 approvals, or modify any execution policy.
 
+### Phase 9.7 Replay Validation Cockpit UX Polish
+
+Phase 9.7 keeps the Phase 9.5/9.6 replay data shape and validation semantics
+stable, then improves only the browser-side cockpit display. The replay panel
+adds compact validation summary cards, local validation issue filters,
+expandable issue groups for errors, warnings, unsafe flags, audit order,
+sensitive key findings, consistency checks, and recommended debug focus, plus
+copy helpers for validation summary, validation errors, debug focus, and replay
+validation JSON.
+
+All Phase 9.7 controls operate on already loaded in-memory replay validation
+data. They do not upload bundles, fetch new execution data, record approvals,
+mutate runtime state, call action-performing endpoints, or change replay
+eligibility. Imported bundles remain untrusted input, and the cockpit remains
+read-only/debug-only.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -553,6 +569,9 @@ The current safety boundaries are intentionally narrow:
 - Phase 9.6 Phase 9 replay validation hardening is read-only validation/debug
   output for untrusted imported bundles; it is not execution permission and it
   never attempts real desktop action.
+- Phase 9.7 Phase 9 replay validation cockpit UX polish is browser-local
+  read-only display and copy logic; it is not execution permission and it never
+  attempts real desktop action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

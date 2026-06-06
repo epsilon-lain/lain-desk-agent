@@ -613,6 +613,31 @@ without changing runtime behavior.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions and
   `real_action_enabled = false` default behavior.
 
+## Phase 9.7: Replay Validation Cockpit UX Polish
+
+Status: implemented as read-only cockpit display polish for Phase 9 replay
+validation.
+
+Goal: make imported bundle validation easier to inspect, filter, copy, and
+hand off to another AI assistant or developer without changing replay behavior.
+
+- Keep the Phase 9.5 replay format and Phase 9.6 validation summary stable.
+- Add compact summary cards for validation pass/fail, error count, warning
+  count, unsafe flag count, consistency status, audit order status, sensitive
+  key findings, and read-only replay eligibility.
+- Add expandable validation issue groups for errors, warnings, unsafe flags,
+  audit order issues, sensitive key findings, consistency issues, and
+  recommended debug focus.
+- Add browser-local quick filters for errors only, warnings only, unsafe flags,
+  audit order issues, sensitive key findings, and consistency issues.
+- Add copy helpers for validation summary, validation errors, recommended
+  debug focus, and replay validation JSON from already loaded browser memory.
+- Keep every control read-only: no execute button, approval button,
+  real-action toggle, sandbox action trigger, `/execute` call, mutation
+  endpoint, upload endpoint, filesystem read, or action-performing endpoint.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions and
+  `real_action_enabled = false` default behavior.
+
 ## Phase 10: Limited Desktop Control
 
 Goal: consider narrow desktop control only after the Phase 7 checklist and
