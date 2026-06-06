@@ -75,6 +75,12 @@ Phase 9.4 adds a read-only Phase 9 export/report bundle for debugging,
 handoff, reproducibility, and AI-assisted review. It copies only already loaded
 deterministic report data and does not add execution control.
 
+The project now maintains a release-prep health snapshot in
+`docs/PROJECT_HEALTH_SNAPSHOT.md`. The snapshot summarizes the current
+dry-run/read-only status, safety boundary, verification commands, known risks,
+Phase 10 readiness checklist, and AI handoff notes for future Codex sessions
+and developers.
+
 ## Completed
 
 - Observation / Understanding
@@ -103,6 +109,7 @@ deterministic report data and does not add execution control.
 - Phase 9.2 Phase 9 Harness Cockpit Display
 - Phase 9.3 Phase 9 Advanced Audit Timeline UX
 - Phase 9.4 Phase 9 Report Export And Reproducibility Bundle
+- Project Health Snapshot / Release-prep Handoff
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix

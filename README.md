@@ -163,6 +163,8 @@ Do not commit or paste real API keys. See
 
 ## Current Docs
 
+- [`docs/PROJECT_HEALTH_SNAPSHOT.md`](docs/PROJECT_HEALTH_SNAPSHOT.md) -
+  current dry-run cockpit health snapshot and AI handoff summary.
 - [`docs/SAFETY.md`](docs/SAFETY.md)
 - [`docs/DEV_CHECKLIST.md`](docs/DEV_CHECKLIST.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
