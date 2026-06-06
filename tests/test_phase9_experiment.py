@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import inspect
+import json
+import threading
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from unittest.mock import patch
+from urllib.request import urlopen
 
 import _path  # noqa: F401
 from lain_desk_agent import phase9_experiment
+from lain_desk_agent.main import create_server
 from lain_desk_agent.phase9_experiment import (
     EVENT_PHASE9_DRY_RUN_COMPLETED,
     EVENT_PHASE9_EMERGENCY_STOP_CHECKED,
@@ -27,6 +33,8 @@ from lain_desk_agent.phase9_experiment import (
     Phase9ExperimentConfig,
     Phase9ExperimentRequest,
     build_phase9_experiment_report,
+    evaluate_phase9_experiment_scenarios,
+    phase9_experiment_scenario_ids,
     run_phase9_experiment,
     validate_phase9_gate,
 )
@@ -55,6 +63,34 @@ OBSERVATION_ID = "observation_0001"
 ACTION_ID = "sandbox_action_0001"
 TARGET_ID = "sandbox_target_button"
 WINDOW_ID = "sandbox_window"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+UI_INDEX_HTML = PROJECT_ROOT / "ui" / "index.html"
+UI_APP_JS = PROJECT_ROOT / "ui" / "app.js"
+
+PHASE9_COCKPIT_FIELDS = {
+    "experiment_id",
+    "experiment_name",
+    "scenario_name",
+    "dry_run",
+    "real_action_enabled",
+    "real_action_skipped",
+    "gate_passed",
+    "actual_outcome",
+    "failure_reason_codes",
+    "blocker_codes",
+    "mock_approval_checked",
+    "user_approval_present",
+    "emergency_stop_available",
+    "post_action_verification_planned",
+    "rollback_plan_recorded",
+    "sandbox_scope",
+    "action_type",
+    "target_risk_hint",
+    "target_confidence",
+    "readiness_ready",
+    "audit_event_names",
+    "notes",
+}
 
 
 class Phase9ExperimentTests(unittest.TestCase):
@@ -392,6 +428,132 @@ class Phase9ExperimentTests(unittest.TestCase):
                 "missing_action_contract_blocks",
             ),
         )
+
+    def test_phase9_demo_report_exposes_cockpit_shape(self) -> None:
+        report = evaluate_phase9_experiment_scenarios()
+
+        self.assertEqual(report["report_type"], "phase9_minimal_sandbox_experiment")
+        self.assertEqual(report["phase"], "phase9_1")
+        self.assertEqual(report["cockpit_exposure_phase"], "phase9_2")
+        self.assertIs(report["external_llm_calls"], False)
+        self.assertIs(report["real_desktop_actions"], False)
+        self.assertEqual(report["scenario_ids"], list(PHASE9_MINIMAL_SCENARIO_IDS))
+        self.assertEqual(phase9_experiment_scenario_ids(), list(PHASE9_MINIMAL_SCENARIO_IDS))
+        self.assertEqual(report["summary"]["real_action_enabled_count"], 0)
+        self.assertEqual(report["summary"]["real_action_attempted_count"], 0)
+        self.assertEqual(report["summary"]["real_action_skipped_count"], 1)
+
+        for scenario in report["scenarios"]:
+            with self.subTest(scenario=scenario["scenario_id"]):
+                self.assertTrue(PHASE9_COCKPIT_FIELDS.issubset(scenario))
+                self.assertTrue(set(PHASE9_REPORT_FIELDS).issubset(scenario))
+                self.assertIs(scenario["mock_approval_checked"], True)
+                self.assertIn("window_id", scenario["sandbox_scope"])
+                self.assertIn("target_id", scenario["sandbox_scope"])
+                self.assertIn("phase9_experiment_requested", scenario["audit_event_names"])
+                self.assertIs(scenario["actual_outcome"]["real_action_attempted"], False)
+
+    def test_phase9_cockpit_endpoint_is_read_only_and_stable(self) -> None:
+        server = create_server("127.0.0.1", 0)
+        host, port = server.server_address
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            with (
+                patch("lain_desk_agent.main.observe", side_effect=AssertionError("observe called")),
+                patch("lain_desk_agent.main.understand", side_effect=AssertionError("understand called")),
+                patch(
+                    "lain_desk_agent.main.execute_action_contract",
+                    side_effect=AssertionError("execution called"),
+                ),
+            ):
+                with urlopen(f"http://{host}:{port}/phase9-experiment/demo", timeout=5) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+        finally:
+            server.shutdown()
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(payload["report_type"], "phase9_minimal_sandbox_experiment")
+        self.assertEqual(payload["cockpit_exposure_phase"], "phase9_2")
+        self.assertEqual(payload["scenario_ids"], list(PHASE9_MINIMAL_SCENARIO_IDS))
+        self.assertEqual(payload["summary"]["real_action_attempted_count"], 0)
+        self.assertTrue(PHASE9_COCKPIT_FIELDS.issubset(payload["scenarios"][0]))
+
+    def test_phase9_cockpit_endpoint_can_filter_one_scenario(self) -> None:
+        server = create_server("127.0.0.1", 0)
+        host, port = server.server_address
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            with urlopen(
+                f"http://{host}:{port}/phase9-experiment/demo?scenario_id=missing_user_approval_blocks",
+                timeout=5,
+            ) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        finally:
+            server.shutdown()
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(payload["scenario_count"], 1)
+        self.assertEqual(payload["scenario_ids"], ["missing_user_approval_blocks"])
+        self.assertEqual(payload["scenarios"][0]["scenario_id"], "missing_user_approval_blocks")
+
+    def test_phase9_cockpit_ui_selectors_and_strings_exist(self) -> None:
+        html = UI_INDEX_HTML.read_text(encoding="utf-8")
+        source = UI_APP_JS.read_text(encoding="utf-8")
+
+        for element_id in [
+            "phase9ExperimentPanel",
+            "loadPhase9Experiment",
+            "phase9ExperimentStatus",
+            "phase9ExperimentSummary",
+            "phase9ExperimentTimeline",
+            "phase9ExperimentResults",
+        ]:
+            with self.subTest(element_id=element_id):
+                self.assertIn(f'id="{element_id}"', html)
+                self.assertIn(f"#{element_id}", source)
+
+        for visible_label in [
+            "Phase 9 dry-run harness",
+            "Approval state",
+            "Emergency stop",
+            "Verification",
+            "Rollback",
+            "Sandbox scope",
+            "Real action",
+            "Phase 9 audit event sequence",
+        ]:
+            with self.subTest(visible_label=visible_label):
+                self.assertIn(visible_label, source + html)
+
+    def test_phase9_cockpit_ui_is_read_only(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        start = source.index("async function loadPhase9Experiment")
+        end = source.index("function setSandboxEvaluationSummary", start)
+        phase9_ui_source = source[start:end]
+
+        self.assertIn('fetch("/phase9-experiment/demo")', phase9_ui_source)
+        for forbidden_fragment in [
+            'fetch("/execute"',
+            "fetch('/execute'",
+            'fetch("/approval"',
+            "fetch('/approval'",
+            "recordApprovalDecision",
+            "runWaitExecutionSelfTest",
+            "realActionEnabled = true",
+            "real_action_enabled = true",
+        ]:
+            with self.subTest(fragment=forbidden_fragment):
+                self.assertNotIn(forbidden_fragment, phase9_ui_source)
+
+        self.assertIn("phase9ExperimentScenarioCard", source)
+        self.assertIn("renderPhase9ExperimentTimeline", source)
+        self.assertIn("phase9_real_action_skipped", source)
 
     def test_no_real_desktop_actuation_api_is_imported_or_called(self) -> None:
         source = inspect.getsource(phase9_experiment)

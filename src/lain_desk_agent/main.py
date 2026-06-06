@@ -33,6 +33,10 @@ from .permission_profile import get_permission_profile_payload
 from .planner import propose
 from .planner_context import build_planner_context
 from .planner_evaluation import evaluate_demo_scenarios
+from .phase9_experiment import (
+    UnknownPhase9ExperimentScenarioError,
+    evaluate_phase9_experiment_scenarios,
+)
 from .resource_guard import DEFAULT_LIMITS, ResourceGuardError
 from .safety import assess_proposal
 from .sandbox_evaluation import (
@@ -80,6 +84,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/sandbox-evaluation/demo":
             self._handle_sandbox_evaluation_demo()
+            return
+
+        if path == "/phase9-experiment/demo":
+            self._handle_phase9_experiment_demo()
             return
 
         if path == "/demo/scenario":
@@ -290,6 +298,22 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 scenario_ids=[scenario_id] if scenario_id else None,
             )
         except UnknownSandboxEvaluationScenarioError as exc:
+            self._send_json({"error": str(exc)}, status=404)
+            return
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+
+        self._send_json(payload)
+
+    def _handle_phase9_experiment_demo(self) -> None:
+        try:
+            query = parse_qs(urlparse(self.path).query)
+            scenario_id = _first_query_value(query, "scenario_id") or _first_query_value(query, "name")
+            payload = evaluate_phase9_experiment_scenarios(
+                scenario_ids=[scenario_id] if scenario_id else None,
+            )
+        except UnknownPhase9ExperimentScenarioError as exc:
             self._send_json({"error": str(exc)}, status=404)
             return
         except Exception as exc:

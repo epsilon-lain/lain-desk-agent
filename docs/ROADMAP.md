@@ -62,6 +62,11 @@ dry-run-only simulation. It reuses the Phase 7 gate through the Phase 8 sandbox
 framework, adds mock approval, mock emergency stop, mock verification, and mock
 rollback checks, and always reports `real_action_attempted = false`.
 
+Phase 9.2 exposes the Phase 9.1 dry-run harness report in the cockpit as
+read-only debug output. It displays mock approval, emergency stop,
+verification, rollback, blockers, and audit trace data without adding any
+execution control.
+
 ## Completed
 
 - Observation / Understanding
@@ -87,6 +92,7 @@ rollback checks, and always reports `real_action_attempted = false`.
 - Phase 8.5 Sandbox Trace UX Refinements
 - Phase 9 Minimal Sandbox Experiment Design
 - Phase 9.1 Minimal Sandbox Experiment Harness
+- Phase 9.2 Phase 9 Harness Cockpit Display
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -120,6 +126,8 @@ rollback checks, and always reports `real_action_attempted = false`.
   not execution permission.
 - Phase 9.1 minimal sandbox experiment harness is dry-run-only simulation and
   not execution permission.
+- Phase 9.2 Phase 9 harness cockpit display is read-only/debug-only and not
+  execution permission.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -457,6 +465,30 @@ real-action adapter is considered.
 - Do not add a cockpit endpoint, execute button, approval button, real-action
   toggle, sandbox action trigger, `/execute` call, desktop control dependency,
   or permission change.
+
+## Phase 9.2: Phase 9 Harness Cockpit Display
+
+Status: implemented as read-only cockpit debug integration.
+
+Goal: make Phase 9.1 dry-run harness status inspectable in the cockpit without
+adding any execution path.
+
+- Expose deterministic Phase 9.1 harness scenarios through
+  `GET /phase9-experiment/demo`.
+- Keep the endpoint fixture-backed and deterministic; no live desktop
+  observation, no understanding pass, no action execution, and no desktop
+  control API.
+- Display experiment ID/name, scenario name, gate status, actual outcome,
+  dry-run state, real-action-enabled state, real-action-skipped state, failure
+  reason codes, blocker codes, mock approval checked/present state, emergency
+  stop state, post-action verification planning, rollback planning, sandbox
+  scope, target risk/confidence, readiness state, action type, notes, and the
+  Phase 9 audit event sequence.
+- Keep the cockpit panel read-only: no execute button, approval button,
+  real-action toggle, click/type/hotkey/scroll/switch_app control, sandbox
+  action trigger, `/execute` call, or action-performing endpoint.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions and
+  `real_action_enabled = false` default behavior.
 
 ## Phase 10: Limited Desktop Control
 

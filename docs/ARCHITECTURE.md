@@ -416,6 +416,27 @@ call `/execute`, does not observe the live desktop, does not change Capability
 Registry, Permission Profile, Execution Policy, Action Contract behavior, or
 Click Readiness, and does not import any desktop control API.
 
+### Phase 9.2 Phase 9 Harness Cockpit Display
+
+Phase 9.2 exposes the existing Phase 9.1 dry-run harness report in the cockpit
+through `GET /phase9-experiment/demo`. The endpoint calls
+`evaluate_phase9_experiment_scenarios(...)` and returns deterministic fixture
+data only. It does not observe the live desktop, understand a screen, execute
+an action contract, or call `/execute`.
+
+The cockpit panel is read-only debug output for Phase 9 harness status. It
+shows experiment ID/name, scenario name, dry-run state, real-action-enabled
+state, real-action-skipped state, gate status, actual outcome, failure reason
+codes, blocker codes, mock approval checked/present state, emergency stop
+availability, post-action verification planning, rollback planning, sandbox
+scope, target risk/confidence, readiness state, action type, notes, and the
+Phase 9 audit event timeline.
+
+Phase 9.2 does not add approve, execute, real-action toggle, click/type/
+hotkey/scroll/switch_app, or sandbox action trigger controls. It does not
+change Capability Registry, Permission Profile, Execution Policy, Action
+Contract behavior, Click Readiness, or the Phase 7 gate.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -442,6 +463,8 @@ The current safety boundaries are intentionally narrow:
   it is not execution permission.
 - Phase 9.1 minimal sandbox experiment harness is dry-run-only simulation;
   it is not execution permission and it never attempts real desktop action.
+- Phase 9.2 Phase 9 harness cockpit display is read-only debug output; it is
+  not execution permission and it never attempts real desktop action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.
@@ -462,6 +485,7 @@ The current safety boundaries are intentionally narrow:
 | `/click-readiness` | GET | Return static click readiness policy metadata. |
 | `/runtime/status` | GET | Return the current runtime safety summary. |
 | `/sandbox-evaluation/demo` | GET | Return deterministic Phase 8.1 sandbox evaluation trace for cockpit display; no observation or execution. |
+| `/phase9-experiment/demo` | GET | Return deterministic Phase 9.1 dry-run harness trace for cockpit display; no observation or execution. |
 | `/execute` | POST | Execute only approved wait contracts and verify them. |
 
 ## Development rule

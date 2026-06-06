@@ -342,6 +342,27 @@
               <div class="sandbox-evaluation-timeline" id="sandboxEvaluationTimeline" hidden></div>
               <div class="planner-evaluation-results" id="sandboxEvaluationResults" aria-live="polite"></div>
             </section>
+            <section
+              class="planner-evaluation-panel"
+              id="phase9ExperimentPanel"
+              aria-label="Phase 9 dry-run harness"
+            >
+              <div class="planner-evaluation-header">
+                <div>
+                  <p class="planner-evaluation-title">Phase 9 dry-run harness</p>
+                  <p class="planner-evaluation-helper">
+                    Read-only Phase 9.1 harness output. Mock approval, emergency stop, verification, and rollback only.
+                  </p>
+                </div>
+                <button class="planner-evaluation-button" id="loadPhase9Experiment" type="button">
+                  Load Phase 9
+                </button>
+              </div>
+              <p class="planner-evaluation-status" id="phase9ExperimentStatus">Not loaded yet.</p>
+              <dl class="planner-evaluation-summary" id="phase9ExperimentSummary" hidden></dl>
+              <div class="sandbox-evaluation-timeline" id="phase9ExperimentTimeline" hidden></div>
+              <div class="planner-evaluation-results" id="phase9ExperimentResults" aria-live="polite"></div>
+            </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
               <p id="safetyBrakeMessage">No safety decision yet.</p>
               <div class="safety-buttons" id="safetyButtons" hidden>

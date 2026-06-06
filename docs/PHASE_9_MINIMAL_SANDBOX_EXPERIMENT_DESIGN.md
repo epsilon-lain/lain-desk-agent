@@ -16,6 +16,13 @@ perform any real desktop action, does not call `/execute`, and does not change
 Execution Policy, Permission Profile, Capability Registry, or any permission
 matrix.
 
+Phase 9.2 exposes the Phase 9.1 harness report in the cockpit through a
+read-only debug panel and `GET /phase9-experiment/demo`. It displays dry-run
+status, gate status, mock approval, mock emergency stop, verification plan,
+rollback plan, sandbox scope, blockers, and audit events. It does not add an
+execute button, approval button, real-action toggle, sandbox action trigger, or
+any action-performing endpoint.
+
 ## Purpose
 
 Define a minimal, reviewable sandbox experiment plan that can validate the
@@ -369,6 +376,25 @@ Phase 9.1 is implemented as dry-run harness code only:
 
 Phase 9.1 does not expose a cockpit execute control, does not add an endpoint,
 does not observe the live desktop, and does not create a real-action adapter.
+
+## Phase 9.2 Cockpit Display Status
+
+Phase 9.2 is implemented as cockpit display/debug integration only:
+
+- `/phase9-experiment/demo` returns deterministic Phase 9.1 harness report
+  data.
+- The report preserves the Phase 8-compatible scenario fields and adds
+  cockpit-facing status such as mock approval checked, user approval present,
+  emergency stop availability, rollback plan recorded, and sandbox scope.
+- The cockpit displays experiment status, gate status, failure reason codes,
+  blocker codes, audit timeline, dry-run state, real-action-skipped state,
+  mock approval state, emergency stop state, post-action verification planning,
+  rollback planning, target risk/confidence, readiness state, action type, and
+  sandbox scope.
+
+Phase 9.2 is not execution permission. It does not observe the live desktop,
+does not call `/execute`, does not mutate runtime state, does not add approval
+or execute controls, and does not add a desktop control dependency.
 
 ## Implementation Guardrails
 
