@@ -454,6 +454,23 @@ not add real-action toggles, do not change Capability Registry, Permission
 Profile, Execution Policy, Action Contract behavior, Click Readiness, or the
 Phase 7 gate, and do not import any desktop control API.
 
+### Phase 9.4 Phase 9 Report Export And Reproducibility Bundle
+
+Phase 9.4 keeps the Phase 9.1 scenario report shape and the Phase 9.2
+read-only endpoint stable, then derives an export bundle from that deterministic
+report. The bundle includes a stable export report, an AI-readable handoff
+summary, minimal reproduction metadata, audit event order, blocker/failure
+codes, and a safety-boundary statement.
+
+The export is for debugging, handoff, reproducibility, and AI-assisted review.
+It avoids private auth material, live OS state, broad filesystem dumps, and
+real desktop screenshots outside deterministic fixture data. Cockpit controls
+copy the already loaded report, JSON export, or reproducibility bundle from
+browser memory only. They do not call `/execute`, do not record approvals, do
+not mutate runtime state, do not add real-action toggles, and do not alter
+Capability Registry, Permission Profile, Execution Policy, Action Contract
+behavior, Click Readiness, or the Phase 7 gate.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -485,6 +502,9 @@ The current safety boundaries are intentionally narrow:
 - Phase 9.3 Phase 9 advanced audit timeline UX is browser-local read-only
   display logic; it is not execution permission and it never attempts real
   desktop action.
+- Phase 9.4 Phase 9 report export and reproducibility bundle is read-only
+  state-transfer/debug data; it is not execution permission and it never
+  attempts real desktop action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

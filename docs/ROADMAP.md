@@ -71,6 +71,10 @@ Phase 9.3 improves the Phase 9 cockpit audit timeline with local-only grouping,
 original-order metadata, event chips, and expandable event detail rows. It is
 still read-only/debug-only and does not add execution control.
 
+Phase 9.4 adds a read-only Phase 9 export/report bundle for debugging,
+handoff, reproducibility, and AI-assisted review. It copies only already loaded
+deterministic report data and does not add execution control.
+
 ## Completed
 
 - Observation / Understanding
@@ -98,6 +102,7 @@ still read-only/debug-only and does not add execution control.
 - Phase 9.1 Minimal Sandbox Experiment Harness
 - Phase 9.2 Phase 9 Harness Cockpit Display
 - Phase 9.3 Phase 9 Advanced Audit Timeline UX
+- Phase 9.4 Phase 9 Report Export And Reproducibility Bundle
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -135,6 +140,8 @@ still read-only/debug-only and does not add execution control.
   execution permission.
 - Phase 9.3 Phase 9 advanced audit timeline UX is read-only/debug-only and not
   execution permission.
+- Phase 9.4 Phase 9 report export and reproducibility bundle is
+  read-only/debug-only and not execution permission.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -518,6 +525,36 @@ deterministic report shape or adding execution permission.
 - Keep all controls browser-local: no execute button, approval button,
   real-action toggle, sandbox action trigger, `/execute` call, or
   action-performing endpoint.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions and
+  `real_action_enabled = false` default behavior.
+
+## Phase 9.4: Phase 9 Report Export And Reproducibility Bundle
+
+Status: implemented as read-only state-transfer/debug export.
+
+Goal: make the Phase 9 dry-run harness state easy to hand off to future Codex
+sessions, developers, or AI assistants without changing behavior or granting
+execution permission.
+
+- Keep using the existing Phase 9.1 scenario report fields and Phase 9.2
+  endpoint.
+- Add a stable Phase 9.4 export report with dry-run state, real-action state,
+  experiment/scope/action fields, gate outcome, blockers, target/readiness
+  fields, approval/emergency/verification/rollback state, audit event names,
+  audit timeline, and notes.
+- Add an AI-readable summary that explains phase, dry-run status, real-action
+  disabled state, gate result, blockers, support-state checks, skipped state,
+  recommended next debugging focus, and safety boundary.
+- Add a reproducibility bundle containing the export report, AI summary,
+  minimal reproduction metadata, scenario IDs, stable assumptions, audit order,
+  blocker/failure codes, and safety boundary statement.
+- Avoid private auth material, live OS state, full local filesystem dumps, and
+  real desktop screenshots outside deterministic fixture data.
+- Add cockpit copy controls for AI summary, JSON report, and reproducibility
+  bundle. These controls copy current in-memory deterministic report data only.
+- Keep every control read-only: no execute button, approval button,
+  real-action toggle, sandbox action trigger, `/execute` call, mutation
+  endpoint, or action-performing endpoint.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions and
   `real_action_enabled = false` default behavior.
 

@@ -90,6 +90,24 @@ PHASE9_DEMO_NOW = datetime(2026, 1, 1, 0, 0, 5, tzinfo=timezone.utc)
 PHASE9_DEMO_OBSERVATION_TIMESTAMP = "2026-01-01T00:00:00Z"
 PHASE9_DEMO_OBSERVATION_ID = "phase9_observation_0001"
 PHASE9_DEMO_ACTION_ID = "phase9_sandbox_action_0001"
+PHASE9_EXPORT_REPORT_VERSION = "phase9_export_v1"
+PHASE9_EXPORT_GENERATED_AT = "deterministic_phase9_fixture"
+PHASE9_EXPORT_PROJECT_PHASE = "phase_9_4"
+PHASE9_EXPORT_BUNDLE_VERSION = "phase9_repro_bundle_v1"
+PHASE9_EXPORT_SAFETY_BOUNDARY = (
+    "Phase 9.4 exports deterministic dry-run debug data only. Real desktop "
+    "actions remain disabled, and no action-performing endpoint is called."
+)
+_SENSITIVE_KEY_FRAGMENTS = (
+    "token",
+    "secret",
+    "api_key",
+    "apikey",
+    "password",
+    "credential",
+    "environment",
+    "env_var",
+)
 
 
 class UnknownPhase9ExperimentScenarioError(ValueError):
@@ -458,10 +476,11 @@ def build_phase9_experiment_report(results: list[Phase9ExperimentResult]) -> dic
 
     scenarios = [result.to_dict() for result in results]
     failed = [scenario for scenario in scenarios if not scenario["passed"]]
-    return {
+    report = {
         "report_type": "phase9_minimal_sandbox_experiment",
         "phase": "phase9_1",
         "cockpit_exposure_phase": "phase9_2",
+        "export_phase": PHASE9_EXPORT_PROJECT_PHASE,
         "source": "phase9_experiment_harness",
         "external_llm_calls": False,
         "real_desktop_actions": False,
@@ -497,6 +516,351 @@ def build_phase9_experiment_report(results: list[Phase9ExperimentResult]) -> dic
         ],
         "scenarios": scenarios,
     }
+    report["phase9_export_bundle"] = build_phase9_reproducibility_bundle(report)
+    return report
+
+
+def build_phase9_export_report(report: dict[str, Any]) -> dict[str, Any]:
+    """Return a stable Phase 9.4 export view derived from the cockpit report."""
+
+    source_report = report if isinstance(report, dict) else {}
+    scenarios = [
+        _phase9_export_scenario(scenario)
+        for scenario in source_report.get("scenarios", [])
+        if isinstance(scenario, dict)
+    ]
+    audit_timeline = _phase9_audit_timeline(scenarios)
+    failure_reason_codes = _unique(
+        [
+            code
+            for scenario in scenarios
+            for code in _string_list(scenario.get("failure_reason_codes"))
+        ]
+    )
+    blocker_codes = _unique(
+        [code for scenario in scenarios for code in _string_list(scenario.get("blocker_codes"))]
+    )
+    audit_event_names = _unique(
+        [
+            event_name
+            for scenario in scenarios
+            for event_name in _string_list(scenario.get("audit_event_names"))
+        ]
+    )
+    summary = source_report.get("summary") if isinstance(source_report.get("summary"), dict) else {}
+
+    export_report = {
+        "report_version": PHASE9_EXPORT_REPORT_VERSION,
+        "generated_at": PHASE9_EXPORT_GENERATED_AT,
+        "project_phase": PHASE9_EXPORT_PROJECT_PHASE,
+        "source_report_type": source_report.get("report_type", "phase9_minimal_sandbox_experiment"),
+        "source_phase": source_report.get("phase", "phase9_1"),
+        "dry_run": all(scenario.get("dry_run") is True for scenario in scenarios),
+        "real_action_enabled": any(
+            scenario.get("real_action_enabled") is True for scenario in scenarios
+        ),
+        "real_action_skipped": any(
+            scenario.get("real_action_skipped") is True for scenario in scenarios
+        ),
+        "experiment_id": _common_or_mixed(
+            [str(scenario.get("experiment_id") or "") for scenario in scenarios]
+        ),
+        "scenario_ids": [str(scenario.get("scenario_id") or "") for scenario in scenarios],
+        "sandbox_scope": _common_scope(scenarios),
+        "action_type": _common_or_mixed(
+            [str(scenario.get("action_type") or "") for scenario in scenarios]
+        ),
+        "gate_passed": all(scenario.get("gate_passed") is True for scenario in scenarios),
+        "actual_outcome": {
+            "status": _aggregate_status(summary, scenarios),
+            "scenario_count": len(scenarios),
+            "gate_passed_count": int(summary.get("gate_passed_count") or 0),
+            "gate_blocked_count": int(summary.get("gate_blocked_count") or 0),
+            "real_action_attempted": False,
+        },
+        "failure_reason_codes": failure_reason_codes,
+        "blocker_codes": blocker_codes,
+        "target_risk_hint": _common_or_mixed(
+            [str(scenario.get("target_risk_hint") or "") for scenario in scenarios]
+        ),
+        "target_confidence": _common_number(
+            [scenario.get("target_confidence") for scenario in scenarios]
+        ),
+        "readiness_ready": all(scenario.get("readiness_ready") is True for scenario in scenarios),
+        "user_approval_present": all(
+            scenario.get("user_approval_present") is True for scenario in scenarios
+        ),
+        "emergency_stop_available": all(
+            scenario.get("emergency_stop_available") is True for scenario in scenarios
+        ),
+        "post_action_verification_planned": all(
+            scenario.get("post_action_verification_planned") is True for scenario in scenarios
+        ),
+        "rollback_plan_recorded": all(
+            scenario.get("rollback_plan_recorded") is True for scenario in scenarios
+        ),
+        "audit_event_names": audit_event_names,
+        "audit_timeline": audit_timeline,
+        "notes": _unique(
+            [
+                note
+                for scenario in scenarios
+                for note in _string_list(scenario.get("notes"))
+            ]
+        ),
+        "scenarios": scenarios,
+    }
+    return _sanitize_export_value(export_report)
+
+
+def build_phase9_ai_readable_summary(export_report: dict[str, Any]) -> str:
+    """Build a concise handoff summary for AI/debug review."""
+
+    report = export_report if isinstance(export_report, dict) else {}
+    actual_outcome = report.get("actual_outcome") if isinstance(report.get("actual_outcome"), dict) else {}
+    failure_reason_codes = _string_list(report.get("failure_reason_codes"))
+    blocker_codes = _string_list(report.get("blocker_codes"))
+    gate = "passed" if report.get("gate_passed") is True else "blocked or mixed"
+    dry_run = "yes" if report.get("dry_run") is True else "mixed"
+    real_action_enabled = "yes" if report.get("real_action_enabled") is True else "no"
+    real_action_skipped = "yes" if report.get("real_action_skipped") is True else "no"
+
+    lines = [
+        "Project phase: phase_9_4 Phase 9 dry-run harness export.",
+        f"Run mode: dry_run={dry_run}; real_action_enabled={real_action_enabled}; real_action_skipped={real_action_skipped}.",
+        (
+            f"Gate result: {gate}; status={actual_outcome.get('status', 'unknown')}; "
+            f"scenarios={actual_outcome.get('scenario_count', 0)}; "
+            f"passed={actual_outcome.get('gate_passed_count', 0)}; "
+            f"blocked={actual_outcome.get('gate_blocked_count', 0)}."
+        ),
+        (
+            "Blockers/failure reasons: "
+            f"failure_reason_codes={_format_codes(failure_reason_codes)}; "
+            f"blocker_codes={_format_codes(blocker_codes)}."
+        ),
+        (
+            "Gate support state: "
+            f"approval_present={_yes_no(report.get('user_approval_present'))}; "
+            f"emergency_stop_available={_yes_no(report.get('emergency_stop_available'))}; "
+            f"verification_planned={_yes_no(report.get('post_action_verification_planned'))}; "
+            f"rollback_recorded={_yes_no(report.get('rollback_plan_recorded'))}."
+        ),
+        f"Recommended next debugging focus: {_phase9_recommended_focus(report)}.",
+        f"Safety boundary: {PHASE9_EXPORT_SAFETY_BOUNDARY}",
+    ]
+    return "\n".join(lines)
+
+
+def build_phase9_reproducibility_bundle(report: dict[str, Any]) -> dict[str, Any]:
+    """Build a deterministic, read-only bundle for handoff and reproduction."""
+
+    export_report = build_phase9_export_report(report)
+    bundle = {
+        "bundle_type": "phase9_reproducibility_bundle",
+        "bundle_version": PHASE9_EXPORT_BUNDLE_VERSION,
+        "generated_at": PHASE9_EXPORT_GENERATED_AT,
+        "project_phase": PHASE9_EXPORT_PROJECT_PHASE,
+        "phase9_report": export_report,
+        "ai_readable_summary": build_phase9_ai_readable_summary(export_report),
+        "minimal_reproduction_metadata": {
+            "scenario_ids": list(export_report["scenario_ids"]),
+            "experiment_id": export_report["experiment_id"],
+            "stable_input_assumptions": [
+                "fixture-backed Phase 9 harness data",
+                "normalized visible element target data only",
+                "mock approval, emergency stop, verification, and rollback state",
+                "no live OS state or real desktop screenshots",
+            ],
+            "audit_event_order": list(export_report["audit_timeline"]),
+            "failure_reason_codes": list(export_report["failure_reason_codes"]),
+            "blocker_codes": list(export_report["blocker_codes"]),
+            "excluded_material": [
+                "private auth material",
+                "live OS state",
+                "full local filesystem dumps",
+                "real desktop screenshots outside deterministic fixtures",
+            ],
+        },
+        "safety_boundary_statement": PHASE9_EXPORT_SAFETY_BOUNDARY,
+    }
+    return _sanitize_export_value(bundle)
+
+
+def _phase9_export_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
+    actual_outcome = (
+        scenario.get("actual_outcome") if isinstance(scenario.get("actual_outcome"), dict) else {}
+    )
+    export_scenario = {
+        "report_version": PHASE9_EXPORT_REPORT_VERSION,
+        "generated_at": PHASE9_EXPORT_GENERATED_AT,
+        "project_phase": PHASE9_EXPORT_PROJECT_PHASE,
+        "experiment_id": str(scenario.get("experiment_id") or ""),
+        "scenario_id": str(scenario.get("scenario_id") or ""),
+        "scenario_name": str(scenario.get("scenario_name") or ""),
+        "dry_run": bool(scenario.get("dry_run") is True),
+        "real_action_enabled": bool(scenario.get("real_action_enabled") is True),
+        "real_action_skipped": bool(scenario.get("real_action_skipped") is True),
+        "sandbox_scope": _sanitize_export_value(scenario.get("sandbox_scope") or {}),
+        "action_type": str(scenario.get("action_type") or ""),
+        "gate_passed": bool(scenario.get("gate_passed") is True),
+        "actual_outcome": _sanitize_export_value(actual_outcome),
+        "failure_reason_codes": _string_list(scenario.get("failure_reason_codes")),
+        "blocker_codes": _string_list(scenario.get("blocker_codes")),
+        "target_risk_hint": str(scenario.get("target_risk_hint") or ""),
+        "target_confidence": _finite_float(scenario.get("target_confidence")),
+        "readiness_ready": bool(scenario.get("readiness_ready") is True),
+        "user_approval_present": bool(scenario.get("user_approval_present") is True),
+        "emergency_stop_available": bool(scenario.get("emergency_stop_available") is True),
+        "post_action_verification_planned": bool(
+            scenario.get("post_action_verification_planned") is True
+        ),
+        "rollback_plan_recorded": bool(scenario.get("rollback_plan_recorded") is True),
+        "audit_event_names": _string_list(scenario.get("audit_event_names")),
+        "audit_timeline": _phase9_scenario_audit_timeline(scenario),
+        "notes": _string_list(scenario.get("notes")),
+    }
+    return _sanitize_export_value(export_scenario)
+
+
+def _phase9_scenario_audit_timeline(scenario: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "order": index + 1,
+            "scenario_id": str(scenario.get("scenario_id") or ""),
+            "event_name": event_name,
+            "gate_passed": bool(scenario.get("gate_passed") is True),
+            "failure_reason_codes": _string_list(scenario.get("failure_reason_codes")),
+            "blocker_codes": _string_list(scenario.get("blocker_codes")),
+        }
+        for index, event_name in enumerate(_string_list(scenario.get("audit_event_names")))
+    ]
+
+
+def _phase9_audit_timeline(scenarios: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    timeline: list[dict[str, Any]] = []
+    order = 0
+    for scenario in scenarios:
+        for event in scenario.get("audit_timeline", []):
+            if not isinstance(event, dict):
+                continue
+            order += 1
+            timeline.append(
+                {
+                    **event,
+                    "global_order": order,
+                    "scenario_order": int(event.get("order") or 0),
+                }
+            )
+    return timeline
+
+
+def _aggregate_status(summary: dict[str, Any], scenarios: list[dict[str, Any]]) -> str:
+    if not scenarios:
+        return "empty"
+    if summary.get("all_expected_outcomes_passed") is not True:
+        return "failed_expectation"
+    if any(scenario.get("real_action_skipped") is True for scenario in scenarios):
+        return "dry_run_with_skipped_paths"
+    if all(scenario.get("gate_passed") is True for scenario in scenarios):
+        return "all_gates_passed"
+    return "mixed_gate_results"
+
+
+def _common_or_mixed(values: list[str]) -> str:
+    present_values = [value for value in values if value]
+    if not present_values:
+        return ""
+    first_value = present_values[0]
+    return first_value if all(value == first_value for value in present_values) else "mixed"
+
+
+def _common_scope(scenarios: list[dict[str, Any]]) -> dict[str, Any]:
+    scopes = [
+        scenario.get("sandbox_scope")
+        for scenario in scenarios
+        if isinstance(scenario.get("sandbox_scope"), dict)
+    ]
+    if not scopes:
+        return {}
+    first_scope = scopes[0]
+    if all(scope == first_scope for scope in scopes):
+        return _sanitize_export_value(first_scope)
+    return {"scope": "mixed"}
+
+
+def _common_number(values: list[Any]) -> float | None:
+    numbers = [_finite_float(value) for value in values]
+    present_numbers = [number for number in numbers if number is not None]
+    if not present_numbers:
+        return None
+    first_number = present_numbers[0]
+    return first_number if all(number == first_number for number in present_numbers) else None
+
+
+def _phase9_recommended_focus(report: dict[str, Any]) -> str:
+    codes = set(_string_list(report.get("failure_reason_codes")))
+    codes.update(_string_list(report.get("blocker_codes")))
+    focus: list[str] = []
+
+    focus_rules = [
+        ("missing_action_contract", "inspect action-contract fixture generation"),
+        ("missing_audit_plan", "inspect audit-plan fixture coverage"),
+        ("missing_user_approval", "inspect mock approval binding and freshness"),
+        ("stale_observation", "inspect observation freshness assumptions"),
+        ("high_risk_target", "inspect risk classification and target selection"),
+        ("high_risk_requires_approval", "inspect high-risk blocker mapping"),
+        ("real_action_disabled", "confirm skipped-path reporting remains explicit"),
+        ("readiness_not_ready", "inspect readiness blocker expectations"),
+    ]
+    for code, recommendation in focus_rules:
+        if code in codes:
+            focus.append(recommendation)
+
+    if not focus and report.get("gate_passed") is True:
+        return "review successful dry-run audit order before any future design change"
+    if not focus:
+        return "review gate status, failure codes, and audit ordering"
+    return "; ".join(focus[:3])
+
+
+def _sanitize_export_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            text_key = str(key)
+            if _is_sensitive_export_key(text_key):
+                continue
+            sanitized[text_key] = _sanitize_export_value(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_export_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_export_value(item) for item in value]
+    return value
+
+
+def _is_sensitive_export_key(key: str) -> bool:
+    normalized = key.lower()
+    return any(fragment in normalized for fragment in _SENSITIVE_KEY_FRAGMENTS)
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item)]
+
+
+def _format_codes(values: list[str]) -> str:
+    return ", ".join(values) if values else "none"
+
+
+def _yes_no(value: Any) -> str:
+    if value is True:
+        return "yes"
+    if value is False:
+        return "no"
+    return "unknown"
 
 
 def phase9_experiment_scenario_ids() -> list[str]:

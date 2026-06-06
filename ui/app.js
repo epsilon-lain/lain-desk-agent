@@ -104,6 +104,10 @@ const expandPhase9Audit = document.querySelector("#expandPhase9Audit");
 const collapsePhase9Audit = document.querySelector("#collapsePhase9Audit");
 const resetPhase9Filters = document.querySelector("#resetPhase9Filters");
 const phase9QuickFilters = document.querySelector("#phase9QuickFilters");
+const copyPhase9AISummary = document.querySelector("#copyPhase9AISummary");
+const copyPhase9JsonReport = document.querySelector("#copyPhase9JsonReport");
+const copyPhase9ReproBundle = document.querySelector("#copyPhase9ReproBundle");
+const phase9ExportCopyStatus = document.querySelector("#phase9ExportCopyStatus");
 const phase9Counts = document.querySelector("#phase9Counts");
 const phase9ExperimentSummary = document.querySelector("#phase9ExperimentSummary");
 const phase9ExperimentTimeline = document.querySelector("#phase9ExperimentTimeline");
@@ -451,6 +455,18 @@ collapsePhase9Audit.addEventListener("click", () => {
 
 resetPhase9Filters.addEventListener("click", () => {
   resetPhase9ExperimentFilters();
+});
+
+copyPhase9AISummary.addEventListener("click", async () => {
+  await copyPhase9ExportPayload("ai_summary");
+});
+
+copyPhase9JsonReport.addEventListener("click", async () => {
+  await copyPhase9ExportPayload("json_report");
+});
+
+copyPhase9ReproBundle.addEventListener("click", async () => {
+  await copyPhase9ExportPayload("repro_bundle");
 });
 
 sandboxEvaluationFixtureSet.addEventListener("change", () => {
@@ -1968,6 +1984,7 @@ async function loadPhase9Experiment() {
   phase9ExperimentStatus.textContent = "Loading Phase 9 dry-run harness report...";
   phase9ExperimentControls.hidden = true;
   phase9QuickFilters.hidden = true;
+  phase9ExportCopyStatus.hidden = true;
   phase9Counts.hidden = true;
   phase9ExperimentSummary.hidden = true;
   phase9ExperimentTimeline.hidden = true;
@@ -2000,6 +2017,7 @@ async function loadPhase9Experiment() {
 function renderPhase9Experiment(report = null) {
   currentPhase9ExperimentReport = report;
   phase9QuickFilters.replaceChildren();
+  phase9ExportCopyStatus.hidden = true;
   phase9Counts.replaceChildren();
   phase9ExperimentSummary.replaceChildren();
   phase9ExperimentTimeline.replaceChildren();
@@ -2010,6 +2028,7 @@ function renderPhase9Experiment(report = null) {
     phase9ExperimentStatus.textContent = "Not loaded yet.";
     phase9ExperimentControls.hidden = true;
     phase9QuickFilters.hidden = true;
+    phase9ExportCopyStatus.hidden = true;
     phase9Counts.hidden = true;
     phase9ExperimentSummary.hidden = true;
     phase9ExperimentTimeline.hidden = true;
@@ -2042,6 +2061,10 @@ function renderPhase9Experiment(report = null) {
   setPhase9ExperimentSummary([
     ["Experiment", report.report_type || "phase9_minimal_sandbox_experiment"],
     ["Phase", `${report.phase || "phase9_1"} exposed by ${report.cockpit_exposure_phase || "phase9_2"}`],
+    [
+      "Export bundle",
+      report.phase9_export_bundle ? "Phase 9.4 bundle available" : "client-side fallback available",
+    ],
     ["Scenarios", String(totalScenarioCount)],
     ["Visible", `${filteredSummary.total}/${totalScenarioCount} after filters`],
     ["Pass/fail", `${summary.passed_scenario_count ?? 0}/${totalScenarioCount} passed`],
@@ -2090,6 +2113,7 @@ function renderPhase9ExperimentError(error) {
   currentPhase9ExperimentReport = null;
   phase9ExperimentControls.hidden = true;
   phase9QuickFilters.hidden = true;
+  phase9ExportCopyStatus.hidden = true;
   phase9Counts.hidden = true;
   phase9ExperimentSummary.hidden = true;
   phase9ExperimentTimeline.hidden = true;
@@ -2442,7 +2466,328 @@ function resetPhase9ExperimentFilters() {
   phase9AuditGroupMode.value = "scenario";
   phase9AuditSortMode.value = "original";
   currentPhase9QuickFilterGroup = "all";
+  phase9ExportCopyStatus.hidden = true;
   renderPhase9Experiment(currentPhase9ExperimentReport);
+}
+
+async function copyPhase9ExportPayload(payloadKind) {
+  const payload = buildPhase9ExportPayload(payloadKind);
+
+  phase9ExportCopyStatus.hidden = false;
+
+  if (!payload) {
+    phase9ExportCopyStatus.textContent = "No Phase 9 report loaded.";
+    return;
+  }
+
+  if (!navigator.clipboard?.writeText) {
+    phase9ExportCopyStatus.textContent = "Clipboard unavailable in this browser.";
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(
+      typeof payload === "string" ? payload : JSON.stringify(payload, null, 2)
+    );
+    phase9ExportCopyStatus.textContent = phase9ExportCopyStatusText(payloadKind);
+  } catch (error) {
+    phase9ExportCopyStatus.textContent = `Copy failed: ${error.message || String(error)}`;
+  }
+}
+
+function buildPhase9ExportPayload(payloadKind) {
+  const report = currentPhase9ExperimentReport;
+
+  if (!report) {
+    return null;
+  }
+
+  const bundle = phase9ReproducibilityBundle(report);
+
+  if (payloadKind === "ai_summary") {
+    return bundle.ai_readable_summary || buildPhase9AIReadableSummary(bundle.phase9_report);
+  }
+
+  if (payloadKind === "json_report") {
+    return bundle.phase9_report || buildPhase9ClientExportReport(report);
+  }
+
+  return bundle;
+}
+
+function phase9ExportCopyStatusText(payloadKind) {
+  if (payloadKind === "ai_summary") {
+    return "Phase 9 AI summary copied.";
+  }
+
+  if (payloadKind === "json_report") {
+    return "Phase 9 JSON report copied.";
+  }
+
+  return "Phase 9 reproducibility bundle copied.";
+}
+
+function phase9ReproducibilityBundle(report) {
+  if (report?.phase9_export_bundle && typeof report.phase9_export_bundle === "object") {
+    return report.phase9_export_bundle;
+  }
+
+  const phase9Report = buildPhase9ClientExportReport(report);
+  return {
+    bundle_type: "phase9_reproducibility_bundle",
+    bundle_version: "phase9_repro_bundle_v1",
+    generated_at: "deterministic_phase9_fixture",
+    project_phase: "phase_9_4",
+    phase9_report: phase9Report,
+    ai_readable_summary: buildPhase9AIReadableSummary(phase9Report),
+    minimal_reproduction_metadata: {
+      scenario_ids: phase9Report.scenario_ids,
+      experiment_id: phase9Report.experiment_id,
+      stable_input_assumptions: [
+        "fixture-backed Phase 9 harness data",
+        "mock approval, emergency stop, verification, and rollback state",
+        "no live OS state or real desktop screenshots",
+      ],
+      audit_event_order: phase9Report.audit_timeline,
+      failure_reason_codes: phase9Report.failure_reason_codes,
+      blocker_codes: phase9Report.blocker_codes,
+      safety_boundary_statement: phase9SafetyBoundaryStatement(),
+    },
+    safety_boundary_statement: phase9SafetyBoundaryStatement(),
+  };
+}
+
+function buildPhase9ClientExportReport(report) {
+  const scenarios = Array.isArray(report?.scenarios) ? report.scenarios : [];
+  const exportedScenarios = scenarios.map((scenario) => phase9ClientExportScenario(scenario));
+  const failureReasonCodes = uniqueSortedValues(
+    exportedScenarios.flatMap((scenario) => sandboxCodes(scenario.failure_reason_codes))
+  );
+  const blockerCodes = uniqueSortedValues(
+    exportedScenarios.flatMap((scenario) => sandboxCodes(scenario.blocker_codes))
+  );
+  const auditEventNames = uniqueSortedValues(
+    exportedScenarios.flatMap((scenario) => sandboxCodes(scenario.audit_event_names))
+  );
+  const summary = report?.summary || {};
+
+  return {
+    report_version: "phase9_export_v1",
+    generated_at: "deterministic_phase9_fixture",
+    project_phase: "phase_9_4",
+    source_report_type: report?.report_type || "phase9_minimal_sandbox_experiment",
+    source_phase: report?.phase || "phase9_1",
+    dry_run: exportedScenarios.every((scenario) => scenario.dry_run === true),
+    real_action_enabled: exportedScenarios.some((scenario) => scenario.real_action_enabled === true),
+    real_action_skipped: exportedScenarios.some((scenario) => scenario.real_action_skipped === true),
+    experiment_id: phase9CommonValue(exportedScenarios.map((scenario) => scenario.experiment_id)),
+    scenario_ids: exportedScenarios.map((scenario) => scenario.scenario_id),
+    sandbox_scope: phase9CommonScope(exportedScenarios),
+    action_type: phase9CommonValue(exportedScenarios.map((scenario) => scenario.action_type)),
+    gate_passed: exportedScenarios.every((scenario) => scenario.gate_passed === true),
+    actual_outcome: {
+      status: phase9AggregateStatus(summary, exportedScenarios),
+      scenario_count: exportedScenarios.length,
+      gate_passed_count: Number(summary.gate_passed_count || 0),
+      gate_blocked_count: Number(summary.gate_blocked_count || 0),
+      real_action_attempted: false,
+    },
+    failure_reason_codes: failureReasonCodes,
+    blocker_codes: blockerCodes,
+    target_risk_hint: phase9CommonValue(
+      exportedScenarios.map((scenario) => scenario.target_risk_hint)
+    ),
+    target_confidence: phase9CommonNumber(
+      exportedScenarios.map((scenario) => scenario.target_confidence)
+    ),
+    readiness_ready: exportedScenarios.every((scenario) => scenario.readiness_ready === true),
+    user_approval_present: exportedScenarios.every(
+      (scenario) => scenario.user_approval_present === true
+    ),
+    emergency_stop_available: exportedScenarios.every(
+      (scenario) => scenario.emergency_stop_available === true
+    ),
+    post_action_verification_planned: exportedScenarios.every(
+      (scenario) => scenario.post_action_verification_planned === true
+    ),
+    rollback_plan_recorded: exportedScenarios.every(
+      (scenario) => scenario.rollback_plan_recorded === true
+    ),
+    audit_event_names: auditEventNames,
+    audit_timeline: phase9ClientAuditTimeline(exportedScenarios),
+    notes: uniqueSortedValues(exportedScenarios.flatMap((scenario) => sandboxCodes(scenario.notes))),
+    scenarios: exportedScenarios,
+  };
+}
+
+function phase9ClientExportScenario(scenario) {
+  return {
+    report_version: "phase9_export_v1",
+    generated_at: "deterministic_phase9_fixture",
+    project_phase: "phase_9_4",
+    experiment_id: scenario.experiment_id || "",
+    scenario_id: scenario.scenario_id || "",
+    scenario_name: scenario.scenario_name || "",
+    dry_run: scenario.dry_run === true,
+    real_action_enabled: scenario.real_action_enabled === true,
+    real_action_skipped: scenario.real_action_skipped === true,
+    sandbox_scope: phase9SanitizedScope(scenario.sandbox_scope),
+    action_type: scenario.action_type || "",
+    gate_passed: scenario.gate_passed === true,
+    actual_outcome: scenario.actual_outcome || {},
+    failure_reason_codes: sandboxCodes(scenario.failure_reason_codes),
+    blocker_codes: sandboxCodes(scenario.blocker_codes),
+    target_risk_hint: scenario.target_risk_hint || "",
+    target_confidence: Number.isFinite(scenario.target_confidence) ? scenario.target_confidence : null,
+    readiness_ready: scenario.readiness_ready === true,
+    user_approval_present: scenario.user_approval_present === true,
+    emergency_stop_available: scenario.emergency_stop_available === true,
+    post_action_verification_planned: scenario.post_action_verification_planned === true,
+    rollback_plan_recorded: scenario.rollback_plan_recorded === true,
+    audit_event_names: sandboxCodes(scenario.audit_event_names),
+    audit_timeline: phase9ScenarioAuditTimeline(scenario),
+    notes: sandboxCodes(scenario.notes),
+  };
+}
+
+function phase9ScenarioAuditTimeline(scenario) {
+  return sandboxCodes(scenario.audit_event_names).map((eventName, index) => ({
+    order: index + 1,
+    scenario_id: scenario.scenario_id || "",
+    event_name: eventName,
+    gate_passed: scenario.gate_passed === true,
+    failure_reason_codes: sandboxCodes(scenario.failure_reason_codes),
+    blocker_codes: sandboxCodes(scenario.blocker_codes),
+  }));
+}
+
+function phase9ClientAuditTimeline(scenarios) {
+  let globalOrder = 0;
+  return scenarios.flatMap((scenario) =>
+    phase9ScenarioAuditTimeline(scenario).map((event) => {
+      globalOrder += 1;
+      return { ...event, global_order: globalOrder, scenario_order: event.order };
+    })
+  );
+}
+
+function buildPhase9AIReadableSummary(exportReport = {}) {
+  const actualOutcome = exportReport.actual_outcome || {};
+  return [
+    "Project phase: phase_9_4 Phase 9 dry-run harness export.",
+    `Run mode: dry_run=${formatSandboxBool(exportReport.dry_run)}; real_action_enabled=${formatSandboxBool(
+      exportReport.real_action_enabled
+    )}; real_action_skipped=${formatSandboxBool(exportReport.real_action_skipped)}.`,
+    `Gate result: ${
+      exportReport.gate_passed === true ? "passed" : "blocked or mixed"
+    }; status=${actualOutcome.status || "unknown"}; scenarios=${
+      actualOutcome.scenario_count || 0
+    }; passed=${actualOutcome.gate_passed_count || 0}; blocked=${
+      actualOutcome.gate_blocked_count || 0
+    }.`,
+    `Blockers/failure reasons: failure_reason_codes=${formatSandboxCodeList(
+      exportReport.failure_reason_codes
+    )}; blocker_codes=${formatSandboxCodeList(exportReport.blocker_codes)}.`,
+    `Gate support state: approval_present=${formatSandboxBool(
+      exportReport.user_approval_present
+    )}; emergency_stop_available=${formatSandboxBool(
+      exportReport.emergency_stop_available
+    )}; verification_planned=${formatSandboxBool(
+      exportReport.post_action_verification_planned
+    )}; rollback_recorded=${formatSandboxBool(exportReport.rollback_plan_recorded)}.`,
+    `Recommended next debugging focus: ${phase9RecommendedFocus(exportReport)}.`,
+    `Safety boundary: ${phase9SafetyBoundaryStatement()}`,
+  ].join("\n");
+}
+
+function phase9RecommendedFocus(exportReport = {}) {
+  const codes = new Set(
+    sandboxCodes(exportReport.failure_reason_codes).concat(sandboxCodes(exportReport.blocker_codes))
+  );
+  const focusRules = [
+    ["missing_action_contract", "inspect action-contract fixture generation"],
+    ["missing_audit_plan", "inspect audit-plan fixture coverage"],
+    ["missing_user_approval", "inspect mock approval binding and freshness"],
+    ["stale_observation", "inspect observation freshness assumptions"],
+    ["high_risk_target", "inspect risk classification and target selection"],
+    ["high_risk_requires_approval", "inspect high-risk blocker mapping"],
+    ["real_action_disabled", "confirm skipped-path reporting remains explicit"],
+    ["readiness_not_ready", "inspect readiness blocker expectations"],
+  ];
+  const focus = focusRules
+    .filter(([code]) => codes.has(code))
+    .map(([, recommendation]) => recommendation);
+
+  if (!focus.length && exportReport.gate_passed === true) {
+    return "review successful dry-run audit order before any future design change";
+  }
+
+  return focus.length ? focus.slice(0, 3).join("; ") : "review gate status, failure codes, and audit ordering";
+}
+
+function phase9CommonValue(values) {
+  const presentValues = values.filter((value) => value);
+  if (!presentValues.length) {
+    return "";
+  }
+
+  return presentValues.every((value) => value === presentValues[0]) ? presentValues[0] : "mixed";
+}
+
+function phase9CommonNumber(values) {
+  const presentValues = values.filter((value) => Number.isFinite(value));
+  if (!presentValues.length) {
+    return null;
+  }
+
+  return presentValues.every((value) => value === presentValues[0]) ? presentValues[0] : null;
+}
+
+function phase9CommonScope(scenarios) {
+  const scopes = scenarios.map((scenario) => scenario.sandbox_scope).filter((scope) => scope);
+  if (!scopes.length) {
+    return {};
+  }
+
+  const firstScope = JSON.stringify(scopes[0]);
+  return scopes.every((scope) => JSON.stringify(scope) === firstScope) ? scopes[0] : { scope: "mixed" };
+}
+
+function phase9SanitizedScope(scope) {
+  if (!scope || typeof scope !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(scope).filter(([key]) => !["credential", "token", "secret", "password"].some(
+      (fragment) => key.toLowerCase().includes(fragment)
+    ))
+  );
+}
+
+function phase9AggregateStatus(summary, scenarios) {
+  if (!scenarios.length) {
+    return "empty";
+  }
+
+  if (summary.all_expected_outcomes_passed !== true) {
+    return "failed_expectation";
+  }
+
+  if (scenarios.some((scenario) => scenario.real_action_skipped === true)) {
+    return "dry_run_with_skipped_paths";
+  }
+
+  return scenarios.every((scenario) => scenario.gate_passed === true)
+    ? "all_gates_passed"
+    : "mixed_gate_results";
+}
+
+function phase9SafetyBoundaryStatement() {
+  return (
+    "Phase 9.4 exports deterministic dry-run debug data only. Real desktop actions remain disabled, " +
+    "and no action-performing endpoint is called."
+  );
 }
 
 function setPhase9ScenarioDetailsOpen(open) {

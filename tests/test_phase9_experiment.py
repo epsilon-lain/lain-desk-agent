@@ -25,6 +25,9 @@ from lain_desk_agent.phase9_experiment import (
     FAILURE_EMERGENCY_STOP_ACTIVE,
     FAILURE_MISSING_ROLLBACK_PLAN,
     PHASE9_MINIMAL_SCENARIO_IDS,
+    PHASE9_EXPORT_BUNDLE_VERSION,
+    PHASE9_EXPORT_PROJECT_PHASE,
+    PHASE9_EXPORT_REPORT_VERSION,
     PHASE9_REPORT_FIELDS,
     MockApprovalState,
     MockEmergencyStopState,
@@ -32,7 +35,10 @@ from lain_desk_agent.phase9_experiment import (
     MockRollbackPlan,
     Phase9ExperimentConfig,
     Phase9ExperimentRequest,
+    build_phase9_ai_readable_summary,
     build_phase9_experiment_report,
+    build_phase9_export_report,
+    build_phase9_reproducibility_bundle,
     evaluate_phase9_experiment_scenarios,
     phase9_experiment_scenario_ids,
     run_phase9_experiment,
@@ -89,6 +95,32 @@ PHASE9_COCKPIT_FIELDS = {
     "target_confidence",
     "readiness_ready",
     "audit_event_names",
+    "notes",
+}
+
+PHASE9_EXPORT_REQUIRED_FIELDS = {
+    "report_version",
+    "generated_at",
+    "project_phase",
+    "dry_run",
+    "real_action_enabled",
+    "real_action_skipped",
+    "experiment_id",
+    "sandbox_scope",
+    "action_type",
+    "gate_passed",
+    "actual_outcome",
+    "failure_reason_codes",
+    "blocker_codes",
+    "target_risk_hint",
+    "target_confidence",
+    "readiness_ready",
+    "user_approval_present",
+    "emergency_stop_available",
+    "post_action_verification_planned",
+    "rollback_plan_recorded",
+    "audit_event_names",
+    "audit_timeline",
     "notes",
 }
 
@@ -453,6 +485,79 @@ class Phase9ExperimentTests(unittest.TestCase):
                 self.assertIn("phase9_experiment_requested", scenario["audit_event_names"])
                 self.assertIs(scenario["actual_outcome"]["real_action_attempted"], False)
 
+        self.assertIn("phase9_export_bundle", report)
+        self.assertEqual(report["export_phase"], PHASE9_EXPORT_PROJECT_PHASE)
+
+    def test_phase9_export_report_contains_required_fields(self) -> None:
+        report = evaluate_phase9_experiment_scenarios()
+        export_report = build_phase9_export_report(report)
+
+        self.assertTrue(PHASE9_EXPORT_REQUIRED_FIELDS.issubset(export_report))
+        self.assertEqual(export_report["report_version"], PHASE9_EXPORT_REPORT_VERSION)
+        self.assertEqual(export_report["project_phase"], PHASE9_EXPORT_PROJECT_PHASE)
+        self.assertEqual(export_report["generated_at"], "deterministic_phase9_fixture")
+        self.assertIs(export_report["real_action_enabled"], False)
+        self.assertIs(export_report["real_action_skipped"], True)
+        self.assertIs(export_report["actual_outcome"]["real_action_attempted"], False)
+        self.assertIn("missing_user_approval", export_report["failure_reason_codes"])
+        self.assertIn("stale_observation", export_report["blocker_codes"])
+        self.assertIn("phase9_experiment_requested", export_report["audit_event_names"])
+        self.assertEqual(
+            len(export_report["audit_timeline"]),
+            sum(len(scenario["audit_event_names"]) for scenario in report["scenarios"]),
+        )
+
+        for scenario in export_report["scenarios"]:
+            with self.subTest(scenario=scenario["scenario_id"]):
+                self.assertTrue(PHASE9_EXPORT_REQUIRED_FIELDS.issubset(scenario))
+                self.assertIn("audit_timeline", scenario)
+
+    def test_phase9_ai_readable_summary_contains_handoff_context(self) -> None:
+        export_report = build_phase9_export_report(evaluate_phase9_experiment_scenarios())
+        summary = build_phase9_ai_readable_summary(export_report)
+
+        for expected_text in [
+            "phase_9_4",
+            "dry_run",
+            "real_action_enabled=no",
+            "Gate result",
+            "failure_reason_codes",
+            "blocker_codes",
+            "approval_present",
+            "emergency_stop_available",
+            "verification_planned",
+            "rollback_recorded",
+            "real_action_skipped=yes",
+            "Recommended next debugging focus",
+            "Safety boundary",
+            "Real desktop actions remain disabled",
+        ]:
+            with self.subTest(expected_text=expected_text):
+                self.assertIn(expected_text, summary)
+
+    def test_phase9_reproducibility_bundle_is_stable_and_sanitized(self) -> None:
+        report = evaluate_phase9_experiment_scenarios()
+        bundle = build_phase9_reproducibility_bundle(report)
+
+        self.assertEqual(bundle["bundle_type"], "phase9_reproducibility_bundle")
+        self.assertEqual(bundle["bundle_version"], PHASE9_EXPORT_BUNDLE_VERSION)
+        self.assertEqual(bundle["project_phase"], PHASE9_EXPORT_PROJECT_PHASE)
+        self.assertIn("phase9_report", bundle)
+        self.assertIn("ai_readable_summary", bundle)
+        self.assertIn("minimal_reproduction_metadata", bundle)
+        self.assertIn("audit_event_order", bundle["minimal_reproduction_metadata"])
+        self.assertIn("failure_reason_codes", bundle["minimal_reproduction_metadata"])
+        self.assertIn("blocker_codes", bundle["minimal_reproduction_metadata"])
+        self.assertIn("safety_boundary_statement", bundle)
+
+        bundle_text = json.dumps(bundle, sort_keys=True).lower()
+        for forbidden_text in ["token", "secret", "api_key", "password", "credential"]:
+            with self.subTest(forbidden_text=forbidden_text):
+                self.assertNotIn(forbidden_text, bundle_text)
+
+        self.assertNotIn("browser_credentials_allowed", bundle_text)
+        self.assertIn("real desktop actions remain disabled", bundle_text)
+
     def test_phase9_cockpit_endpoint_is_read_only_and_stable(self) -> None:
         server = create_server("127.0.0.1", 0)
         host, port = server.server_address
@@ -480,6 +585,9 @@ class Phase9ExperimentTests(unittest.TestCase):
         self.assertEqual(payload["scenario_ids"], list(PHASE9_MINIMAL_SCENARIO_IDS))
         self.assertEqual(payload["summary"]["real_action_attempted_count"], 0)
         self.assertTrue(PHASE9_COCKPIT_FIELDS.issubset(payload["scenarios"][0]))
+        self.assertIn("phase9_export_bundle", payload)
+        self.assertIn("phase9_report", payload["phase9_export_bundle"])
+        self.assertIn("ai_readable_summary", payload["phase9_export_bundle"])
 
     def test_phase9_cockpit_endpoint_can_filter_one_scenario(self) -> None:
         server = create_server("127.0.0.1", 0)
@@ -524,7 +632,11 @@ class Phase9ExperimentTests(unittest.TestCase):
             "expandPhase9Audit",
             "collapsePhase9Audit",
             "resetPhase9Filters",
+            "copyPhase9AISummary",
+            "copyPhase9JsonReport",
+            "copyPhase9ReproBundle",
             "phase9QuickFilters",
+            "phase9ExportCopyStatus",
             "phase9Counts",
             "phase9ExperimentStatus",
             "phase9ExperimentSummary",
@@ -551,6 +663,9 @@ class Phase9ExperimentTests(unittest.TestCase):
             "Audit order",
             "original order",
             "blocker severity",
+            "Copy AI summary",
+            "Copy JSON report",
+            "Copy repro bundle",
         ]:
             with self.subTest(visible_label=visible_label):
                 self.assertIn(visible_label, source + html)
@@ -573,6 +688,12 @@ class Phase9ExperimentTests(unittest.TestCase):
             "phase9GateBlockerCodes",
             "phase9BlockerSeverity",
             "phase9ScenarioBlockerSeverity",
+            "copyPhase9ExportPayload",
+            "buildPhase9ExportPayload",
+            "phase9ReproducibilityBundle",
+            "buildPhase9ClientExportReport",
+            "buildPhase9AIReadableSummary",
+            "phase9RecommendedFocus",
         ]:
             with self.subTest(function_name=function_name):
                 self.assertIn(f"function {function_name}", source)
@@ -707,6 +828,8 @@ class Phase9ExperimentTests(unittest.TestCase):
         self.assertIn("phase9ExperimentScenarioCard", source)
         self.assertIn("renderPhase9ExperimentTimeline", source)
         self.assertIn("phase9_real_action_skipped", source)
+        self.assertIn("navigator.clipboard.writeText", phase9_ui_source)
+        self.assertIn("phase9_export_bundle", phase9_ui_source)
 
     def test_no_real_desktop_actuation_api_is_imported_or_called(self) -> None:
         source = inspect.getsource(phase9_experiment)

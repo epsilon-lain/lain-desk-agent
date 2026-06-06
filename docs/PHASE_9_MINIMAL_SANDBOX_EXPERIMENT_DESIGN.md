@@ -23,6 +23,13 @@ rollback plan, sandbox scope, blockers, and audit events. It does not add an
 execute button, approval button, real-action toggle, sandbox action trigger, or
 any action-performing endpoint.
 
+Phase 9.4 derives a read-only export/report bundle from the same deterministic
+Phase 9.1 harness report. The bundle is for debugging, handoff,
+reproducibility, and AI-assisted review. It does not grant execution
+permission, does not add an action-performing endpoint, and does not include
+private auth material, live OS state, broad filesystem dumps, or real desktop
+screenshots outside deterministic fixture data.
+
 ## Purpose
 
 Define a minimal, reviewable sandbox experiment plan that can validate the
@@ -395,6 +402,29 @@ Phase 9.2 is implemented as cockpit display/debug integration only:
 Phase 9.2 is not execution permission. It does not observe the live desktop,
 does not call `/execute`, does not mutate runtime state, does not add approval
 or execute controls, and does not add a desktop control dependency.
+
+## Phase 9.4 Export Bundle Status
+
+Phase 9.4 is implemented as read-only state transfer and reproducibility
+support:
+
+- `build_phase9_export_report(...)` derives a stable export report from the
+  existing Phase 9.1 cockpit-facing report.
+- `build_phase9_ai_readable_summary(...)` creates a concise handoff summary
+  for future AI assistants, Codex sessions, or developers.
+- `build_phase9_reproducibility_bundle(...)` packages the export report,
+  summary, minimal reproduction metadata, scenario IDs, stable fixture
+  assumptions, audit event order, blocker/failure codes, and safety boundary.
+- `/phase9-experiment/demo` includes the export bundle as read-only payload
+  data; it still does not observe the live desktop, mutate state, or call an
+  action-performing endpoint.
+- The cockpit copy controls operate on the already loaded deterministic report
+  in browser memory only.
+
+The Phase 9.4 bundle is not execution permission. It avoids private auth
+material, live OS state, full local filesystem dumps, and real desktop
+screenshots outside deterministic fixture data. Real desktop actions remain
+disabled.
 
 ## Implementation Guardrails
 
