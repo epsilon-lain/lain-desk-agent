@@ -1612,6 +1612,23 @@ button {
   color: #ffd6d0;
 }
 
+.phase9-audit-event-details {
+  min-width: 0;
+}
+
+.phase9-audit-event-summary {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.phase9-audit-event-summary::-webkit-details-marker {
+  color: var(--blue);
+}
+
 .planner-evaluation-summary,
 .planner-evaluation-facts {
   display: grid;

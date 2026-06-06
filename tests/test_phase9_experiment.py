@@ -509,6 +509,21 @@ class Phase9ExperimentTests(unittest.TestCase):
         for element_id in [
             "phase9ExperimentPanel",
             "loadPhase9Experiment",
+            "phase9ExperimentControls",
+            "phase9OutcomeFilter",
+            "phase9GateBlockerFilter",
+            "phase9ApprovalFilter",
+            "phase9RiskFilter",
+            "phase9ReadinessFilter",
+            "phase9ScenarioTypeFilter",
+            "phase9GroupMode",
+            "expandPhase9Scenarios",
+            "collapsePhase9Scenarios",
+            "expandPhase9Audit",
+            "collapsePhase9Audit",
+            "resetPhase9Filters",
+            "phase9QuickFilters",
+            "phase9Counts",
             "phase9ExperimentStatus",
             "phase9ExperimentSummary",
             "phase9ExperimentTimeline",
@@ -527,9 +542,69 @@ class Phase9ExperimentTests(unittest.TestCase):
             "Sandbox scope",
             "Real action",
             "Phase 9 audit event sequence",
+            "Gate blocker",
+            "Scenario type",
+            "Group by",
         ]:
             with self.subTest(visible_label=visible_label):
                 self.assertIn(visible_label, source + html)
+
+    def test_phase9_cockpit_filters_counts_and_grouping_hooks_exist(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+
+        for function_name in [
+            "currentPhase9ExperimentFilters",
+            "populatePhase9ExperimentFilters",
+            "phase9ExperimentFilteredScenarios",
+            "phase9ScenarioMatchesFilters",
+            "renderPhase9QuickFilters",
+            "renderPhase9ExperimentCounts",
+            "phase9ExperimentScenarioGroups",
+            "phase9ExperimentScenarioGroupSection",
+            "phase9OutcomeKind",
+            "phase9RiskLevel",
+            "phase9ReadinessStatus",
+            "phase9GateBlockerCodes",
+        ]:
+            with self.subTest(function_name=function_name):
+                self.assertIn(f"function {function_name}", source)
+
+        for dataset_field in [
+            "phase9HarnessCard",
+            "scenarioType",
+            "outcome",
+            "gateBlockers",
+            "riskLevel",
+            "readinessStatus",
+            "phase9CountKey",
+            "phase9QuickFilter",
+            "phase9ScenarioGroup",
+        ]:
+            with self.subTest(dataset_field=dataset_field):
+                self.assertIn(f"dataset.{dataset_field}", source)
+
+        for group_name in ["blockers", "approval", "risk", "readiness", "skipped"]:
+            with self.subTest(group_name=group_name):
+                self.assertIn(f"{group_name}:", source)
+
+    def test_phase9_cockpit_audit_drilldown_hooks_exist(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = (PROJECT_ROOT / "ui" / "styles.css").read_text(encoding="utf-8")
+
+        for function_name in [
+            "phase9AuditEventDrilldownList",
+            "phase9AuditEventDrilldownDetails",
+            "setPhase9AuditDetailsOpen",
+            "setPhase9ScenarioDetailsOpen",
+        ]:
+            with self.subTest(function_name=function_name):
+                self.assertIn(f"function {function_name}", source)
+
+        self.assertIn("data-phase9-audit-event-details", source)
+        self.assertIn("dataset.auditOrder", source)
+        self.assertIn("phase9-audit-event-details", source)
+        self.assertIn(".phase9-audit-event-details", styles)
+        self.assertIn(".phase9-audit-event-summary", styles)
 
     def test_phase9_cockpit_ui_is_read_only(self) -> None:
         source = UI_APP_JS.read_text(encoding="utf-8")
@@ -547,6 +622,10 @@ class Phase9ExperimentTests(unittest.TestCase):
             "runWaitExecutionSelfTest",
             "realActionEnabled = true",
             "real_action_enabled = true",
+            ".click(",
+            ".type(",
+            "hotkey(",
+            "switch_app",
         ]:
             with self.subTest(fragment=forbidden_fragment):
                 self.assertNotIn(forbidden_fragment, phase9_ui_source)

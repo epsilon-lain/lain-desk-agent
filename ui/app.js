@@ -88,6 +88,21 @@ const sandboxEvaluationResults = document.querySelector("#sandboxEvaluationResul
 const phase9ExperimentPanel = document.querySelector("#phase9ExperimentPanel");
 const loadPhase9ExperimentButton = document.querySelector("#loadPhase9Experiment");
 const phase9ExperimentStatus = document.querySelector("#phase9ExperimentStatus");
+const phase9ExperimentControls = document.querySelector("#phase9ExperimentControls");
+const phase9OutcomeFilter = document.querySelector("#phase9OutcomeFilter");
+const phase9GateBlockerFilter = document.querySelector("#phase9GateBlockerFilter");
+const phase9ApprovalFilter = document.querySelector("#phase9ApprovalFilter");
+const phase9RiskFilter = document.querySelector("#phase9RiskFilter");
+const phase9ReadinessFilter = document.querySelector("#phase9ReadinessFilter");
+const phase9ScenarioTypeFilter = document.querySelector("#phase9ScenarioTypeFilter");
+const phase9GroupMode = document.querySelector("#phase9GroupMode");
+const expandPhase9Scenarios = document.querySelector("#expandPhase9Scenarios");
+const collapsePhase9Scenarios = document.querySelector("#collapsePhase9Scenarios");
+const expandPhase9Audit = document.querySelector("#expandPhase9Audit");
+const collapsePhase9Audit = document.querySelector("#collapsePhase9Audit");
+const resetPhase9Filters = document.querySelector("#resetPhase9Filters");
+const phase9QuickFilters = document.querySelector("#phase9QuickFilters");
+const phase9Counts = document.querySelector("#phase9Counts");
 const phase9ExperimentSummary = document.querySelector("#phase9ExperimentSummary");
 const phase9ExperimentTimeline = document.querySelector("#phase9ExperimentTimeline");
 const phase9ExperimentResults = document.querySelector("#phase9ExperimentResults");
@@ -211,6 +226,28 @@ const SANDBOX_QUICK_FILTER_GROUPS = {
     description: "missing audit-plan and audit-gate scenarios",
   },
 };
+const PHASE9_QUICK_FILTER_GROUPS = {
+  blockers: {
+    label: "gate blockers",
+    description: "Phase 7/8 gate blocker and failure reason scenarios",
+  },
+  approval: {
+    label: "approval",
+    description: "mock approval present, checked, or missing states",
+  },
+  risk: {
+    label: "risk",
+    description: "high, unknown, medium, and low risk targets",
+  },
+  readiness: {
+    label: "readiness",
+    description: "readiness ready or blocked/unknown states",
+  },
+  skipped: {
+    label: "skipped",
+    description: "real-action skipped dry-run experiment paths",
+  },
+};
 const DEMO_SCENARIOS = {
   browser_search: {
     defaultTask: "Search",
@@ -247,6 +284,7 @@ let currentActionContract = null;
 let currentSandboxEvaluationReport = null;
 let currentSandboxQuickFilterGroup = "all";
 let currentPhase9ExperimentReport = null;
+let currentPhase9QuickFilterGroup = "all";
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 setDemoScenarioSelectionDefaults();
@@ -356,6 +394,40 @@ loadSandboxEvaluationButton.addEventListener("click", async () => {
 
 loadPhase9ExperimentButton.addEventListener("click", async () => {
   await loadPhase9Experiment();
+});
+
+for (const phase9FilterControl of [
+  phase9OutcomeFilter,
+  phase9GateBlockerFilter,
+  phase9ApprovalFilter,
+  phase9RiskFilter,
+  phase9ReadinessFilter,
+  phase9ScenarioTypeFilter,
+  phase9GroupMode,
+]) {
+  phase9FilterControl.addEventListener("change", () => {
+    renderPhase9Experiment(currentPhase9ExperimentReport);
+  });
+}
+
+expandPhase9Scenarios.addEventListener("click", () => {
+  setPhase9ScenarioDetailsOpen(true);
+});
+
+collapsePhase9Scenarios.addEventListener("click", () => {
+  setPhase9ScenarioDetailsOpen(false);
+});
+
+expandPhase9Audit.addEventListener("click", () => {
+  setPhase9AuditDetailsOpen(true);
+});
+
+collapsePhase9Audit.addEventListener("click", () => {
+  setPhase9AuditDetailsOpen(false);
+});
+
+resetPhase9Filters.addEventListener("click", () => {
+  resetPhase9ExperimentFilters();
 });
 
 sandboxEvaluationFixtureSet.addEventListener("change", () => {
@@ -1871,12 +1943,17 @@ async function loadPhase9Experiment() {
   phase9ExperimentPanel.dataset.state = "running";
   loadPhase9ExperimentButton.disabled = true;
   phase9ExperimentStatus.textContent = "Loading Phase 9 dry-run harness report...";
+  phase9ExperimentControls.hidden = true;
+  phase9QuickFilters.hidden = true;
+  phase9Counts.hidden = true;
   phase9ExperimentSummary.hidden = true;
   phase9ExperimentTimeline.hidden = true;
   phase9ExperimentResults.replaceChildren();
   statusText.textContent = "loading Phase 9 harness...";
 
   try {
+    // A real-action system would hand off after a gate pass; Phase 9 keeps that
+    // handoff absent and only loads deterministic dry-run fixture JSON.
     const response = await fetch("/phase9-experiment/demo");
     const payload = await response.json();
 
@@ -1899,6 +1976,8 @@ async function loadPhase9Experiment() {
 
 function renderPhase9Experiment(report = null) {
   currentPhase9ExperimentReport = report;
+  phase9QuickFilters.replaceChildren();
+  phase9Counts.replaceChildren();
   phase9ExperimentSummary.replaceChildren();
   phase9ExperimentTimeline.replaceChildren();
   phase9ExperimentResults.replaceChildren();
@@ -1906,6 +1985,9 @@ function renderPhase9Experiment(report = null) {
   if (!report) {
     phase9ExperimentPanel.dataset.state = "empty";
     phase9ExperimentStatus.textContent = "Not loaded yet.";
+    phase9ExperimentControls.hidden = true;
+    phase9QuickFilters.hidden = true;
+    phase9Counts.hidden = true;
     phase9ExperimentSummary.hidden = true;
     phase9ExperimentTimeline.hidden = true;
     phase9ExperimentResults.appendChild(
@@ -1916,6 +1998,10 @@ function renderPhase9Experiment(report = null) {
 
   const summary = report.summary ?? {};
   const scenarios = Array.isArray(report.scenarios) ? report.scenarios : [];
+  populatePhase9ExperimentFilters(report, currentPhase9ExperimentFilters());
+  const filters = currentPhase9ExperimentFilters();
+  const filteredScenarios = phase9ExperimentFilteredScenarios(scenarios, filters);
+  const filteredSummary = summarizePhase9ExperimentScenarios(filteredScenarios);
   const totalScenarioCount = summary.total_scenario_count ?? report.scenario_count ?? scenarios.length;
   const allPassed =
     summary.all_expected_outcomes_passed === true &&
@@ -1924,13 +2010,19 @@ function renderPhase9Experiment(report = null) {
   phase9ExperimentPanel.dataset.state = allPassed ? "ready" : "warning";
   phase9ExperimentStatus.textContent =
     "Phase 9.1 dry-run harness loaded. This is read-only debug output, not execution permission.";
+  phase9ExperimentControls.hidden = false;
+  renderPhase9QuickFilters(filters);
+  phase9QuickFilters.hidden = false;
+  renderPhase9ExperimentCounts(filteredSummary, totalScenarioCount);
   phase9ExperimentSummary.hidden = false;
   phase9ExperimentTimeline.hidden = false;
   setPhase9ExperimentSummary([
     ["Experiment", report.report_type || "phase9_minimal_sandbox_experiment"],
     ["Phase", `${report.phase || "phase9_1"} exposed by ${report.cockpit_exposure_phase || "phase9_2"}`],
     ["Scenarios", String(totalScenarioCount)],
+    ["Visible", `${filteredSummary.total}/${totalScenarioCount} after filters`],
     ["Pass/fail", `${summary.passed_scenario_count ?? 0}/${totalScenarioCount} passed`],
+    ["Visible pass/fail", `${filteredSummary.passed}/${filteredSummary.total} pass; ${filteredSummary.failed} fail`],
     [
       "Gate results",
       `${summary.gate_passed_count ?? 0} passed; ${summary.gate_blocked_count ?? 0} blocked`,
@@ -1939,6 +2031,8 @@ function renderPhase9Experiment(report = null) {
     ["Real-action enabled", String(summary.real_action_enabled_count ?? 0)],
     ["Real-action skipped", String(summary.real_action_skipped_count ?? 0)],
     ["Real-action attempted", String(summary.real_action_attempted_count ?? 0)],
+    ["Visible skipped", String(filteredSummary.skipped)],
+    ["Visible blocked", String(filteredSummary.blocked)],
     ["Post verification", `${summary.post_action_verification_planned_count ?? 0} planned`],
     [
       "Boundary",
@@ -1946,7 +2040,7 @@ function renderPhase9Experiment(report = null) {
     ],
   ]);
 
-  renderPhase9ExperimentTimeline(scenarios);
+  renderPhase9ExperimentTimeline(filteredScenarios);
 
   if (!scenarios.length) {
     phase9ExperimentResults.appendChild(
@@ -1955,8 +2049,15 @@ function renderPhase9Experiment(report = null) {
     return;
   }
 
-  for (const scenario of scenarios) {
-    phase9ExperimentResults.appendChild(phase9ExperimentScenarioCard(scenario));
+  if (!filteredScenarios.length) {
+    phase9ExperimentResults.appendChild(
+      phase9ExperimentEmptyState("No Phase 9 harness scenarios match the active filters.", filters)
+    );
+    return;
+  }
+
+  for (const group of phase9ExperimentScenarioGroups(filteredScenarios, filters)) {
+    phase9ExperimentResults.appendChild(phase9ExperimentScenarioGroupSection(group));
   }
 }
 
@@ -1964,6 +2065,9 @@ function renderPhase9ExperimentError(error) {
   phase9ExperimentPanel.dataset.state = "error";
   phase9ExperimentStatus.textContent = "Phase 9 dry-run harness could not be loaded.";
   currentPhase9ExperimentReport = null;
+  phase9ExperimentControls.hidden = true;
+  phase9QuickFilters.hidden = true;
+  phase9Counts.hidden = true;
   phase9ExperimentSummary.hidden = true;
   phase9ExperimentTimeline.hidden = true;
   phase9ExperimentSummary.replaceChildren();
@@ -1977,6 +2081,434 @@ function setPhase9ExperimentSummary(rows) {
   for (const [label, value] of rows) {
     phase9ExperimentSummary.appendChild(plannerEvaluationFact(label, value));
   }
+}
+
+function phase9ExperimentEmptyState(message, filters = {}) {
+  const container = document.createElement("div");
+  const title = document.createElement("p");
+  const detail = document.createElement("p");
+
+  container.className = "sandbox-evaluation-empty-state";
+  container.dataset.phase9EmptyState = "true";
+  title.className = "sandbox-evaluation-empty-title";
+  title.textContent = message;
+  detail.className = "sandbox-evaluation-empty-detail";
+  detail.textContent = `Active filters: ${phase9ActiveFilterDescription(filters)}.`;
+  container.append(title, detail);
+  return container;
+}
+
+function phase9ActiveFilterDescription(filters = {}) {
+  return [
+    `outcome ${filters.outcome || "all"}`,
+    `gate blocker ${filters.gateBlocker || "all"}`,
+    `approval ${filters.approval || "all"}`,
+    `risk ${filters.risk || "all"}`,
+    `readiness ${filters.readiness || "all"}`,
+    `scenario type ${filters.scenarioType || "all"}`,
+    `group ${filters.groupMode || "scenario_type"}`,
+    `quick group ${filters.quickGroup || "all"}`,
+  ].join("; ");
+}
+
+function currentPhase9ExperimentFilters() {
+  return {
+    outcome: phase9OutcomeFilter.value || "all",
+    gateBlocker: phase9GateBlockerFilter.value || "all",
+    approval: phase9ApprovalFilter.value || "all",
+    risk: phase9RiskFilter.value || "all",
+    readiness: phase9ReadinessFilter.value || "all",
+    scenarioType: phase9ScenarioTypeFilter.value || "all",
+    groupMode: phase9GroupMode.value || "scenario_type",
+    quickGroup: currentPhase9QuickFilterGroup || "all",
+  };
+}
+
+function populatePhase9ExperimentFilters(report, activeFilters) {
+  const scenarios = Array.isArray(report?.scenarios) ? report.scenarios : [];
+  const scenarioTypes = uniqueSortedValues(scenarios.map((scenario) => phase9ScenarioType(scenario)));
+  const gateBlockers = uniqueSortedValues(scenarios.flatMap((scenario) => phase9GateBlockerCodes(scenario)));
+
+  setSelectOptions(
+    phase9ScenarioTypeFilter,
+    [["all", "all scenario types"]].concat(
+      scenarioTypes.map((scenarioType) => [scenarioType, displayPhase9ScenarioType(scenarioType)])
+    ),
+    activeFilters.scenarioType
+  );
+  setSelectOptions(
+    phase9GateBlockerFilter,
+    [["all", "all gate blockers"]].concat(gateBlockers.map((blocker) => [blocker, blocker])),
+    activeFilters.gateBlocker
+  );
+  phase9OutcomeFilter.value = ["all", "pass", "fail", "skipped", "blocked"].includes(
+    activeFilters.outcome
+  )
+    ? activeFilters.outcome
+    : "all";
+  phase9ApprovalFilter.value = ["all", "present", "missing", "checked"].includes(
+    activeFilters.approval
+  )
+    ? activeFilters.approval
+    : "all";
+  phase9RiskFilter.value = ["all", "low", "medium", "high", "unknown"].includes(
+    activeFilters.risk
+  )
+    ? activeFilters.risk
+    : "all";
+  phase9ReadinessFilter.value = ["all", "ready", "blocked"].includes(activeFilters.readiness)
+    ? activeFilters.readiness
+    : "all";
+  phase9GroupMode.value = ["scenario_type", "outcome", "gate", "risk"].includes(
+    activeFilters.groupMode
+  )
+    ? activeFilters.groupMode
+    : "scenario_type";
+}
+
+function phase9ExperimentFilteredScenarios(scenarios, filters) {
+  return (Array.isArray(scenarios) ? scenarios : []).filter((scenario) =>
+    phase9ScenarioMatchesFilters(scenario, filters)
+  );
+}
+
+function phase9ScenarioMatchesFilters(scenario, filters = {}) {
+  const outcome = phase9OutcomeKind(scenario);
+  const gateBlockers = phase9GateBlockerCodes(scenario);
+
+  if ((filters.outcome || "all") !== "all" && filters.outcome !== outcome) {
+    return false;
+  }
+
+  if ((filters.gateBlocker || "all") !== "all" && !gateBlockers.includes(filters.gateBlocker)) {
+    return false;
+  }
+
+  if ((filters.approval || "all") !== "all" && !phase9ApprovalMatches(scenario, filters.approval)) {
+    return false;
+  }
+
+  if ((filters.risk || "all") !== "all" && filters.risk !== phase9RiskLevel(scenario)) {
+    return false;
+  }
+
+  if ((filters.readiness || "all") !== "all" && filters.readiness !== phase9ReadinessStatus(scenario)) {
+    return false;
+  }
+
+  if ((filters.scenarioType || "all") !== "all" && filters.scenarioType !== phase9ScenarioType(scenario)) {
+    return false;
+  }
+
+  return phase9ScenarioMatchesQuickGroup(scenario, filters.quickGroup || "all");
+}
+
+function phase9ApprovalMatches(scenario, approvalFilter) {
+  if (approvalFilter === "present") {
+    return scenario.user_approval_present === true;
+  }
+
+  if (approvalFilter === "missing") {
+    return scenario.user_approval_present !== true;
+  }
+
+  if (approvalFilter === "checked") {
+    return scenario.mock_approval_checked === true;
+  }
+
+  return true;
+}
+
+function phase9ScenarioMatchesQuickGroup(scenario, quickGroup) {
+  if (!quickGroup || quickGroup === "all") {
+    return true;
+  }
+
+  const gateBlockers = phase9GateBlockerCodes(scenario);
+
+  if (quickGroup === "blockers") {
+    return scenario.gate_passed === false || gateBlockers.length > 0;
+  }
+
+  if (quickGroup === "approval") {
+    return (
+      scenario.mock_approval_checked === true ||
+      scenario.user_approval_present !== true ||
+      gateBlockers.includes("missing_user_approval")
+    );
+  }
+
+  if (quickGroup === "risk") {
+    return ["high", "unknown", "medium"].includes(phase9RiskLevel(scenario));
+  }
+
+  if (quickGroup === "readiness") {
+    return phase9ReadinessStatus(scenario) === "blocked" || gateBlockers.includes("readiness_not_ready");
+  }
+
+  if (quickGroup === "skipped") {
+    return scenario.real_action_skipped === true;
+  }
+
+  return true;
+}
+
+function phase9ExperimentScenarioGroups(scenarios, filters) {
+  const groups = new Map();
+
+  for (const scenario of scenarios) {
+    const key = phase9ExperimentScenarioGroupKey(scenario, filters);
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        title: phase9ExperimentScenarioGroupTitle(scenario, filters),
+        scenarios: [],
+      });
+    }
+
+    groups.get(key).scenarios.push(scenario);
+  }
+
+  return Array.from(groups.values());
+}
+
+function phase9ExperimentScenarioGroupKey(scenario, filters) {
+  const groupMode = filters.groupMode || "scenario_type";
+
+  if (groupMode === "outcome") {
+    return `outcome:${phase9OutcomeKind(scenario)}`;
+  }
+
+  if (groupMode === "gate") {
+    return `gate:${scenario.gate_passed === true ? "passed" : "blocked"}`;
+  }
+
+  if (groupMode === "risk") {
+    return `risk:${phase9RiskLevel(scenario)}`;
+  }
+
+  return `type:${phase9ScenarioType(scenario)}`;
+}
+
+function phase9ExperimentScenarioGroupTitle(scenario, filters) {
+  const groupMode = filters.groupMode || "scenario_type";
+
+  if (groupMode === "outcome") {
+    return `Outcome: ${sandboxEvaluationStatusLabel(phase9OutcomeKind(scenario))}`;
+  }
+
+  if (groupMode === "gate") {
+    return `Gate: ${scenario.gate_passed === true ? "passed" : "blocked"}`;
+  }
+
+  if (groupMode === "risk") {
+    return `Risk: ${phase9RiskLevel(scenario)}`;
+  }
+
+  return displayPhase9ScenarioType(phase9ScenarioType(scenario));
+}
+
+function phase9ExperimentScenarioGroupSection(group) {
+  const section = document.createElement("section");
+  const title = document.createElement("p");
+
+  section.className = "sandbox-evaluation-scenario-group";
+  section.dataset.phase9ScenarioGroup = group.key;
+  title.className = "sandbox-evaluation-scenario-group-title";
+  title.textContent = `${group.title} (${group.scenarios.length})`;
+  section.appendChild(title);
+
+  for (const scenario of group.scenarios) {
+    section.appendChild(phase9ExperimentScenarioCard(scenario));
+  }
+
+  return section;
+}
+
+function summarizePhase9ExperimentScenarios(scenarios) {
+  const safeScenarios = Array.isArray(scenarios) ? scenarios : [];
+
+  return {
+    total: safeScenarios.length,
+    passed: safeScenarios.filter((scenario) => scenario.passed === true).length,
+    failed: safeScenarios.filter((scenario) => scenario.passed !== true).length,
+    skipped: safeScenarios.filter((scenario) => scenario.real_action_skipped === true).length,
+    blocked: safeScenarios.filter(
+      (scenario) => scenario.actual_outcome?.status === "blocked" || scenario.gate_passed === false
+    ).length,
+    approvalPresent: safeScenarios.filter((scenario) => scenario.user_approval_present === true).length,
+    readinessReady: safeScenarios.filter((scenario) => scenario.readiness_ready === true).length,
+  };
+}
+
+function renderPhase9ExperimentCounts(summary, totalScenarioCount) {
+  phase9Counts.replaceChildren();
+  phase9Counts.hidden = false;
+
+  for (const [label, value, tone] of [
+    ["total", String(totalScenarioCount), "neutral"],
+    ["visible", String(summary.total), "neutral"],
+    ["passed", String(summary.passed), "ok"],
+    ["failed", String(summary.failed), summary.failed > 0 ? "risk" : "neutral"],
+    ["skipped", String(summary.skipped), summary.skipped > 0 ? "warn" : "neutral"],
+    ["blocked", String(summary.blocked), summary.blocked > 0 ? "risk" : "neutral"],
+    ["approval", String(summary.approvalPresent), "ok"],
+    ["ready", String(summary.readinessReady), "ok"],
+  ]) {
+    const chip = document.createElement("div");
+    const countValue = document.createElement("span");
+    const countLabel = document.createElement("span");
+
+    chip.className = "sandbox-evaluation-count";
+    chip.dataset.phase9CountKey = label;
+    chip.dataset.countKey = label;
+    chip.dataset.tone = tone;
+    countValue.className = "sandbox-evaluation-count-value";
+    countValue.textContent = value;
+    countLabel.className = "sandbox-evaluation-count-label";
+    countLabel.textContent = label;
+    chip.append(countValue, countLabel);
+    phase9Counts.appendChild(chip);
+  }
+}
+
+function renderPhase9QuickFilters(filters) {
+  phase9QuickFilters.replaceChildren();
+
+  for (const [groupKey, group] of Object.entries(PHASE9_QUICK_FILTER_GROUPS)) {
+    const button = document.createElement("button");
+
+    button.type = "button";
+    button.className = "sandbox-evaluation-quick-filter";
+    button.dataset.phase9QuickFilter = groupKey;
+    button.title = group.description;
+    button.setAttribute("aria-pressed", String(filters.quickGroup === groupKey));
+    button.textContent = group.label;
+    button.addEventListener("click", () => {
+      currentPhase9QuickFilterGroup =
+        currentPhase9QuickFilterGroup === groupKey ? "all" : groupKey;
+      renderPhase9Experiment(currentPhase9ExperimentReport);
+    });
+    phase9QuickFilters.appendChild(button);
+  }
+}
+
+function resetPhase9ExperimentFilters() {
+  phase9OutcomeFilter.value = "all";
+  phase9GateBlockerFilter.value = "all";
+  phase9ApprovalFilter.value = "all";
+  phase9RiskFilter.value = "all";
+  phase9ReadinessFilter.value = "all";
+  phase9ScenarioTypeFilter.value = "all";
+  phase9GroupMode.value = "scenario_type";
+  currentPhase9QuickFilterGroup = "all";
+  renderPhase9Experiment(currentPhase9ExperimentReport);
+}
+
+function setPhase9ScenarioDetailsOpen(open) {
+  const detailsNodes = phase9ExperimentResults.querySelectorAll(
+    "details[data-phase9-scenario-details='true']"
+  );
+  detailsNodes.forEach((details) => {
+    details.open = open;
+  });
+}
+
+function setPhase9AuditDetailsOpen(open) {
+  const detailsNodes = phase9ExperimentPanel.querySelectorAll(
+    "details[data-phase9-audit-event-details='true']"
+  );
+  detailsNodes.forEach((details) => {
+    details.open = open;
+  });
+}
+
+function phase9OutcomeKind(scenario) {
+  return sandboxEvaluationStatusKind(scenario);
+}
+
+function phase9ScenarioType(scenario) {
+  const failureReasons = sandboxCodes(scenario.failure_reason_codes);
+  const blockerCodes = sandboxCodes(scenario.blocker_codes);
+
+  if (scenario.real_action_skipped === true || failureReasons.includes("real_action_disabled")) {
+    return "real_action_skipped";
+  }
+
+  if (failureReasons.includes("missing_user_approval")) {
+    return "approval";
+  }
+
+  if (failureReasons.includes("high_risk_target") || phase9RiskLevel(scenario) !== "low") {
+    return "risk";
+  }
+
+  if (failureReasons.includes("stale_observation") || blockerCodes.includes("stale_observation")) {
+    return "phase7_freshness";
+  }
+
+  if (failureReasons.includes("missing_audit_plan")) {
+    return "phase7_audit";
+  }
+
+  if (failureReasons.includes("missing_action_contract")) {
+    return "phase7_contract";
+  }
+
+  if (failureReasons.includes("readiness_not_ready")) {
+    return "readiness";
+  }
+
+  if (scenario.gate_passed === false) {
+    return "phase7_gate";
+  }
+
+  return "dry_run_success";
+}
+
+function displayPhase9ScenarioType(scenarioType) {
+  const labels = {
+    dry_run_success: "dry-run success",
+    real_action_skipped: "real-action skipped",
+    approval: "approval gate",
+    risk: "risk gate",
+    readiness: "readiness gate",
+    phase7_freshness: "Phase 7 freshness",
+    phase7_audit: "Phase 7 audit",
+    phase7_contract: "Phase 7 contract",
+    phase7_gate: "Phase 7/8 gate",
+  };
+
+  return labels[scenarioType] || scenarioType || "unknown";
+}
+
+function phase9RiskLevel(scenario) {
+  const riskHint = String(scenario.target_risk_hint || "").toLowerCase();
+
+  if (riskHint === "high" || riskHint === "high_risk") {
+    return "high";
+  }
+
+  if (riskHint === "medium" || riskHint === "medium_risk") {
+    return "medium";
+  }
+
+  if (riskHint === "unknown" || !riskHint) {
+    return "unknown";
+  }
+
+  return "low";
+}
+
+function phase9ReadinessStatus(scenario) {
+  return scenario.readiness_ready === true ? "ready" : "blocked";
+}
+
+function phase9GateBlockerCodes(scenario) {
+  return uniqueSortedValues(
+    sandboxCodes(scenario.failure_reason_codes).concat(sandboxCodes(scenario.blocker_codes))
+  );
 }
 
 function phase9ExperimentScenarioCard(scenario) {
@@ -1999,7 +2531,10 @@ function phase9ExperimentScenarioCard(scenario) {
   card.dataset.status = status;
   card.dataset.experimentId = scenario.experiment_id || "";
   card.dataset.scenarioId = scenario.scenario_id || "";
+  card.dataset.scenarioType = phase9ScenarioType(scenario);
+  card.dataset.outcome = phase9OutcomeKind(scenario);
   card.dataset.gatePassed = String(scenario.gate_passed === true);
+  card.dataset.gateBlockers = phase9GateBlockerCodes(scenario).join(",");
   card.dataset.dryRun = String(scenario.dry_run === true);
   card.dataset.realActionSkipped = String(scenario.real_action_skipped === true);
   card.dataset.mockApprovalChecked = String(scenario.mock_approval_checked === true);
@@ -2011,6 +2546,8 @@ function phase9ExperimentScenarioCard(scenario) {
   card.dataset.rollbackPlanRecorded = String(scenario.rollback_plan_recorded === true);
   card.dataset.actionType = scenario.action_type || "";
   card.dataset.targetRiskHint = scenario.target_risk_hint || "";
+  card.dataset.riskLevel = phase9RiskLevel(scenario);
+  card.dataset.readinessStatus = phase9ReadinessStatus(scenario);
   card.dataset.targetConfidence = Number.isFinite(scenario.target_confidence)
     ? scenario.target_confidence.toFixed(2)
     : "";
@@ -2038,6 +2575,7 @@ function phase9ExperimentScenarioCard(scenario) {
 
   details.className = "sandbox-evaluation-scenario-details";
   details.dataset.phase9ScenarioDetails = "true";
+  details.dataset.testHook = "phase9-scenario-details";
   detailsSummary.textContent = "Harness fields";
   facts.className = "planner-evaluation-facts";
   for (const [label, value] of phase9ExperimentRows(scenario)) {
@@ -2147,8 +2685,66 @@ function phase9ExperimentAuditTimeline(scenario) {
   container.className = "sandbox-evaluation-audit";
   title.className = "sandbox-evaluation-audit-title";
   title.textContent = "Phase 9 audit event sequence";
-  container.append(title, sandboxAuditEventList(scenario.audit_event_names));
+  container.append(title, phase9AuditEventDrilldownList(scenario.audit_event_names, scenario));
   return container;
+}
+
+function phase9AuditEventDrilldownList(auditEventNames, scenario) {
+  const list = document.createElement("ol");
+  const auditEvents = sandboxCodes(auditEventNames);
+
+  list.className = "sandbox-evaluation-audit-list";
+  list.dataset.phase9AuditList = "true";
+
+  if (!auditEvents.length) {
+    const item = document.createElement("li");
+    item.textContent = "none";
+    list.appendChild(item);
+    return list;
+  }
+
+  auditEvents.forEach((eventName, index) => {
+    const item = document.createElement("li");
+
+    item.dataset.auditEventName = eventName;
+    item.dataset.auditOrder = String(index + 1);
+    item.dataset.auditTone = sandboxAuditEventTone(eventName);
+    item.appendChild(phase9AuditEventDrilldownDetails(eventName, index, scenario));
+    list.appendChild(item);
+  });
+
+  return list;
+}
+
+function phase9AuditEventDrilldownDetails(eventName, index, scenario) {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const step = document.createElement("span");
+  const event = document.createElement("span");
+  const body = document.createElement("p");
+
+  details.className = "phase9-audit-event-details";
+  details.dataset.phase9AuditEventDetails = "true";
+  details.dataset.auditEventName = eventName;
+  details.dataset.auditOrder = String(index + 1);
+  summary.className = "phase9-audit-event-summary";
+  step.className = "sandbox-evaluation-audit-step";
+  step.textContent = String(index + 1);
+  event.className = "sandbox-evaluation-event-chip";
+  event.dataset.tone = sandboxAuditEventTone(eventName);
+  event.title = eventName;
+  event.textContent = sandboxAuditEventLabel(eventName);
+  body.className = "sandbox-evaluation-empty-detail";
+  body.textContent = [
+    `raw ${eventName}`,
+    `scenario ${scenario?.scenario_id || "unknown"}`,
+    `order ${index + 1}`,
+    `gate ${scenario?.gate_passed === true ? "passed" : "blocked"}`,
+    `dry_run ${formatSandboxBool(scenario?.dry_run)}`,
+  ].join("; ");
+  summary.append(step, event);
+  details.append(summary, body);
+  return details;
 }
 
 function renderPhase9ExperimentTimeline(scenarios) {
@@ -2165,21 +2761,13 @@ function renderPhase9ExperimentTimeline(scenarios) {
     sandboxCodes(scenario.audit_event_names).forEach((eventName, index) => {
       const item = document.createElement("li");
       const scenarioId = document.createElement("span");
-      const step = document.createElement("span");
-      const event = document.createElement("span");
 
       item.dataset.scenarioId = scenario.scenario_id || "";
       item.dataset.auditEventName = eventName;
       item.dataset.auditTone = sandboxAuditEventTone(eventName);
       scenarioId.className = "sandbox-evaluation-timeline-scenario";
       scenarioId.textContent = scenario.scenario_id || "unknown";
-      step.className = "sandbox-evaluation-audit-step";
-      step.textContent = String(index + 1);
-      event.className = "sandbox-evaluation-event-chip";
-      event.dataset.tone = sandboxAuditEventTone(eventName);
-      event.title = eventName;
-      event.textContent = sandboxAuditEventLabel(eventName);
-      item.append(scenarioId, step, event);
+      item.append(scenarioId, phase9AuditEventDrilldownDetails(eventName, index, scenario));
       list.appendChild(item);
     });
   }

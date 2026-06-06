@@ -359,6 +359,85 @@
                 </button>
               </div>
               <p class="planner-evaluation-status" id="phase9ExperimentStatus">Not loaded yet.</p>
+              <div class="sandbox-evaluation-controls" id="phase9ExperimentControls" hidden>
+                <label>
+                  Outcome
+                  <select id="phase9OutcomeFilter">
+                    <option value="all">all outcomes</option>
+                    <option value="pass">passed</option>
+                    <option value="fail">failed expectation</option>
+                    <option value="skipped">skipped</option>
+                    <option value="blocked">blocked</option>
+                  </select>
+                </label>
+                <label>
+                  Gate blocker
+                  <select id="phase9GateBlockerFilter">
+                    <option value="all">all gate blockers</option>
+                  </select>
+                </label>
+                <label>
+                  Approval
+                  <select id="phase9ApprovalFilter">
+                    <option value="all">all approval states</option>
+                    <option value="present">approval present</option>
+                    <option value="missing">approval missing</option>
+                    <option value="checked">mock checked</option>
+                  </select>
+                </label>
+                <label>
+                  Risk
+                  <select id="phase9RiskFilter">
+                    <option value="all">all risk levels</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                    <option value="unknown">unknown</option>
+                  </select>
+                </label>
+                <label>
+                  Readiness
+                  <select id="phase9ReadinessFilter">
+                    <option value="all">all readiness states</option>
+                    <option value="ready">ready</option>
+                    <option value="blocked">blocked or unknown</option>
+                  </select>
+                </label>
+                <label>
+                  Scenario type
+                  <select id="phase9ScenarioTypeFilter">
+                    <option value="all">all scenario types</option>
+                  </select>
+                </label>
+                <label>
+                  Group by
+                  <select id="phase9GroupMode">
+                    <option value="scenario_type">scenario type</option>
+                    <option value="outcome">outcome</option>
+                    <option value="gate">gate status</option>
+                    <option value="risk">risk level</option>
+                  </select>
+                </label>
+                <div class="sandbox-evaluation-detail-actions" aria-label="Phase 9 display controls">
+                  <button class="planner-evaluation-button" id="expandPhase9Scenarios" type="button">
+                    Expand scenarios
+                  </button>
+                  <button class="planner-evaluation-button" id="collapsePhase9Scenarios" type="button">
+                    Collapse scenarios
+                  </button>
+                  <button class="planner-evaluation-button" id="expandPhase9Audit" type="button">
+                    Expand audit
+                  </button>
+                  <button class="planner-evaluation-button" id="collapsePhase9Audit" type="button">
+                    Collapse audit
+                  </button>
+                  <button class="planner-evaluation-button" id="resetPhase9Filters" type="button">
+                    Reset filters
+                  </button>
+                </div>
+              </div>
+              <div class="sandbox-evaluation-quick-filters" id="phase9QuickFilters" hidden></div>
+              <div class="sandbox-evaluation-counts" id="phase9Counts" hidden></div>
               <dl class="planner-evaluation-summary" id="phase9ExperimentSummary" hidden></dl>
               <div class="sandbox-evaluation-timeline" id="phase9ExperimentTimeline" hidden></div>
               <div class="planner-evaluation-results" id="phase9ExperimentResults" aria-live="polite"></div>
