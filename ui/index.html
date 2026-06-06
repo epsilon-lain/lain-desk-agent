@@ -418,6 +418,22 @@
                     <option value="risk">risk level</option>
                   </select>
                 </label>
+                <label>
+                  Audit group
+                  <select id="phase9AuditGroupMode">
+                    <option value="scenario">scenario</option>
+                    <option value="gate">gate status</option>
+                    <option value="severity">blocker severity</option>
+                    <option value="event">event type</option>
+                  </select>
+                </label>
+                <label>
+                  Audit order
+                  <select id="phase9AuditSortMode">
+                    <option value="original">original order</option>
+                    <option value="scenario_original">scenario, then original order</option>
+                  </select>
+                </label>
                 <div class="sandbox-evaluation-detail-actions" aria-label="Phase 9 display controls">
                   <button class="planner-evaluation-button" id="expandPhase9Scenarios" type="button">
                     Expand scenarios

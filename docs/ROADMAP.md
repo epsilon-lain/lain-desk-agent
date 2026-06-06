@@ -67,6 +67,10 @@ read-only debug output. It displays mock approval, emergency stop,
 verification, rollback, blockers, and audit trace data without adding any
 execution control.
 
+Phase 9.3 improves the Phase 9 cockpit audit timeline with local-only grouping,
+original-order metadata, event chips, and expandable event detail rows. It is
+still read-only/debug-only and does not add execution control.
+
 ## Completed
 
 - Observation / Understanding
@@ -93,6 +97,7 @@ execution control.
 - Phase 9 Minimal Sandbox Experiment Design
 - Phase 9.1 Minimal Sandbox Experiment Harness
 - Phase 9.2 Phase 9 Harness Cockpit Display
+- Phase 9.3 Phase 9 Advanced Audit Timeline UX
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -127,6 +132,8 @@ execution control.
 - Phase 9.1 minimal sandbox experiment harness is dry-run-only simulation and
   not execution permission.
 - Phase 9.2 Phase 9 harness cockpit display is read-only/debug-only and not
+  execution permission.
+- Phase 9.3 Phase 9 advanced audit timeline UX is read-only/debug-only and not
   execution permission.
 
 ## Phase 4: AI Planner Evaluation And Reliability
@@ -487,6 +494,30 @@ adding any execution path.
 - Keep the cockpit panel read-only: no execute button, approval button,
   real-action toggle, click/type/hotkey/scroll/switch_app control, sandbox
   action trigger, `/execute` call, or action-performing endpoint.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions and
+  `real_action_enabled = false` default behavior.
+
+## Phase 9.3: Phase 9 Advanced Audit Timeline UX
+
+Status: implemented as read-only cockpit UX polish.
+
+Goal: make Phase 9 audit traces easier to inspect without changing the
+deterministic report shape or adding execution permission.
+
+- Keep using the Phase 9.1 report fields exposed by the Phase 9.2 endpoint.
+- Add local-only audit timeline grouping by scenario, gate status, blocker
+  severity, and event type.
+- Preserve original audit order with rendered metadata while allowing
+  scenario-first local display ordering.
+- Add expandable event detail rows for event name, scenario ID, gate status,
+  blocker/failure codes, mock approval state, emergency stop state,
+  verification planning, rollback planning, dry-run state, and skipped state.
+- Add event chips for request, approval check, emergency stop check, gate
+  pass/block, verification planning, rollback planning, dry-run completion,
+  and real-action skip.
+- Keep all controls browser-local: no execute button, approval button,
+  real-action toggle, sandbox action trigger, `/execute` call, or
+  action-performing endpoint.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions and
   `real_action_enabled = false` default behavior.
 

@@ -1612,6 +1612,77 @@ button {
   color: #ffd6d0;
 }
 
+.sandbox-evaluation-event-chip[data-phase9-event-kind="success"] {
+  border-color: rgba(135, 244, 255, 0.44);
+  background: rgba(135, 244, 255, 0.06);
+  color: var(--accent);
+}
+
+.sandbox-evaluation-event-chip[data-phase9-event-kind="warning"] {
+  border-color: rgba(255, 198, 109, 0.62);
+  background: rgba(255, 198, 109, 0.08);
+  color: #ffd89a;
+}
+
+.sandbox-evaluation-event-chip[data-phase9-event-kind="blocked"] {
+  border-color: rgba(255, 115, 95, 0.72);
+  background: rgba(255, 115, 95, 0.1);
+  color: #ffd6d0;
+}
+
+.sandbox-evaluation-event-chip[data-phase9-event-kind="skipped"] {
+  border-color: rgba(255, 198, 109, 0.58);
+  background: rgba(255, 198, 109, 0.07);
+  color: #ffd89a;
+}
+
+.phase9-audit-timeline-group {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  margin-top: 8px;
+  border-top: 1px solid rgba(134, 184, 220, 0.16);
+  padding-top: 7px;
+}
+
+.phase9-audit-timeline-group:first-of-type {
+  margin-top: 6px;
+}
+
+.phase9-audit-timeline-group-title {
+  margin: 0;
+  color: var(--blue);
+  font-size: 11px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.phase9-audit-timeline-group[data-blocker-severity="critical"] .phase9-audit-timeline-group-title,
+.phase9-audit-timeline-group[data-blocker-severity="high"] .phase9-audit-timeline-group-title {
+  color: #ffd6d0;
+}
+
+.sandbox-evaluation-timeline-list li[data-phase9-timeline-event="true"] {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: start;
+}
+
+.sandbox-evaluation-timeline-list li[data-phase9-event-kind="success"] {
+  border-left: 2px solid rgba(135, 244, 255, 0.42);
+  padding-left: 5px;
+}
+
+.sandbox-evaluation-timeline-list li[data-phase9-event-kind="warning"],
+.sandbox-evaluation-timeline-list li[data-phase9-event-kind="skipped"] {
+  border-left: 2px solid rgba(255, 198, 109, 0.56);
+  padding-left: 5px;
+}
+
+.sandbox-evaluation-timeline-list li[data-phase9-event-kind="blocked"] {
+  border-left: 2px solid rgba(255, 115, 95, 0.72);
+  padding-left: 5px;
+}
+
 .phase9-audit-event-details {
   min-width: 0;
 }
@@ -1627,6 +1698,34 @@ button {
 
 .phase9-audit-event-summary::-webkit-details-marker {
   color: var(--blue);
+}
+
+.phase9-audit-event-detail-grid {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 7px 0 0 26px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.phase9-audit-event-detail-grid div {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 7px;
+  min-width: 0;
+}
+
+.phase9-audit-event-detail-grid dt {
+  color: var(--blue);
+}
+
+.phase9-audit-event-detail-grid dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .planner-evaluation-summary,
@@ -2383,6 +2482,7 @@ button {
   .sandbox-evaluation-counts,
   .sandbox-evaluation-bar-row,
   .sandbox-evaluation-blocker-item,
+  .phase9-audit-event-detail-grid div,
   .planner-evaluation-summary,
   .planner-evaluation-facts div,
   .click-readiness-check {

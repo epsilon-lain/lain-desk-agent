@@ -437,6 +437,23 @@ hotkey/scroll/switch_app, or sandbox action trigger controls. It does not
 change Capability Registry, Permission Profile, Execution Policy, Action
 Contract behavior, Click Readiness, or the Phase 7 gate.
 
+### Phase 9.3 Phase 9 Advanced Audit Timeline UX
+
+Phase 9.3 keeps the Phase 9.1 report fields and Phase 9.2 cockpit endpoint
+stable, then improves only browser-side audit inspection. The Phase 9 cockpit
+can group the already loaded audit events by scenario, gate status, blocker
+severity, or event type, and it preserves original event ordering through
+rendered metadata. Scenario and event detail rows show mock approval,
+emergency stop, verification, rollback, gate status, blockers, failure reasons,
+and dry-run/skipped state.
+
+All Phase 9.3 controls are local display controls. Sorting, grouping, and
+expand/collapse operate on the deterministic `/phase9-experiment/demo` JSON
+after it has loaded. They do not call `/execute`, do not record approvals, do
+not add real-action toggles, do not change Capability Registry, Permission
+Profile, Execution Policy, Action Contract behavior, Click Readiness, or the
+Phase 7 gate, and do not import any desktop control API.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -465,6 +482,9 @@ The current safety boundaries are intentionally narrow:
   it is not execution permission and it never attempts real desktop action.
 - Phase 9.2 Phase 9 harness cockpit display is read-only debug output; it is
   not execution permission and it never attempts real desktop action.
+- Phase 9.3 Phase 9 advanced audit timeline UX is browser-local read-only
+  display logic; it is not execution permission and it never attempts real
+  desktop action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

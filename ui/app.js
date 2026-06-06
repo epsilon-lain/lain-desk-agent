@@ -96,6 +96,8 @@ const phase9RiskFilter = document.querySelector("#phase9RiskFilter");
 const phase9ReadinessFilter = document.querySelector("#phase9ReadinessFilter");
 const phase9ScenarioTypeFilter = document.querySelector("#phase9ScenarioTypeFilter");
 const phase9GroupMode = document.querySelector("#phase9GroupMode");
+const phase9AuditGroupMode = document.querySelector("#phase9AuditGroupMode");
+const phase9AuditSortMode = document.querySelector("#phase9AuditSortMode");
 const expandPhase9Scenarios = document.querySelector("#expandPhase9Scenarios");
 const collapsePhase9Scenarios = document.querySelector("#collapsePhase9Scenarios");
 const expandPhase9Audit = document.querySelector("#expandPhase9Audit");
@@ -196,7 +198,7 @@ const SANDBOX_AUDIT_EVENT_LABELS = {
   phase9_gate_passed: "gate passed",
   phase9_gate_blocked: "gate blocked",
   phase9_post_action_verification_planned: "verification planned",
-  phase9_rollback_plan_recorded: "rollback planned",
+  phase9_rollback_plan_recorded: "rollback recorded",
   phase9_dry_run_completed: "dry-run complete",
   phase9_real_action_skipped: "real action skipped",
 };
@@ -247,6 +249,25 @@ const PHASE9_QUICK_FILTER_GROUPS = {
     label: "skipped",
     description: "real-action skipped dry-run experiment paths",
   },
+};
+const PHASE9_BLOCKER_SEVERITY = {
+  missing_phase7_checklist: "critical",
+  missing_user_approval: "critical",
+  real_action_disabled: "medium",
+  readiness_not_ready: "high",
+  high_risk_target: "critical",
+  stale_observation: "medium",
+  invalid_target_geometry: "critical",
+  missing_post_action_verification: "high",
+  forbidden_action_type: "critical",
+  outside_sandbox_scope: "critical",
+  missing_audit_plan: "high",
+  missing_action_contract: "critical",
+  missing_target: "critical",
+  missing_emergency_stop: "critical",
+  emergency_stop_active: "critical",
+  missing_rollback_plan: "high",
+  low_confidence_target: "high",
 };
 const DEMO_SCENARIOS = {
   browser_search: {
@@ -404,6 +425,8 @@ for (const phase9FilterControl of [
   phase9ReadinessFilter,
   phase9ScenarioTypeFilter,
   phase9GroupMode,
+  phase9AuditGroupMode,
+  phase9AuditSortMode,
 ]) {
   phase9FilterControl.addEventListener("change", () => {
     renderPhase9Experiment(currentPhase9ExperimentReport);
@@ -2040,7 +2063,7 @@ function renderPhase9Experiment(report = null) {
     ],
   ]);
 
-  renderPhase9ExperimentTimeline(filteredScenarios);
+  renderPhase9ExperimentTimeline(filteredScenarios, filters);
 
   if (!scenarios.length) {
     phase9ExperimentResults.appendChild(
@@ -2107,6 +2130,8 @@ function phase9ActiveFilterDescription(filters = {}) {
     `readiness ${filters.readiness || "all"}`,
     `scenario type ${filters.scenarioType || "all"}`,
     `group ${filters.groupMode || "scenario_type"}`,
+    `audit group ${filters.auditGroupMode || "scenario"}`,
+    `audit order ${filters.auditSortMode || "original"}`,
     `quick group ${filters.quickGroup || "all"}`,
   ].join("; ");
 }
@@ -2120,6 +2145,8 @@ function currentPhase9ExperimentFilters() {
     readiness: phase9ReadinessFilter.value || "all",
     scenarioType: phase9ScenarioTypeFilter.value || "all",
     groupMode: phase9GroupMode.value || "scenario_type",
+    auditGroupMode: phase9AuditGroupMode.value || "scenario",
+    auditSortMode: phase9AuditSortMode.value || "original",
     quickGroup: currentPhase9QuickFilterGroup || "all",
   };
 }
@@ -2164,6 +2191,16 @@ function populatePhase9ExperimentFilters(report, activeFilters) {
   )
     ? activeFilters.groupMode
     : "scenario_type";
+  phase9AuditGroupMode.value = ["scenario", "gate", "severity", "event"].includes(
+    activeFilters.auditGroupMode
+  )
+    ? activeFilters.auditGroupMode
+    : "scenario";
+  phase9AuditSortMode.value = ["original", "scenario_original"].includes(
+    activeFilters.auditSortMode
+  )
+    ? activeFilters.auditSortMode
+    : "original";
 }
 
 function phase9ExperimentFilteredScenarios(scenarios, filters) {
@@ -2402,6 +2439,8 @@ function resetPhase9ExperimentFilters() {
   phase9ReadinessFilter.value = "all";
   phase9ScenarioTypeFilter.value = "all";
   phase9GroupMode.value = "scenario_type";
+  phase9AuditGroupMode.value = "scenario";
+  phase9AuditSortMode.value = "original";
   currentPhase9QuickFilterGroup = "all";
   renderPhase9Experiment(currentPhase9ExperimentReport);
 }
@@ -2705,80 +2744,278 @@ function phase9AuditEventDrilldownList(auditEventNames, scenario) {
 
   auditEvents.forEach((eventName, index) => {
     const item = document.createElement("li");
+    const record = phase9TimelineEventRecord(scenario, eventName, index, index + 1);
 
     item.dataset.auditEventName = eventName;
-    item.dataset.auditOrder = String(index + 1);
+    item.dataset.auditOrder = String(record.auditOrder);
     item.dataset.auditTone = sandboxAuditEventTone(eventName);
-    item.appendChild(phase9AuditEventDrilldownDetails(eventName, index, scenario));
+    item.dataset.originalOrder = String(record.originalOrder);
+    item.dataset.scenarioAuditOrder = String(record.auditOrder);
+    item.dataset.gateStatus = record.gateStatus;
+    item.dataset.blockerSeverity = record.blockerSeverity;
+    item.dataset.phase9EventKind = record.eventKind;
+    item.appendChild(phase9AuditEventDrilldownDetails(eventName, index, scenario, record));
     list.appendChild(item);
   });
 
   return list;
 }
 
-function phase9AuditEventDrilldownDetails(eventName, index, scenario) {
+function phase9AuditEventDrilldownDetails(eventName, index, scenario, record = null) {
+  const eventRecord = record || phase9TimelineEventRecord(scenario, eventName, index, index + 1);
   const details = document.createElement("details");
   const summary = document.createElement("summary");
   const step = document.createElement("span");
   const event = document.createElement("span");
-  const body = document.createElement("p");
+  const body = document.createElement("dl");
 
   details.className = "phase9-audit-event-details";
   details.dataset.phase9AuditEventDetails = "true";
-  details.dataset.auditEventName = eventName;
-  details.dataset.auditOrder = String(index + 1);
+  details.dataset.testHook = "phase9-audit-event-details";
+  details.dataset.auditEventName = eventRecord.eventName;
+  details.dataset.auditOrder = String(eventRecord.auditOrder);
+  details.dataset.originalOrder = String(eventRecord.originalOrder);
+  details.dataset.scenarioAuditOrder = String(eventRecord.auditOrder);
+  details.dataset.gateStatus = eventRecord.gateStatus;
+  details.dataset.blockerSeverity = eventRecord.blockerSeverity;
+  details.dataset.phase9EventKind = eventRecord.eventKind;
   summary.className = "phase9-audit-event-summary";
   step.className = "sandbox-evaluation-audit-step";
-  step.textContent = String(index + 1);
+  step.textContent = String(eventRecord.auditOrder);
   event.className = "sandbox-evaluation-event-chip";
-  event.dataset.tone = sandboxAuditEventTone(eventName);
-  event.title = eventName;
-  event.textContent = sandboxAuditEventLabel(eventName);
-  body.className = "sandbox-evaluation-empty-detail";
-  body.textContent = [
-    `raw ${eventName}`,
-    `scenario ${scenario?.scenario_id || "unknown"}`,
-    `order ${index + 1}`,
-    `gate ${scenario?.gate_passed === true ? "passed" : "blocked"}`,
-    `dry_run ${formatSandboxBool(scenario?.dry_run)}`,
-  ].join("; ");
+  event.dataset.tone = sandboxAuditEventTone(eventRecord.eventName);
+  event.dataset.phase9AuditEventChip = "true";
+  event.dataset.phase9EventKind = eventRecord.eventKind;
+  event.dataset.testHook = "phase9-audit-event-chip";
+  event.title = eventRecord.eventName;
+  event.textContent = sandboxAuditEventLabel(eventRecord.eventName);
+  body.className = "phase9-audit-event-detail-grid";
+  for (const [label, value] of phase9AuditEventDetailRows(eventRecord)) {
+    body.appendChild(plannerEvaluationFact(label, value));
+  }
   summary.append(step, event);
   details.append(summary, body);
   return details;
 }
 
-function renderPhase9ExperimentTimeline(scenarios) {
+function phase9AuditEventDetailRows(record) {
+  const scenario = record.scenario || {};
+
+  return [
+    ["Event", record.eventName || "unknown"],
+    ["Scenario ID", record.scenarioId || "unknown"],
+    ["Original order", String(record.originalOrder)],
+    ["Scenario order", String(record.auditOrder)],
+    ["Gate status", record.gateStatus],
+    ["Blocker severity", record.blockerSeverity],
+    ["Failure reasons", formatSandboxCodeList(scenario.failure_reason_codes)],
+    ["Blockers", formatSandboxCodeList(scenario.blocker_codes)],
+    [
+      "Approval state",
+      `mock checked ${formatSandboxBool(scenario.mock_approval_checked)}; present ${formatSandboxBool(
+        scenario.user_approval_present
+      )}`,
+    ],
+    [
+      "Emergency stop",
+      `available ${formatSandboxBool(scenario.emergency_stop_available)}; active ${formatSandboxBool(
+        scenario.emergency_stop_active
+      )}`,
+    ],
+    [
+      "Verification",
+      scenario.post_action_verification_planned === true ? "post-action plan recorded" : "not planned",
+    ],
+    ["Rollback", scenario.rollback_plan_recorded === true ? "mock rollback recorded" : "not recorded"],
+    ["Dry-run", formatSandboxBool(scenario.dry_run)],
+    ["Real-action skipped", formatSandboxBool(scenario.real_action_skipped)],
+  ];
+}
+
+function renderPhase9ExperimentTimeline(scenarios, filters = {}) {
   phase9ExperimentTimeline.replaceChildren();
 
   const title = document.createElement("p");
-  const list = document.createElement("ol");
+  const records = phase9SortedTimelineEvents(
+    phase9TimelineEventRecords(scenarios),
+    filters.auditSortMode || "original"
+  );
+  const groups = phase9TimelineEventGroups(records, filters.auditGroupMode || "scenario");
 
   title.className = "sandbox-evaluation-timeline-title";
-  title.textContent = "Phase 9 audit sequence across harness scenarios";
-  list.className = "sandbox-evaluation-timeline-list";
+  title.textContent = `Phase 9 audit sequence across harness scenarios - ${phase9TimelineSortLabel(
+    filters.auditSortMode || "original"
+  )}`;
+  phase9ExperimentTimeline.dataset.phase9AuditGroupMode = filters.auditGroupMode || "scenario";
+  phase9ExperimentTimeline.dataset.phase9AuditSortMode = filters.auditSortMode || "original";
+
+  phase9ExperimentTimeline.appendChild(title);
+
+  if (!groups.length) {
+    const list = document.createElement("ol");
+    const item = document.createElement("li");
+
+    list.className = "sandbox-evaluation-timeline-list";
+    item.textContent = "No Phase 9 audit events returned.";
+    list.appendChild(item);
+    phase9ExperimentTimeline.appendChild(list);
+    return;
+  }
+
+  for (const group of groups) {
+    phase9ExperimentTimeline.appendChild(phase9TimelineEventGroupSection(group));
+  }
+}
+
+function phase9TimelineEventRecords(scenarios) {
+  const records = [];
+  let originalOrder = 0;
 
   for (const scenario of Array.isArray(scenarios) ? scenarios : []) {
     sandboxCodes(scenario.audit_event_names).forEach((eventName, index) => {
-      const item = document.createElement("li");
-      const scenarioId = document.createElement("span");
-
-      item.dataset.scenarioId = scenario.scenario_id || "";
-      item.dataset.auditEventName = eventName;
-      item.dataset.auditTone = sandboxAuditEventTone(eventName);
-      scenarioId.className = "sandbox-evaluation-timeline-scenario";
-      scenarioId.textContent = scenario.scenario_id || "unknown";
-      item.append(scenarioId, phase9AuditEventDrilldownDetails(eventName, index, scenario));
-      list.appendChild(item);
+      originalOrder += 1;
+      records.push(phase9TimelineEventRecord(scenario, eventName, index, originalOrder));
     });
   }
 
-  if (!list.children.length) {
+  return records;
+}
+
+function phase9TimelineEventRecord(scenario, eventName, index, originalOrder) {
+  const normalizedEventName = String(eventName || "");
+
+  return {
+    scenario,
+    scenarioId: scenario?.scenario_id || "unknown",
+    scenarioName: scenario?.scenario_name || "unknown",
+    eventName: normalizedEventName,
+    auditOrder: Number(index) + 1,
+    originalOrder: Number(originalOrder) || Number(index) + 1,
+    gateStatus: scenario?.gate_passed === true ? "passed" : "blocked",
+    blockerSeverity: phase9ScenarioBlockerSeverity(scenario),
+    eventKind: phase9AuditEventKind(normalizedEventName, scenario),
+  };
+}
+
+function phase9SortedTimelineEvents(records, sortMode) {
+  const sortedRecords = Array.isArray(records) ? records.slice() : [];
+
+  if (sortMode === "scenario_original") {
+    return sortedRecords.sort(
+      (left, right) =>
+        left.scenarioId.localeCompare(right.scenarioId) ||
+        left.auditOrder - right.auditOrder ||
+        left.originalOrder - right.originalOrder
+    );
+  }
+
+  return sortedRecords.sort((left, right) => left.originalOrder - right.originalOrder);
+}
+
+function phase9TimelineEventGroups(records, groupMode) {
+  const groups = new Map();
+
+  for (const record of Array.isArray(records) ? records : []) {
+    const key = phase9TimelineEventGroupKey(record, groupMode);
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        title: phase9TimelineEventGroupTitle(record, groupMode),
+        severity: record.blockerSeverity,
+        records: [],
+      });
+    }
+
+    groups.get(key).records.push(record);
+  }
+
+  return Array.from(groups.values());
+}
+
+function phase9TimelineEventGroupKey(record, groupMode) {
+  if (groupMode === "gate") {
+    return `gate:${record.gateStatus}`;
+  }
+
+  if (groupMode === "severity") {
+    return `severity:${record.blockerSeverity}`;
+  }
+
+  if (groupMode === "event") {
+    return `event:${record.eventName}`;
+  }
+
+  return `scenario:${record.scenarioId}`;
+}
+
+function phase9TimelineEventGroupTitle(record, groupMode) {
+  if (groupMode === "gate") {
+    return `Gate status: ${record.gateStatus}`;
+  }
+
+  if (groupMode === "severity") {
+    return `Blocker severity: ${record.blockerSeverity}`;
+  }
+
+  if (groupMode === "event") {
+    return `Event: ${sandboxAuditEventLabel(record.eventName)}`;
+  }
+
+  return `Scenario: ${record.scenarioId}`;
+}
+
+function phase9TimelineEventGroupSection(group) {
+  const section = document.createElement("section");
+  const title = document.createElement("p");
+
+  section.className = "phase9-audit-timeline-group";
+  section.dataset.phase9AuditGroup = group.key;
+  section.dataset.blockerSeverity = group.severity || "normal";
+  title.className = "phase9-audit-timeline-group-title";
+  title.textContent = `${group.title} (${group.records.length})`;
+  section.append(title, phase9TimelineEventList(group.records));
+  return section;
+}
+
+function phase9TimelineEventList(records) {
+  const list = document.createElement("ol");
+
+  list.className = "sandbox-evaluation-timeline-list";
+  list.dataset.phase9TimelineEventList = "true";
+
+  for (const record of Array.isArray(records) ? records : []) {
     const item = document.createElement("li");
-    item.textContent = "No Phase 9 audit events returned.";
+    const scenarioId = document.createElement("span");
+
+    item.dataset.phase9TimelineEvent = "true";
+    item.dataset.scenarioId = record.scenarioId;
+    item.dataset.auditEventName = record.eventName;
+    item.dataset.auditTone = sandboxAuditEventTone(record.eventName);
+    item.dataset.auditOrder = String(record.auditOrder);
+    item.dataset.originalOrder = String(record.originalOrder);
+    item.dataset.scenarioAuditOrder = String(record.auditOrder);
+    item.dataset.gateStatus = record.gateStatus;
+    item.dataset.blockerSeverity = record.blockerSeverity;
+    item.dataset.phase9EventKind = record.eventKind;
+    scenarioId.className = "sandbox-evaluation-timeline-scenario";
+    scenarioId.textContent = `${record.originalOrder}. ${record.scenarioId}`;
+    item.append(
+      scenarioId,
+      phase9AuditEventDrilldownDetails(record.eventName, record.auditOrder - 1, record.scenario, record)
+    );
     list.appendChild(item);
   }
 
-  phase9ExperimentTimeline.append(title, list);
+  return list;
+}
+
+function phase9TimelineSortLabel(sortMode) {
+  if (sortMode === "scenario_original") {
+    return "scenario, then original order";
+  }
+
+  return "original order";
 }
 
 function phase9ExperimentTraceDetails(scenario) {
@@ -3693,6 +3930,63 @@ function sandboxBlockerDescription(blockerCode) {
 
 function sandboxBlockerSeverity(blockerCode) {
   return SANDBOX_BLOCKER_SEVERITY[blockerCode] || "medium";
+}
+
+function phase9BlockerSeverity(blockerCode) {
+  return PHASE9_BLOCKER_SEVERITY[blockerCode] || sandboxBlockerSeverity(blockerCode);
+}
+
+function phase9ScenarioBlockerSeverity(scenario) {
+  const severities = phase9GateBlockerCodes(scenario).map((code) => phase9BlockerSeverity(code));
+
+  if (severities.includes("critical")) {
+    return "critical";
+  }
+
+  if (severities.includes("high")) {
+    return "high";
+  }
+
+  if (severities.includes("medium")) {
+    return "medium";
+  }
+
+  return "normal";
+}
+
+function phase9AuditEventKind(eventName, scenario = {}) {
+  if (eventName === "phase9_gate_blocked") {
+    return "blocked";
+  }
+
+  if (eventName === "phase9_real_action_skipped") {
+    return "skipped";
+  }
+
+  if (
+    eventName === "phase9_mock_approval_checked" &&
+    scenario?.user_approval_present !== true
+  ) {
+    return "warning";
+  }
+
+  if (
+    eventName === "phase9_emergency_stop_checked" &&
+    (scenario?.emergency_stop_available !== true || scenario?.emergency_stop_active === true)
+  ) {
+    return "warning";
+  }
+
+  if (
+    eventName === "phase9_gate_passed" ||
+    eventName === "phase9_dry_run_completed" ||
+    eventName === "phase9_post_action_verification_planned" ||
+    eventName === "phase9_rollback_plan_recorded"
+  ) {
+    return "success";
+  }
+
+  return "normal";
 }
 
 function sandboxAuditEventLabel(eventName) {

@@ -517,6 +517,8 @@ class Phase9ExperimentTests(unittest.TestCase):
             "phase9ReadinessFilter",
             "phase9ScenarioTypeFilter",
             "phase9GroupMode",
+            "phase9AuditGroupMode",
+            "phase9AuditSortMode",
             "expandPhase9Scenarios",
             "collapsePhase9Scenarios",
             "expandPhase9Audit",
@@ -545,6 +547,10 @@ class Phase9ExperimentTests(unittest.TestCase):
             "Gate blocker",
             "Scenario type",
             "Group by",
+            "Audit group",
+            "Audit order",
+            "original order",
+            "blocker severity",
         ]:
             with self.subTest(visible_label=visible_label):
                 self.assertIn(visible_label, source + html)
@@ -565,6 +571,8 @@ class Phase9ExperimentTests(unittest.TestCase):
             "phase9RiskLevel",
             "phase9ReadinessStatus",
             "phase9GateBlockerCodes",
+            "phase9BlockerSeverity",
+            "phase9ScenarioBlockerSeverity",
         ]:
             with self.subTest(function_name=function_name):
                 self.assertIn(f"function {function_name}", source)
@@ -594,6 +602,7 @@ class Phase9ExperimentTests(unittest.TestCase):
         for function_name in [
             "phase9AuditEventDrilldownList",
             "phase9AuditEventDrilldownDetails",
+            "phase9AuditEventDetailRows",
             "setPhase9AuditDetailsOpen",
             "setPhase9ScenarioDetailsOpen",
         ]:
@@ -602,9 +611,74 @@ class Phase9ExperimentTests(unittest.TestCase):
 
         self.assertIn("data-phase9-audit-event-details", source)
         self.assertIn("dataset.auditOrder", source)
+        self.assertIn("dataset.originalOrder", source)
+        self.assertIn("dataset.scenarioAuditOrder", source)
+        self.assertIn("dataset.gateStatus", source)
+        self.assertIn("dataset.blockerSeverity", source)
+        self.assertIn("dataset.phase9EventKind", source)
+        self.assertIn("dataset.phase9AuditEventChip", source)
         self.assertIn("phase9-audit-event-details", source)
         self.assertIn(".phase9-audit-event-details", styles)
         self.assertIn(".phase9-audit-event-summary", styles)
+        self.assertIn(".phase9-audit-event-detail-grid", styles)
+
+    def test_phase9_cockpit_advanced_audit_timeline_hooks_exist(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = (PROJECT_ROOT / "ui" / "styles.css").read_text(encoding="utf-8")
+
+        for function_name in [
+            "renderPhase9ExperimentTimeline",
+            "phase9TimelineEventRecords",
+            "phase9TimelineEventRecord",
+            "phase9SortedTimelineEvents",
+            "phase9TimelineEventGroups",
+            "phase9TimelineEventGroupKey",
+            "phase9TimelineEventGroupTitle",
+            "phase9TimelineEventGroupSection",
+            "phase9TimelineEventList",
+            "phase9TimelineSortLabel",
+            "phase9AuditEventKind",
+        ]:
+            with self.subTest(function_name=function_name):
+                self.assertIn(f"function {function_name}", source)
+
+        for required_string in [
+            "phase9_experiment_requested",
+            "phase9_mock_approval_checked",
+            "phase9_emergency_stop_checked",
+            "phase9_gate_passed",
+            "phase9_gate_blocked",
+            "phase9_dry_run_completed",
+            "phase9_real_action_skipped",
+            "phase9_rollback_plan_recorded",
+            "phase9_post_action_verification_planned",
+            "Approval state",
+            "Emergency stop",
+            "Verification",
+            "Rollback",
+        ]:
+            with self.subTest(required_string=required_string):
+                self.assertIn(required_string, source)
+
+        for dataset_field in [
+            "phase9AuditGroupMode",
+            "phase9AuditSortMode",
+            "phase9AuditGroup",
+            "phase9TimelineEventList",
+            "phase9TimelineEvent",
+            "phase9EventKind",
+            "originalOrder",
+            "scenarioAuditOrder",
+        ]:
+            with self.subTest(dataset_field=dataset_field):
+                self.assertIn(f"dataset.{dataset_field}", source)
+
+        self.assertIn(".phase9-audit-timeline-group", styles)
+        self.assertIn(".phase9-audit-timeline-group-title", styles)
+        self.assertIn('data-phase9-event-kind="success"', styles)
+        self.assertIn('data-phase9-event-kind="warning"', styles)
+        self.assertIn('data-phase9-event-kind="blocked"', styles)
+        self.assertIn('data-phase9-event-kind="skipped"', styles)
 
     def test_phase9_cockpit_ui_is_read_only(self) -> None:
         source = UI_APP_JS.read_text(encoding="utf-8")
