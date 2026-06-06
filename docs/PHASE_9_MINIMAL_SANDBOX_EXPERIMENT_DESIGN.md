@@ -49,6 +49,12 @@ groups, and copy helpers for validation summary, validation errors, debug focus,
 and replay validation JSON. It does not change replay semantics or the
 underlying validation format.
 
+Phase 9.8 continues that cockpit polish with explicit replay-validation hook
+names, a validation health strip, local-only issue filters, grouped issue cards,
+expand/collapse controls, and copy helpers for validation summary, validation
+errors, recommended debug focus, and replay validation JSON. It still only
+operates on already-loaded browser memory.
+
 ## Purpose
 
 Define a minimal, reviewable sandbox experiment plan that can validate the
@@ -507,6 +513,26 @@ Phase 9.7 is not execution permission. It does not upload imported bundles,
 mutate runtime state, record approvals, call an action-performing endpoint, or
 change replay semantics. Imported bundles remain untrusted input, and real
 desktop actions remain disabled.
+
+## Phase 9.8 Cockpit UX Polish Status
+
+Phase 9.8 is implemented as replay validation cockpit UX polish only:
+
+- The cockpit exposes explicit hooks for validation filters, issue groups,
+  replay validation JSON copy, and validation group expand/collapse.
+- The validation health strip summarizes pass/fail, errors, warnings, unsafe
+  flags, consistency checks, audit-order checks, sensitive key findings, and
+  read-only replay eligibility.
+- Validation issue groups remain local-only and cover errors, warnings, unsafe
+  flags, audit order issues, sensitive key findings, consistency issues, and
+  recommended debug focus.
+- Copy helpers only read already-loaded replay validation data from browser
+  memory.
+
+Phase 9.8 does not change replay semantics, upload imported bundles, mutate
+runtime state, record approvals, call an action-performing endpoint, or grant
+execution permission. Imported bundles remain untrusted input, and real desktop
+actions remain disabled.
 
 ## Implementation Guardrails
 

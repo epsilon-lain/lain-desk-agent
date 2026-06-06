@@ -122,8 +122,11 @@ const copyPhase9ValidationSummary = document.querySelector("#copyPhase9Validatio
 const copyPhase9ValidationErrors = document.querySelector("#copyPhase9ValidationErrors");
 const copyPhase9DebugFocus = document.querySelector("#copyPhase9DebugFocus");
 const copyPhase9ValidationJson = document.querySelector("#copyPhase9ValidationJson");
+const copyPhase9ReplayValidationJson = document.querySelector("#copyPhase9ReplayValidationJson");
 const expandPhase9ValidationGroups = document.querySelector("#expandPhase9ValidationGroups");
 const collapsePhase9ValidationGroups = document.querySelector("#collapsePhase9ValidationGroups");
+const expandPhase9ReplayValidationGroups = document.querySelector("#expandPhase9ReplayValidationGroups");
+const collapsePhase9ReplayValidationGroups = document.querySelector("#collapsePhase9ReplayValidationGroups");
 const clearPhase9Bundle = document.querySelector("#clearPhase9Bundle");
 const phase9ReplayStatus = document.querySelector("#phase9ReplayStatus");
 const phase9ReplayErrors = document.querySelector("#phase9ReplayErrors");
@@ -604,11 +607,23 @@ copyPhase9ValidationJson.addEventListener("click", async () => {
   await copyPhase9ReplayPayload("validation_json");
 });
 
+copyPhase9ReplayValidationJson.addEventListener("click", async () => {
+  await copyPhase9ReplayPayload("validation_json");
+});
+
 expandPhase9ValidationGroups.addEventListener("click", () => {
   setPhase9ReplayValidationGroupsOpen(true);
 });
 
 collapsePhase9ValidationGroups.addEventListener("click", () => {
+  setPhase9ReplayValidationGroupsOpen(false);
+});
+
+expandPhase9ReplayValidationGroups.addEventListener("click", () => {
+  setPhase9ReplayValidationGroupsOpen(true);
+});
+
+collapsePhase9ReplayValidationGroups.addEventListener("click", () => {
   setPhase9ReplayValidationGroupsOpen(false);
 });
 
@@ -3019,7 +3034,7 @@ function renderPhase9ReplayValidation(validation, imported = null) {
     ? "Bundle validation passed. Replay remains read-only and dry-run."
     : "Bundle validation blocked replay. Review validation errors below.";
   renderPhase9ReplayErrors(validation.errors || []);
-  renderPhase9ReplayValidationCounts(validation);
+  renderPhase9ReplayValidationHealthStrip(validation);
   renderPhase9ReplayValidationFilters(validation);
   renderPhase9ReplayValidationIssueGroups(validation);
   setPhase9ReplaySummary([
@@ -3090,6 +3105,11 @@ function renderPhase9ReplayErrors(errors) {
     }`;
     phase9ReplayErrors.appendChild(item);
   }
+}
+
+function renderPhase9ReplayValidationHealthStrip(validation = {}) {
+  renderPhase9ReplayValidationCounts(validation);
+  phase9ReplayValidationCounts.dataset.phase9ReplayValidationHealthStrip = "true";
 }
 
 function renderPhase9ReplayValidationCounts(validation = {}) {
@@ -4264,6 +4284,22 @@ function phase9ReplayCopyPayload(payloadKind) {
   }
 
   return currentPhase9ReplayReport;
+}
+
+function copyPhase9ValidationSummaryPayload() {
+  return phase9ReplayCopyPayload("validation_summary");
+}
+
+function copyPhase9ValidationErrorsPayload() {
+  return phase9ReplayCopyPayload("validation_errors");
+}
+
+function copyPhase9DebugFocusPayload() {
+  return phase9ReplayCopyPayload("debug_focus");
+}
+
+function copyPhase9ReplayValidationJsonPayload() {
+  return phase9ReplayCopyPayload("validation_json");
 }
 
 function phase9CurrentReplayValidation() {

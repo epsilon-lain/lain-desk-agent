@@ -490,7 +490,7 @@
                     placeholder="Paste phase9_reproducibility_bundle JSON here"
                   ></textarea>
                 </label>
-                <div class="sandbox-evaluation-detail-actions" aria-label="Phase 9 replay controls">
+                <div class="sandbox-evaluation-detail-actions phase9-replay-copy-actions" aria-label="Phase 9 replay controls">
                   <button class="planner-evaluation-button" id="validatePhase9Bundle" type="button">
                     Validate bundle
                   </button>
@@ -515,11 +515,20 @@
                   <button class="planner-evaluation-button" id="copyPhase9ValidationJson" type="button">
                     Copy validation JSON
                   </button>
+                  <button class="planner-evaluation-button" id="copyPhase9ReplayValidationJson" type="button">
+                    Copy replay validation JSON
+                  </button>
                   <button class="planner-evaluation-button" id="expandPhase9ValidationGroups" type="button">
                     Expand validation
                   </button>
                   <button class="planner-evaluation-button" id="collapsePhase9ValidationGroups" type="button">
                     Collapse validation
+                  </button>
+                  <button class="planner-evaluation-button" id="expandPhase9ReplayValidationGroups" type="button">
+                    Expand replay validation
+                  </button>
+                  <button class="planner-evaluation-button" id="collapsePhase9ReplayValidationGroups" type="button">
+                    Collapse replay validation
                   </button>
                   <button class="planner-evaluation-button" id="clearPhase9Bundle" type="button">
                     Clear imported bundle
@@ -530,7 +539,7 @@
                 </p>
                 <ul class="phase9-replay-errors" id="phase9ReplayErrors" hidden></ul>
                 <div
-                  class="sandbox-evaluation-counts"
+                  class="sandbox-evaluation-counts phase9-replay-validation-health-strip"
                   id="phase9ReplayValidationCounts"
                   hidden
                 ></div>

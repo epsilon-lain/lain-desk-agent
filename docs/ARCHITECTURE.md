@@ -529,6 +529,21 @@ mutate runtime state, call action-performing endpoints, or change replay
 eligibility. Imported bundles remain untrusted input, and the cockpit remains
 read-only/debug-only.
 
+### Phase 9.8 Replay Validation Cockpit UX Polish
+
+Phase 9.8 continues the replay validation cockpit polish while preserving the
+Phase 9.5/9.6 replay data shape and Phase 9.7 read-only display behavior. The
+cockpit includes explicit Phase 9 replay validation hooks, a validation health
+strip, local-only validation filters, grouped issue sections, expand/collapse
+controls, and copy helpers for validation summary, validation errors,
+recommended debug focus, and replay validation JSON.
+
+The Phase 9.8 UI reads only from the already-loaded bundle import/replay state
+held in browser memory. It does not change replay semantics, upload imported
+bundles, call action-performing endpoints, record approvals, mutate runtime
+state, or alter Execution Policy, Permission Profile, Capability Registry,
+Action Contract behavior, Click Readiness, or the Phase 7 gate.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -572,6 +587,9 @@ The current safety boundaries are intentionally narrow:
 - Phase 9.7 Phase 9 replay validation cockpit UX polish is browser-local
   read-only display and copy logic; it is not execution permission and it never
   attempts real desktop action.
+- Phase 9.8 Phase 9 replay validation cockpit UX polish is browser-local
+  read-only filtering, grouping, expand/collapse, and copy logic; it is not
+  execution permission and it never attempts real desktop action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.
