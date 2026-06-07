@@ -544,6 +544,57 @@ bundles, call action-performing endpoints, record approvals, mutate runtime
 state, or alter Execution Policy, Permission Profile, Capability Registry,
 Action Contract behavior, Click Readiness, or the Phase 7 gate.
 
+### AI Handoff, Export, Import, And Replay Pipeline
+
+The Phase 9 handoff pipeline is a read-only state-transfer/debug pipeline:
+
+```text
+deterministic Phase 9 report
+-> export report
+-> AI-readable summary
+-> reproducibility bundle
+-> local pasted import
+-> validation of untrusted input
+-> deterministic replay report
+-> cockpit display and copy helpers
+```
+
+This pipeline is for reproducibility, debugging, regression review, and AI
+handoff. It is not AI control and it is not execution permission. Imported
+bundles are untrusted input. Validation errors do not mutate runtime state.
+Replay is read-only. Copy/export controls read already loaded browser or
+deterministic fixture state only.
+
+### Safety Invariants Summary
+
+The current release-candidate safety invariants are documented in
+`docs/SAFETY_INVARIANTS.md`. In brief:
+
+- no real desktop APIs in runtime paths
+- no sandbox or replay `/execute` path
+- no execute button, real-action approval button, sandbox action trigger, or
+  real-action toggle
+- `dry_run` remains default
+- `real_action_enabled` remains false by default
+- imported bundles are untrusted input
+- readiness is not permission
+- proposal is not execution
+- cockpit display is not authorization
+- Execution Policy, Permission Profile, and Capability Registry remain
+  separate from readiness and report display
+
+### Phase 10 Readiness Boundary
+
+Phase 10 real actions are not implemented yet. Current Phase 10 work is
+readiness and release-candidate hardening only: documentation, tests,
+auditability, AI handoff quality, deterministic dry-run parity, and regression
+protection.
+
+Any future Phase 10 experiment must satisfy
+`docs/PHASE_10_READINESS_CHECKLIST.md` and receive a separate user request.
+Passing readiness diagnostics, replay validation, report export, imported
+bundle validation, or cockpit display never grants execution permission.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -590,6 +641,9 @@ The current safety boundaries are intentionally narrow:
 - Phase 9.8 Phase 9 replay validation cockpit UX polish is browser-local
   read-only filtering, grouping, expand/collapse, and copy logic; it is not
   execution permission and it never attempts real desktop action.
+- Phase 10 readiness / release-candidate hardening is documentation, tests,
+  auditability, AI handoff, and dry-run regression protection only; Phase 10
+  real actions are not implemented yet.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

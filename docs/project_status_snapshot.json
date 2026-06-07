@@ -1,0 +1,36 @@
+{
+  "project": "lain-desk-agent",
+  "phase": "post_phase_9_release_candidate_hardening",
+  "next_phase": "phase_10_readiness",
+  "real_actions_enabled": false,
+  "dry_run_default": true,
+  "read_only_cockpit": true,
+  "debug_only_sandbox_and_replay": true,
+  "safety_boundary": [
+    "no real desktop actions",
+    "no real click/type/hotkey/scroll/switch_app",
+    "no sandbox or replay /execute path",
+    "no real-action toggle",
+    "imported bundles are untrusted input",
+    "readiness is not permission",
+    "proposal is not execution",
+    "cockpit display is not authorization"
+  ],
+  "tests_command": ".\\scripts\\verify.ps1",
+  "safety_scan_command": "python scripts\\safety_scan.py",
+  "manual_checks": [
+    "git diff --check",
+    "node --check ui/app.js",
+    "python -m unittest discover -s tests"
+  ],
+  "important_docs": [
+    "docs/PROJECT_HEALTH_SNAPSHOT.md",
+    "docs/PHASE_10_READINESS_CHECKLIST.md",
+    "docs/AI_HANDOFF_CONTEXT.md",
+    "docs/SAFETY_INVARIANTS.md",
+    "docs/PHASE_7_SANDBOX_ACTION_DESIGN.md",
+    "docs/PHASE_9_MINIMAL_SANDBOX_EXPERIMENT_DESIGN.md",
+    "docs/ROADMAP.md",
+    "docs/ARCHITECTURE.md"
+  ]
+}

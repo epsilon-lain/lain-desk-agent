@@ -75,11 +75,23 @@ Phase 9.4 adds a read-only Phase 9 export/report bundle for debugging,
 handoff, reproducibility, and AI-assisted review. It copies only already loaded
 deterministic report data and does not add execution control.
 
+Phase 9.5 through 9.8 complete the current Phase 9.x dry-run replay line:
+bundle import, deterministic replay, validation hardening, and cockpit replay
+validation polish. Imported bundles remain untrusted input, replay is
+read-only, and cockpit validation display is not execution permission.
+
 The project now maintains a release-prep health snapshot in
 `docs/PROJECT_HEALTH_SNAPSHOT.md`. The snapshot summarizes the current
 dry-run/read-only status, safety boundary, verification commands, known risks,
 Phase 10 readiness checklist, and AI handoff notes for future Codex sessions
 and developers.
+
+Phase 10 readiness / release-candidate hardening is now documented in
+`docs/PHASE_10_READINESS_CHECKLIST.md`, `docs/AI_HANDOFF_CONTEXT.md`, and
+`docs/SAFETY_INVARIANTS.md`. Phase 10 real actions are not implemented yet.
+Recommended next work remains docs, tests, auditability, and dry-run
+regression protection unless a future request explicitly satisfies the Phase
+10 checklist.
 
 ## Completed
 
@@ -109,7 +121,15 @@ and developers.
 - Phase 9.2 Phase 9 Harness Cockpit Display
 - Phase 9.3 Phase 9 Advanced Audit Timeline UX
 - Phase 9.4 Phase 9 Report Export And Reproducibility Bundle
+- Phase 9.5 Phase 9 Bundle Import And Replay
+- Phase 9.6 Phase 9 Replay Validation Hardening
+- Phase 9.7 Phase 9 Replay Validation Cockpit UX Polish
+- Phase 9.8 Phase 9 Replay Validation Cockpit UX Polish
 - Project Health Snapshot / Release-prep Handoff
+- Phase 10 Readiness / Release-candidate Hardening Docs
+- AI Handoff Context
+- Safety Invariants
+- Read-only Project Status Helper
 - Capability Registry
 - Permission Profile
 - Execution Policy Matrix
@@ -149,6 +169,15 @@ and developers.
   execution permission.
 - Phase 9.4 Phase 9 report export and reproducibility bundle is
   read-only/debug-only and not execution permission.
+- Phase 9.5 Phase 9 bundle import and replay is read-only/debug-only and not
+  execution permission.
+- Phase 9.6 Phase 9 replay validation hardening treats imported bundles as
+  untrusted input and is not execution permission.
+- Phase 9.7 / 9.8 replay validation cockpit polish is local display and copy
+  logic only; it is not execution permission.
+- Phase 10 readiness is documentation, tests, auditability, handoff, and
+  release-candidate hardening only. Phase 10 real actions are not implemented
+  yet.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -672,9 +701,12 @@ AI while preserving all existing replay semantics and safety boundaries.
 
 ## Phase 10: Limited Desktop Control
 
-Goal: consider narrow desktop control only after the Phase 7 checklist and
-Phase 9 dry-run design plus Phase 9.1 harness gates are satisfied and
-separately approved.
+Status: not implemented. Current work is Phase 10 readiness and
+release-candidate hardening only.
+
+Goal: consider narrow desktop control only after the Phase 7 checklist, Phase
+9 dry-run design, Phase 9.1 harness gates, and
+`docs/PHASE_10_READINESS_CHECKLIST.md` are satisfied and separately approved.
 
 - Enable click, type, hotkey, and scroll only as individually gated
   capabilities.
@@ -684,6 +716,8 @@ separately approved.
 - Never enable broad autonomous execution by default.
 - Maintain a safe fallback path when confidence, validation, or verification
   fails.
+- Keep real actions disabled until a future user request explicitly approves a
+  named Phase 10 experiment and all go/no-go checklist items pass.
 
 ## Historical Drafts
 

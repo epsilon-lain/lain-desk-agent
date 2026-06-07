@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import json
 from pathlib import Path
 
 import _path  # noqa: F401
@@ -10,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT_DOC = PROJECT_ROOT / "docs" / "PROJECT_HEALTH_SNAPSHOT.md"
 README_DOC = PROJECT_ROOT / "README.md"
 ROADMAP_DOC = PROJECT_ROOT / "docs" / "ROADMAP.md"
+STATUS_JSON = PROJECT_ROOT / "docs" / "project_status_snapshot.json"
 
 
 class ProjectHealthSnapshotTests(unittest.TestCase):
@@ -21,13 +23,22 @@ class ProjectHealthSnapshotTests(unittest.TestCase):
         for phrase in [
             "dry-run",
             "read-only",
+            "debug-only",
             "no real desktop actions",
             "phase 9",
             "phase 10 readiness",
             "safety boundary",
+            "no /execute",
+            "no real-action toggle",
+            "imported bundles are untrusted input",
             "verify.ps1",
             "safety_scan.py",
             "ai handoff",
+            "execution policy",
+            "permission profile",
+            "capability registry",
+            "readiness is not permission",
+            "proposal is not execution",
         ]:
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, normalized)
@@ -39,6 +50,16 @@ class ProjectHealthSnapshotTests(unittest.TestCase):
                     "docs/PROJECT_HEALTH_SNAPSHOT.md",
                     doc.read_text(encoding="utf-8"),
                 )
+
+    def test_project_status_snapshot_json_is_static_and_safe(self) -> None:
+        payload = json.loads(STATUS_JSON.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["project"], "lain-desk-agent")
+        self.assertIs(payload["real_actions_enabled"], False)
+        self.assertIs(payload["dry_run_default"], True)
+        self.assertIn("docs/PHASE_10_READINESS_CHECKLIST.md", payload["important_docs"])
+        self.assertIn("no real desktop actions", payload["safety_boundary"])
+        self.assertIn("readiness is not permission", payload["safety_boundary"])
 
 
 if __name__ == "__main__":

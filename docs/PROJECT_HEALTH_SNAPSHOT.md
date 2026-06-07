@@ -26,6 +26,8 @@ Latest expected state:
 - Imported bundles are treated as untrusted input.
 - Replay validation is local-only and does not change runtime behavior.
 - No real desktop actions are enabled.
+- Phase 10 readiness is documentation, tests, auditability, handoff, and
+  release-candidate hardening only.
 
 ## Current Safety Boundary
 
@@ -35,7 +37,9 @@ The safety boundary is unchanged:
 - No real click, type, hotkey, scroll, or switch_app execution.
 - No execute buttons, approval buttons, real-action toggles, or sandbox action
   triggers in the cockpit.
+- No real-action toggle.
 - No calls to `/execute` from sandbox or replay UI paths.
+- No /execute calls from sandbox or replay UI paths.
 - No `pyautogui`, `pynput`, `keyboard`, `mouse`, `win32api`, `ctypes`
   `SendInput` / `mouse_event`, `xdotool`, AppleScript UI scripting, or other
   real desktop control API.
@@ -77,6 +81,8 @@ The cockpit cannot:
 - Convert readiness or validation success into actuation permission.
 - Modify Execution Policy, Permission Profile, Capability Registry, or the
   permission matrix from the UI.
+- Treat cockpit display, export, import, replay, validation, readiness, or AI
+  handoff as authorization to execute.
 
 ## Completed Phase Summary
 
@@ -99,6 +105,8 @@ The cockpit cannot:
 - Phase 9.6: replay validation hardening for imported bundles.
 - Phase 9.7 / 9.8: replay validation cockpit UX polish for health strips,
   issue groups, copy helpers, and AI handoff readability.
+- Phase 10 readiness / release-candidate hardening: project status docs,
+  safety invariants, AI handoff context, and read-only status helper.
 
 ## Test And Verification Commands
 
@@ -127,6 +135,12 @@ python scripts\safety_scan.py
 node --check ui/app.js
 ```
 
+Read-only project status helper:
+
+```powershell
+.\scripts\project_status.ps1
+```
+
 ## Latest Expected Verification State
 
 The expected release-prep state is:
@@ -137,6 +151,8 @@ The expected release-prep state is:
 - `git diff --check` passes.
 - `node --check ui/app.js` passes.
 - Full unittest discovery passes.
+- Latest stable full test count is expected to be in the mid-250s; small
+  documentation or invariant-test additions may move it upward.
 - Phase 9 replay and validation tests remain deterministic and do not require
   live desktop access.
 
@@ -163,6 +179,8 @@ The expected release-prep state is:
   copy must keep saying they are diagnostics, not permission.
 - Future Phase 10 work could accidentally broaden execution if it bypasses the
   Phase 7 gate, safety scan, or permission boundaries.
+- AI handoff text can become stale if Phase 10 readiness docs are not updated
+  alongside future architecture or roadmap edits.
 
 ## Phase 10 Readiness Checklist
 
@@ -185,6 +203,10 @@ considered:
 - Execution Policy, Permission Profile, Capability Registry, and permission
   matrix changes are reviewed as separate safety-sensitive work.
 
+Current Phase 10 readiness status: not ready for real action implementation.
+The repository is ready for additional dry-run hardening, docs, tests, and
+auditability work.
+
 ## Recommended Next Work
 
 - Keep Phase 9 replay validation stable while adding small regression tests for
@@ -195,6 +217,9 @@ considered:
   demo.
 - Consider a read-only architecture diagram for the Phase 9 bundle lifecycle:
   export, import, validate, replay, and AI handoff.
+- Use `docs/PHASE_10_READINESS_CHECKLIST.md`,
+  `docs/AI_HANDOFF_CONTEXT.md`, and `docs/SAFETY_INVARIANTS.md` as the first
+  handoff bundle for future Phase 10 discussions.
 - Defer all real-action work until Phase 10 is explicitly approved and scoped.
 
 ## AI Handoff Summary
@@ -212,3 +237,26 @@ For the next AI handoff:
 - Always run `.\scripts\verify.ps1`, `python scripts\safety_scan.py`,
   `git diff --check`, and `node --check ui/app.js` after UI or safety-related
   edits.
+
+## Under 20-line Future Codex Explanation
+
+1. `lain-desk-agent` is a supervised local desktop-agent cockpit.
+2. It is dry-run, read-only, and debug-only for sandbox/replay paths.
+3. The only executable action remains approved `wait`.
+4. Real click/type/hotkey/scroll/switch_app are disabled.
+5. Phase 8 validates sandbox gates with deterministic dry-run reports.
+6. Phase 9 adds a dry-run harness with mock approval, emergency stop,
+   verification, rollback, export, import, validation, and replay.
+7. Imported bundles are untrusted input.
+8. Replay is read-only.
+9. Proposal is not execution.
+10. Readiness is not permission.
+11. Cockpit display is not authorization.
+12. Execution Policy, Permission Profile, and Capability Registry remain
+    separate gates.
+13. Do not add `/execute` from sandbox or replay UI.
+14. Do not add real desktop APIs.
+15. Do not add real-action toggles or execute controls.
+16. Phase 10 real actions are not implemented yet.
+17. Read `docs/PHASE_10_READINESS_CHECKLIST.md` before Phase 10 work.
+18. Run `.\scripts\verify.ps1` and `python scripts\safety_scan.py`.

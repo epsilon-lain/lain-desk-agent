@@ -7,6 +7,19 @@ with wait-only execution and a proposal-only AI Planner path.
 It is not an autonomous desktop controller. It does not provide real mouse or
 keyboard control.
 
+## Project Health
+
+The current repository is in Phase 10 readiness / release-candidate hardening.
+Phase 10 real actions are not implemented yet; sandbox and replay work remains
+dry-run, read-only, and debug-only.
+
+Start with:
+
+- [`docs/PROJECT_HEALTH_SNAPSHOT.md`](docs/PROJECT_HEALTH_SNAPSHOT.md)
+- [`docs/PHASE_10_READINESS_CHECKLIST.md`](docs/PHASE_10_READINESS_CHECKLIST.md)
+- [`docs/AI_HANDOFF_CONTEXT.md`](docs/AI_HANDOFF_CONTEXT.md)
+- [`docs/SAFETY_INVARIANTS.md`](docs/SAFETY_INVARIANTS.md)
+
 ## Current State
 
 The cockpit can:
@@ -165,6 +178,9 @@ Do not commit or paste real API keys. See
 
 - [`docs/PROJECT_HEALTH_SNAPSHOT.md`](docs/PROJECT_HEALTH_SNAPSHOT.md) -
   current dry-run cockpit health snapshot and AI handoff summary.
+- [`docs/PHASE_10_READINESS_CHECKLIST.md`](docs/PHASE_10_READINESS_CHECKLIST.md)
+- [`docs/AI_HANDOFF_CONTEXT.md`](docs/AI_HANDOFF_CONTEXT.md)
+- [`docs/SAFETY_INVARIANTS.md`](docs/SAFETY_INVARIANTS.md)
 - [`docs/SAFETY.md`](docs/SAFETY.md)
 - [`docs/DEV_CHECKLIST.md`](docs/DEV_CHECKLIST.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)

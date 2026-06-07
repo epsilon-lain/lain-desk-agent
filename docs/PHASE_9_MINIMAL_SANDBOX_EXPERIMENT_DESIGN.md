@@ -534,6 +534,15 @@ runtime state, record approvals, call an action-performing endpoint, or grant
 execution permission. Imported bundles remain untrusted input, and real desktop
 actions remain disabled.
 
+## Phase 10 Readiness Status
+
+Phase 10 real actions are not implemented yet. The current readiness pass adds
+release-candidate documentation, safety invariants, AI handoff context,
+project-health reporting, and regression tests only. It does not change Phase 9
+dry-run semantics, does not call `/execute`, does not add a desktop actuation
+adapter, and does not change Execution Policy, Permission Profile, Capability
+Registry, or any permission matrix.
+
 ## Implementation Guardrails
 
 Before any Phase 9 code exists:

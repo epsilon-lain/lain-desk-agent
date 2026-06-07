@@ -293,6 +293,13 @@ endpoints, must not add cockpit execute/approval/real-action controls, must not
 modify Capability Registry, Permission Profile, Execution Policy, or any
 permission matrix, and must not import or call desktop control APIs.
 
+## Phase 10 Readiness Note
+
+Phase 10 readiness / release-candidate hardening does not change this Phase 7
+gate. The checklist in `docs/PHASE_10_READINESS_CHECKLIST.md` is an additional
+pre-implementation review layer; it does not grant execution permission and it
+does not enable real desktop actions.
+
 ## Checklist Before Any Phase 8 Real-action Experiment
 
 Before implementing real actuation inside a minimal sandbox experiment:
