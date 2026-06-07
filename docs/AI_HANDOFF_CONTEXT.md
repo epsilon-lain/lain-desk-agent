@@ -64,6 +64,8 @@ Phase 10 real actions are not implemented yet.
 - `src/lain_desk_agent/sandbox_evaluation.py`: deterministic Phase 8 report.
 - `src/lain_desk_agent/phase9_experiment.py`: Phase 9 dry-run harness,
   export/import/replay helpers, and validation.
+- `src/lain_desk_agent/phase10_readiness.py`: deterministic Phase 10.1
+  readiness report; NO-GO by default.
 - `src/lain_desk_agent/main.py`: HTTP endpoints; sandbox/Phase 9 endpoints are
   deterministic read-only report endpoints.
 - `ui/app.js`, `ui/index.html`, `ui/styles.css`: cockpit UI and local-only
@@ -109,6 +111,24 @@ satisfies `docs/PHASE_10_READINESS_CHECKLIST.md`:
   the Phase 9 dry-run report.
 
 No Phase 8 or Phase 9 path performs real action.
+
+## Phase 10.1 Readiness Report
+
+Phase 10.1 adds a deterministic readiness report and cockpit panel.
+Phase 10.1 readiness is NO-GO by default.
+
+Future AI should interpret the report like this:
+
+- `go_for_phase10 = false` is the expected default.
+- `real_actions_enabled = false` means real desktop actions remain disabled.
+- `phase10_real_actions_implemented = false` means implementation has not
+  started.
+- No-go reasons are expected readiness blockers, not runtime errors.
+- The cockpit panel is display and copy only; it is not authorization.
+
+Future AI must not change Execution Policy, Permission Profile, Capability
+Registry, permission matrix, safety scan, Phase 7 gate, Phase 9 gate, replay
+validation, or audit constraints to make the report green.
 
 ## Phase 9 Export / Import / Replay Pipeline
 
@@ -163,8 +183,9 @@ paths. Real click/type/hotkey/scroll/switch_app are disabled. Do not add real
 desktop APIs, /execute paths from sandbox/replay UI, approval buttons for real
 action, real-action toggles, or permission changes. Read
 docs/PROJECT_HEALTH_SNAPSHOT.md, docs/SAFETY_INVARIANTS.md, and
-docs/PHASE_10_READINESS_CHECKLIST.md before editing. Preserve proposal is not
-execution, readiness is not permission, cockpit display is not authorization,
-and imported bundles are untrusted input. Run verify.ps1, safety_scan.py,
-git diff --check, and node --check ui/app.js.
+docs/PHASE_10_READINESS_CHECKLIST.md before editing. Phase 10.1 readiness is
+NO-GO by default; do not make it GO by enabling real actions. Preserve proposal
+is not execution, readiness is not permission, cockpit display is not
+authorization, and imported bundles are untrusted input. Run verify.ps1,
+safety_scan.py, git diff --check, and node --check ui/app.js.
 ```

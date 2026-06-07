@@ -565,6 +565,62 @@
                 </details>
               </section>
             </section>
+            <section
+              class="planner-evaluation-panel phase10-readiness-panel"
+              id="phase10ReadinessPanel"
+              aria-label="Phase 10 readiness"
+            >
+              <div class="planner-evaluation-header">
+                <div>
+                  <p class="planner-evaluation-title">Phase 10 readiness</p>
+                  <p class="planner-evaluation-helper">
+                    Read-only readiness report. NO-GO by default; no real action implementation.
+                  </p>
+                </div>
+                <button class="planner-evaluation-button" id="loadPhase10Readiness" type="button">
+                  Load readiness
+                </button>
+              </div>
+              <p class="planner-evaluation-status" id="phase10ReadinessStatus">Not loaded yet.</p>
+              <div class="sandbox-evaluation-controls" id="phase10ReadinessControls" hidden>
+                <label>
+                  Group
+                  <select id="phase10ReadinessGroupFilter">
+                    <option value="all">all groups</option>
+                    <option value="gates">gates</option>
+                    <option value="blockers">blockers</option>
+                    <option value="invariants">invariants</option>
+                    <option value="commands">commands</option>
+                    <option value="files">files</option>
+                    <option value="ai_handoff">AI handoff</option>
+                  </select>
+                </label>
+                <div class="sandbox-evaluation-detail-actions" aria-label="Phase 10 readiness controls">
+                  <button class="planner-evaluation-button" id="expandPhase10ReadinessGroups" type="button">
+                    Expand groups
+                  </button>
+                  <button class="planner-evaluation-button" id="collapsePhase10ReadinessGroups" type="button">
+                    Collapse groups
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10AIHandoffSummary" type="button">
+                    Copy AI handoff
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10ReadinessJson" type="button">
+                    Copy readiness JSON
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10NoGoReasons" type="button">
+                    Copy no-go reasons
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10SafetyInvariants" type="button">
+                    Copy safety invariants
+                  </button>
+                </div>
+              </div>
+              <p class="sandbox-evaluation-copy-status" id="phase10ReadinessCopyStatus" hidden></p>
+              <div class="phase10-readiness-strip" id="phase10ReadinessStrip" hidden></div>
+              <dl class="planner-evaluation-summary" id="phase10ReadinessSummary" hidden></dl>
+              <div class="phase10-readiness-groups" id="phase10ReadinessGroups" hidden></div>
+            </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
               <p id="safetyBrakeMessage">No safety decision yet.</p>
               <div class="safety-buttons" id="safetyButtons" hidden>

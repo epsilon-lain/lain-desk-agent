@@ -1906,6 +1906,109 @@ button {
   white-space: pre-wrap;
 }
 
+.phase10-readiness-panel[data-state="warning"] {
+  border-color: rgba(255, 115, 95, 0.36);
+}
+
+.phase10-readiness-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.phase10-readiness-strip[hidden],
+.phase10-readiness-groups[hidden] {
+  display: none;
+}
+
+.phase10-readiness-chip {
+  border: 1px solid rgba(134, 184, 220, 0.22);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: rgba(2, 8, 14, 0.26);
+}
+
+.phase10-readiness-chip[data-tone="ok"] {
+  border-color: rgba(88, 214, 141, 0.38);
+  background: rgba(26, 82, 46, 0.18);
+}
+
+.phase10-readiness-chip[data-tone="warn"] {
+  border-color: rgba(255, 198, 109, 0.42);
+  background: rgba(120, 74, 20, 0.18);
+}
+
+.phase10-readiness-chip[data-tone="risk"] {
+  border-color: rgba(255, 115, 95, 0.48);
+  background: rgba(96, 32, 32, 0.2);
+}
+
+.phase10-readiness-chip-value {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.phase10-readiness-chip-label {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.phase10-readiness-groups {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.phase10-readiness-section {
+  border: 1px solid rgba(134, 184, 220, 0.18);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(2, 8, 14, 0.22);
+}
+
+.phase10-readiness-section[data-tone="risk"] {
+  border-color: rgba(255, 115, 95, 0.38);
+}
+
+.phase10-readiness-section[data-tone="warn"] {
+  border-color: rgba(255, 198, 109, 0.36);
+}
+
+.phase10-readiness-section[data-tone="ok"] {
+  border-color: rgba(88, 214, 141, 0.3);
+}
+
+.phase10-readiness-section-summary {
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.phase10-readiness-list {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.phase10-readiness-list li {
+  border: 1px solid rgba(134, 184, 220, 0.14);
+  border-radius: 7px;
+  padding: 7px 8px;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .planner-evaluation-summary,
 .planner-evaluation-facts {
   display: grid;

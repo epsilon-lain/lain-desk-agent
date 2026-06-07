@@ -28,6 +28,8 @@ Latest expected state:
 - No real desktop actions are enabled.
 - Phase 10 readiness is documentation, tests, auditability, handoff, and
   release-candidate hardening only.
+- Phase 10.1 readiness cockpit can display deterministic GO/NO-GO data, but it
+  remains NO-GO by default and does not grant execution permission.
 
 ## Current Safety Boundary
 
@@ -67,6 +69,10 @@ The cockpit can:
 - Validate imported bundles for required fields, unsafe flags, sensitive key
   findings, consistency, audit ordering, and read-only replay eligibility.
 - Replay deterministic audit timelines locally for debugging and handoff.
+- Load and display a deterministic Phase 10 readiness report from
+  `/phase10-readiness/demo`.
+- Copy Phase 10 AI handoff summary, readiness JSON, no-go reasons, and safety
+  invariants from already loaded browser state.
 
 ## What The Cockpit Cannot Do
 
@@ -107,6 +113,8 @@ The cockpit cannot:
   issue groups, copy helpers, and AI handoff readability.
 - Phase 10 readiness / release-candidate hardening: project status docs,
   safety invariants, AI handoff context, and read-only status helper.
+- Phase 10.1 readiness cockpit and report: deterministic NO-GO readiness
+  report, read-only endpoint, cockpit display, and copy helpers.
 
 ## Test And Verification Commands
 
@@ -207,6 +215,10 @@ Current Phase 10 readiness status: not ready for real action implementation.
 The repository is ready for additional dry-run hardening, docs, tests, and
 auditability work.
 
+Phase 10.1 report status: `go_for_phase10 = false`,
+`real_actions_enabled = false`, and
+`phase10_real_actions_implemented = false`.
+
 ## Recommended Next Work
 
 - Keep Phase 9 replay validation stable while adding small regression tests for
@@ -259,4 +271,5 @@ For the next AI handoff:
 15. Do not add real-action toggles or execute controls.
 16. Phase 10 real actions are not implemented yet.
 17. Read `docs/PHASE_10_READINESS_CHECKLIST.md` before Phase 10 work.
-18. Run `.\scripts\verify.ps1` and `python scripts\safety_scan.py`.
+18. The Phase 10.1 readiness panel reports NO-GO by default.
+19. Run `.\scripts\verify.ps1` and `python scripts\safety_scan.py`.

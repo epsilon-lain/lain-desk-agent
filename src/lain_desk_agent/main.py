@@ -37,6 +37,7 @@ from .phase9_experiment import (
     UnknownPhase9ExperimentScenarioError,
     evaluate_phase9_experiment_scenarios,
 )
+from .phase10_readiness import build_phase10_readiness_report
 from .resource_guard import DEFAULT_LIMITS, ResourceGuardError
 from .safety import assess_proposal
 from .sandbox_evaluation import (
@@ -88,6 +89,10 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/phase9-experiment/demo":
             self._handle_phase9_experiment_demo()
+            return
+
+        if path == "/phase10-readiness/demo":
+            self._handle_phase10_readiness_demo()
             return
 
         if path == "/demo/scenario":
@@ -321,6 +326,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(payload)
+
+    def _handle_phase10_readiness_demo(self) -> None:
+        self._send_json(build_phase10_readiness_report())
 
     def _handle_approval(self) -> None:
         try:

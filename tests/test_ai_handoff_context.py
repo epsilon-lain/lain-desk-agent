@@ -28,6 +28,8 @@ class AIHandoffContextDocTests(unittest.TestCase):
             "no sandbox or replay `/execute` call",
             "no real-action toggle",
             "imported bundles are untrusted input",
+            "phase 10.1 readiness report",
+            "go_for_phase10 = false",
             "ai handoff",
             "do not enable real actions unless the phase 10 readiness checklist",
         ]:
@@ -42,6 +44,7 @@ class AIHandoffContextDocTests(unittest.TestCase):
             "docs/PHASE_10_READINESS_CHECKLIST.md",
             "docs/SAFETY_INVARIANTS.md",
             "src/lain_desk_agent/phase9_experiment.py",
+            "src/lain_desk_agent/phase10_readiness.py",
             "src/lain_desk_agent/sandbox_experiment.py",
             "ui/app.js",
             "scripts/safety_scan.py",
@@ -67,6 +70,7 @@ class AIHandoffContextDocTests(unittest.TestCase):
             "Known Safe Next Steps",
             "Known Dangerous Next Steps",
             "Copyable Mini-prompt",
+            "NO-GO by default",
         ]:
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, text)

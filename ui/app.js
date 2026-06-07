@@ -137,6 +137,21 @@ const phase9ReplayValidationIssueGroups = document.querySelector("#phase9ReplayV
 const phase9ReplayTimeline = document.querySelector("#phase9ReplayTimeline");
 const phase9ReplayValidationDetails = document.querySelector("#phase9ReplayValidationDetails");
 const phase9ReplayValidationJson = document.querySelector("#phase9ReplayValidationJson");
+const phase10ReadinessPanel = document.querySelector("#phase10ReadinessPanel");
+const loadPhase10ReadinessButton = document.querySelector("#loadPhase10Readiness");
+const phase10ReadinessStatus = document.querySelector("#phase10ReadinessStatus");
+const phase10ReadinessControls = document.querySelector("#phase10ReadinessControls");
+const phase10ReadinessGroupFilter = document.querySelector("#phase10ReadinessGroupFilter");
+const expandPhase10ReadinessGroups = document.querySelector("#expandPhase10ReadinessGroups");
+const collapsePhase10ReadinessGroups = document.querySelector("#collapsePhase10ReadinessGroups");
+const copyPhase10AIHandoffSummary = document.querySelector("#copyPhase10AIHandoffSummary");
+const copyPhase10ReadinessJson = document.querySelector("#copyPhase10ReadinessJson");
+const copyPhase10NoGoReasons = document.querySelector("#copyPhase10NoGoReasons");
+const copyPhase10SafetyInvariants = document.querySelector("#copyPhase10SafetyInvariants");
+const phase10ReadinessCopyStatus = document.querySelector("#phase10ReadinessCopyStatus");
+const phase10ReadinessStrip = document.querySelector("#phase10ReadinessStrip");
+const phase10ReadinessSummary = document.querySelector("#phase10ReadinessSummary");
+const phase10ReadinessGroups = document.querySelector("#phase10ReadinessGroups");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -416,6 +431,7 @@ let currentPhase9QuickFilterGroup = "all";
 let currentPhase9ImportedBundle = null;
 let currentPhase9ReplayReport = null;
 let currentPhase9ReplayValidationFilter = "all";
+let currentPhase10ReadinessReport = null;
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 setDemoScenarioSelectionDefaults();
@@ -479,6 +495,7 @@ renderPlannerTrace();
 renderPlannerEvaluation();
 renderSandboxEvaluation();
 renderPhase9Experiment();
+renderPhase10Readiness();
 renderPermissionProfile();
 renderCapabilities();
 fetchRuntimeStatus({ silent: true });
@@ -525,6 +542,38 @@ loadSandboxEvaluationButton.addEventListener("click", async () => {
 
 loadPhase9ExperimentButton.addEventListener("click", async () => {
   await loadPhase9Experiment();
+});
+
+loadPhase10ReadinessButton.addEventListener("click", async () => {
+  await loadPhase10Readiness();
+});
+
+phase10ReadinessGroupFilter.addEventListener("change", () => {
+  renderPhase10Readiness(currentPhase10ReadinessReport);
+});
+
+expandPhase10ReadinessGroups.addEventListener("click", () => {
+  setPhase10ReadinessGroupsOpen(true);
+});
+
+collapsePhase10ReadinessGroups.addEventListener("click", () => {
+  setPhase10ReadinessGroupsOpen(false);
+});
+
+copyPhase10AIHandoffSummary.addEventListener("click", async () => {
+  await copyPhase10ReadinessPayload("ai_handoff_summary");
+});
+
+copyPhase10ReadinessJson.addEventListener("click", async () => {
+  await copyPhase10ReadinessPayload("readiness_json");
+});
+
+copyPhase10NoGoReasons.addEventListener("click", async () => {
+  await copyPhase10ReadinessPayload("no_go_reasons");
+});
+
+copyPhase10SafetyInvariants.addEventListener("click", async () => {
+  await copyPhase10ReadinessPayload("safety_invariants");
 });
 
 for (const phase9FilterControl of [
@@ -2282,6 +2331,370 @@ function renderPhase9ExperimentError(error) {
   phase9ExperimentSummary.replaceChildren();
   phase9ExperimentTimeline.replaceChildren();
   phase9ExperimentResults.replaceChildren(plannerEvaluationEmptyState(error.message || String(error)));
+}
+
+async function loadPhase10Readiness() {
+  phase10ReadinessPanel.dataset.state = "running";
+  loadPhase10ReadinessButton.disabled = true;
+  phase10ReadinessStatus.textContent = "Loading Phase 10 readiness report...";
+  phase10ReadinessControls.hidden = true;
+  phase10ReadinessCopyStatus.hidden = true;
+  phase10ReadinessStrip.hidden = true;
+  phase10ReadinessSummary.hidden = true;
+  phase10ReadinessGroups.hidden = true;
+  phase10ReadinessGroups.replaceChildren();
+  statusText.textContent = "loading Phase 10 readiness...";
+
+  try {
+    const response = await fetch("/phase10-readiness/demo");
+    if (!response.ok) {
+      throw new Error(`Phase 10 readiness failed: HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    renderPhase10Readiness(payload);
+    statusText.textContent = "Phase 10 readiness loaded";
+  } catch (error) {
+    renderPhase10ReadinessError(error);
+    statusText.textContent = "Phase 10 readiness failed";
+  } finally {
+    loadPhase10ReadinessButton.disabled = false;
+  }
+}
+
+function renderPhase10Readiness(report = null) {
+  currentPhase10ReadinessReport = report;
+  phase10ReadinessCopyStatus.hidden = true;
+  phase10ReadinessStrip.replaceChildren();
+  phase10ReadinessSummary.replaceChildren();
+  phase10ReadinessGroups.replaceChildren();
+
+  if (!report) {
+    phase10ReadinessPanel.dataset.state = "empty";
+    phase10ReadinessStatus.textContent = "Not loaded yet.";
+    phase10ReadinessControls.hidden = true;
+    phase10ReadinessStrip.hidden = true;
+    phase10ReadinessSummary.hidden = true;
+    phase10ReadinessGroups.hidden = true;
+    return;
+  }
+
+  const goForPhase10 = report.go_for_phase10 === true;
+  phase10ReadinessPanel.dataset.state = goForPhase10 ? "ready" : "warning";
+  phase10ReadinessPanel.dataset.phase10GoForPhase10 = String(goForPhase10);
+  phase10ReadinessStatus.textContent = goForPhase10
+    ? "Phase 10 readiness report loaded: GO. This still does not execute actions."
+    : "Phase 10 readiness report loaded: NO-GO by design. This is not execution permission.";
+  phase10ReadinessControls.hidden = false;
+  phase10ReadinessStrip.hidden = false;
+  phase10ReadinessSummary.hidden = false;
+  phase10ReadinessGroups.hidden = false;
+
+  renderPhase10ReadinessStrip(report);
+  setPhase10ReadinessSummary([
+    ["Report", report.report_version || "phase10_readiness_v1"],
+    ["Project phase", report.project_phase || "Phase 10 readiness"],
+    ["GO/NO-GO", goForPhase10 ? "GO" : "NO-GO"],
+    ["Dry-run", formatSandboxBool(report.dry_run)],
+    ["Read-only", formatSandboxBool(report.read_only)],
+    ["Debug-only", formatSandboxBool(report.debug_only)],
+    ["Real actions enabled", formatSandboxBool(report.real_actions_enabled)],
+    ["Phase 10 implemented", formatSandboxBool(report.phase10_real_actions_implemented)],
+    ["No-go reasons", String(sandboxCodes(report.no_go_reasons).length)],
+    ["Boundary", "readiness report only; cockpit display is not authorization"],
+  ]);
+  renderPhase10ReadinessGroups(report);
+}
+
+function renderPhase10ReadinessError(error) {
+  currentPhase10ReadinessReport = null;
+  phase10ReadinessPanel.dataset.state = "error";
+  phase10ReadinessStatus.textContent = "Phase 10 readiness report could not be loaded.";
+  phase10ReadinessControls.hidden = true;
+  phase10ReadinessCopyStatus.hidden = true;
+  phase10ReadinessStrip.hidden = true;
+  phase10ReadinessSummary.hidden = true;
+  phase10ReadinessGroups.hidden = false;
+  phase10ReadinessGroups.replaceChildren(plannerEvaluationEmptyState(error.message || String(error)));
+}
+
+function renderPhase10ReadinessStrip(report) {
+  phase10ReadinessStrip.replaceChildren();
+  const items = [
+    ["status", report.go_for_phase10 === true ? "GO" : "NO-GO", report.go_for_phase10 === true ? "ok" : "risk"],
+    ["dry-run", formatSandboxBool(report.dry_run), report.dry_run ? "ok" : "risk"],
+    ["read-only", formatSandboxBool(report.read_only), report.read_only ? "ok" : "risk"],
+    ["debug-only", formatSandboxBool(report.debug_only), report.debug_only ? "ok" : "risk"],
+    [
+      "real actions",
+      report.real_actions_enabled === true ? "enabled" : "disabled",
+      report.real_actions_enabled === true ? "risk" : "ok",
+    ],
+    [
+      "Phase 10 implemented",
+      formatSandboxBool(report.phase10_real_actions_implemented),
+      report.phase10_real_actions_implemented === true ? "warn" : "ok",
+    ],
+  ];
+
+  for (const [label, value, tone] of items) {
+    const chip = document.createElement("div");
+    const valueNode = document.createElement("span");
+    const labelNode = document.createElement("span");
+    chip.className = "phase10-readiness-chip";
+    chip.dataset.phase10ReadinessChip = label;
+    chip.dataset.tone = tone;
+    valueNode.className = "phase10-readiness-chip-value";
+    valueNode.textContent = value;
+    labelNode.className = "phase10-readiness-chip-label";
+    labelNode.textContent = label;
+    chip.append(valueNode, labelNode);
+    phase10ReadinessStrip.appendChild(chip);
+  }
+}
+
+function setPhase10ReadinessSummary(rows) {
+  phase10ReadinessSummary.replaceChildren();
+  for (const [label, value] of rows) {
+    phase10ReadinessSummary.appendChild(plannerEvaluationFact(label, value));
+  }
+}
+
+function renderPhase10ReadinessGroups(report) {
+  const filter = phase10ReadinessGroupFilter.value || "all";
+  const sections = phase10ReadinessSections(report).filter(
+    (section) => filter === "all" || section.filterKey === filter
+  );
+  phase10ReadinessGroups.replaceChildren();
+  phase10ReadinessGroups.dataset.activeFilter = filter;
+
+  if (!sections.length) {
+    phase10ReadinessGroups.appendChild(
+      plannerEvaluationEmptyState("No Phase 10 readiness groups match the active filter.")
+    );
+    return;
+  }
+
+  for (const section of sections) {
+    phase10ReadinessGroups.appendChild(phase10ReadinessSection(section));
+  }
+}
+
+function phase10ReadinessSections(report) {
+  return [
+    {
+      key: "required_gates",
+      filterKey: "gates",
+      title: "Required gates",
+      tone: "warn",
+      items: phase10GateItems(report.required_gates),
+    },
+    {
+      key: "readiness_checks",
+      filterKey: "gates",
+      title: "Readiness checks",
+      tone: "warn",
+      items: phase10ReadinessCheckItems(report.readiness_checks),
+    },
+    {
+      key: "no_go_reasons",
+      filterKey: "blockers",
+      title: "NO-GO reasons",
+      tone: "risk",
+      items: phase10BlockerItems(report.known_blockers, report.no_go_reasons),
+    },
+    {
+      key: "safety_invariants",
+      filterKey: "invariants",
+      title: "Safety invariants",
+      tone: "ok",
+      items: sandboxCodes(report.safety_invariants),
+    },
+    {
+      key: "forbidden_actions",
+      filterKey: "invariants",
+      title: "Forbidden actions",
+      tone: "risk",
+      items: sandboxCodes(report.forbidden_actions),
+    },
+    {
+      key: "forbidden_apis",
+      filterKey: "invariants",
+      title: "Forbidden APIs",
+      tone: "risk",
+      items: sandboxCodes(report.forbidden_apis),
+    },
+    {
+      key: "required_commands",
+      filterKey: "commands",
+      title: "Required verification commands",
+      tone: "ok",
+      items: sandboxCodes(report.required_test_commands),
+    },
+    {
+      key: "manual_checks",
+      filterKey: "commands",
+      title: "Required manual checks",
+      tone: "warn",
+      items: sandboxCodes(report.required_manual_checks),
+    },
+    {
+      key: "important_files",
+      filterKey: "files",
+      title: "Important files",
+      tone: "neutral",
+      items: sandboxCodes(report.important_files),
+    },
+    {
+      key: "ai_handoff",
+      filterKey: "ai_handoff",
+      title: "AI handoff summary",
+      tone: "neutral",
+      items: [report.ai_handoff_summary || "No AI handoff summary available."],
+    },
+    {
+      key: "recommended_next_work",
+      filterKey: "ai_handoff",
+      title: "Recommended next work",
+      tone: "neutral",
+      items: sandboxCodes(report.recommended_next_work),
+    },
+  ];
+}
+
+function phase10ReadinessSection(section) {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const list = document.createElement("ul");
+
+  details.className = "phase10-readiness-section";
+  details.dataset.phase10ReadinessGroup = section.key;
+  details.dataset.phase10ReadinessFilterKey = section.filterKey;
+  details.dataset.tone = section.tone || "neutral";
+  details.open = true;
+  summary.className = "phase10-readiness-section-summary";
+  summary.textContent = `${section.title} (${section.items.length})`;
+  list.className = "phase10-readiness-list";
+
+  for (const item of section.items) {
+    const li = document.createElement("li");
+    li.dataset.phase10ReadinessItem = "true";
+    li.textContent = item;
+    list.appendChild(li);
+  }
+
+  details.append(summary, list);
+  return details;
+}
+
+function phase10GateItems(gates) {
+  if (!Array.isArray(gates)) {
+    return [];
+  }
+  return gates.map((gate) => {
+    const label = gate.label || gate.code || "gate";
+    return `${label}: ${gate.current_status || "unknown"}`;
+  });
+}
+
+function phase10ReadinessCheckItems(checks) {
+  if (!Array.isArray(checks)) {
+    return [];
+  }
+  return checks.map((check) => {
+    const status = check.passed === true ? "pass" : "blocked";
+    return `${check.code || "check"}: ${status} - ${check.description || ""}`;
+  });
+}
+
+function phase10BlockerItems(blockers, reasons) {
+  if (Array.isArray(blockers) && blockers.length) {
+    return blockers.map((blocker) => `${blocker.code || "blocker"}: ${blocker.description || ""}`);
+  }
+  return sandboxCodes(reasons);
+}
+
+function setPhase10ReadinessGroupsOpen(open) {
+  const detailsNodes = phase10ReadinessGroups.querySelectorAll(
+    "details[data-phase10-readiness-group]"
+  );
+  for (const details of detailsNodes) {
+    details.open = open;
+  }
+}
+
+async function copyPhase10ReadinessPayload(payloadKind) {
+  phase10ReadinessCopyStatus.hidden = false;
+  if (!currentPhase10ReadinessReport) {
+    phase10ReadinessCopyStatus.textContent = "No Phase 10 readiness report loaded.";
+    return;
+  }
+  if (!navigator.clipboard?.writeText) {
+    phase10ReadinessCopyStatus.textContent = "Clipboard unavailable in this browser.";
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(phase10ReadinessPayloadText(payloadKind));
+    phase10ReadinessCopyStatus.textContent = phase10ReadinessCopyStatusText(payloadKind);
+  } catch (error) {
+    phase10ReadinessCopyStatus.textContent = `Copy failed: ${error.message || String(error)}`;
+  }
+}
+
+function phase10ReadinessPayloadText(payloadKind) {
+  const payload = phase10ReadinessPayload(payloadKind);
+  return typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+}
+
+function phase10ReadinessPayload(payloadKind) {
+  if (payloadKind === "ai_handoff_summary") {
+    return copyPhase10AIHandoffSummaryPayload();
+  }
+  if (payloadKind === "no_go_reasons") {
+    return copyPhase10NoGoReasonsPayload();
+  }
+  if (payloadKind === "safety_invariants") {
+    return copyPhase10SafetyInvariantsPayload();
+  }
+  return copyPhase10ReadinessJsonPayload();
+}
+
+function copyPhase10AIHandoffSummaryPayload() {
+  return currentPhase10ReadinessReport?.ai_handoff_summary || "";
+}
+
+function copyPhase10ReadinessJsonPayload() {
+  return currentPhase10ReadinessReport || {};
+}
+
+function copyPhase10NoGoReasonsPayload() {
+  return {
+    project_phase: currentPhase10ReadinessReport?.project_phase || "",
+    go_for_phase10: currentPhase10ReadinessReport?.go_for_phase10 === true,
+    no_go_reasons: sandboxCodes(currentPhase10ReadinessReport?.no_go_reasons),
+    known_blockers: currentPhase10ReadinessReport?.known_blockers || [],
+  };
+}
+
+function copyPhase10SafetyInvariantsPayload() {
+  return {
+    project_phase: currentPhase10ReadinessReport?.project_phase || "",
+    safety_invariants: sandboxCodes(currentPhase10ReadinessReport?.safety_invariants),
+    safety_boundary: sandboxCodes(currentPhase10ReadinessReport?.safety_boundary),
+  };
+}
+
+function phase10ReadinessCopyStatusText(payloadKind) {
+  if (payloadKind === "ai_handoff_summary") {
+    return "Phase 10 AI handoff summary copied.";
+  }
+  if (payloadKind === "no_go_reasons") {
+    return "Phase 10 no-go reasons copied.";
+  }
+  if (payloadKind === "safety_invariants") {
+    return "Phase 10 safety invariants copied.";
+  }
+  return "Phase 10 readiness JSON copied.";
 }
 
 function setPhase9ExperimentSummary(rows) {

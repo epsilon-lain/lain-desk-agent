@@ -543,6 +543,10 @@ dry-run semantics, does not call `/execute`, does not add a desktop actuation
 adapter, and does not change Execution Policy, Permission Profile, Capability
 Registry, or any permission matrix.
 
+Phase 10.1 adds a deterministic readiness report and cockpit panel that report
+NO-GO by default. That report is a handoff/debug surface only and does not
+change Phase 9 export/import/replay behavior.
+
 ## Implementation Guardrails
 
 Before any Phase 9 code exists:

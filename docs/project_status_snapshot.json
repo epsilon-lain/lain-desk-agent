@@ -1,9 +1,16 @@
 {
+  "schema_version": "project_status_snapshot_v2",
   "project": "lain-desk-agent",
-  "phase": "post_phase_9_release_candidate_hardening",
-  "next_phase": "phase_10_readiness",
+  "phase": "phase_10_1_readiness_cockpit",
+  "project_phase": "Phase 10.1 readiness cockpit / release-candidate hardening",
+  "next_phase": "future_phase_10_real_action_experiment_only_if_explicitly_approved",
+  "latest_completed_phase": "Phase 9.x dry-run sandbox, replay, and validation pipeline",
   "real_actions_enabled": false,
+  "phase10_real_actions_implemented": false,
+  "go_for_phase10": false,
   "dry_run_default": true,
+  "read_only_default": true,
+  "debug_only_default": true,
   "read_only_cockpit": true,
   "debug_only_sandbox_and_replay": true,
   "safety_boundary": [
@@ -16,21 +23,34 @@
     "proposal is not execution",
     "cockpit display is not authorization"
   ],
-  "tests_command": ".\\scripts\\verify.ps1",
-  "safety_scan_command": "python scripts\\safety_scan.py",
-  "manual_checks": [
+  "verification_commands": [
+    ".\\scripts\\verify.ps1",
+    "python scripts\\safety_scan.py",
     "git diff --check",
     "node --check ui/app.js",
     "python -m unittest discover -s tests"
+  ],
+  "tests_command": ".\\scripts\\verify.ps1",
+  "safety_scan_command": "python scripts\\safety_scan.py",
+  "manual_checks": [
+    "review docs/PHASE_10_READINESS_CHECKLIST.md",
+    "confirm no sandbox or replay UI calls /execute",
+    "confirm Execution Policy, Permission Profile, and Capability Registry remain unchanged"
   ],
   "important_docs": [
     "docs/PROJECT_HEALTH_SNAPSHOT.md",
     "docs/PHASE_10_READINESS_CHECKLIST.md",
     "docs/AI_HANDOFF_CONTEXT.md",
     "docs/SAFETY_INVARIANTS.md",
+    "docs/project_status_snapshot.json",
     "docs/PHASE_7_SANDBOX_ACTION_DESIGN.md",
     "docs/PHASE_9_MINIMAL_SANDBOX_EXPERIMENT_DESIGN.md",
     "docs/ROADMAP.md",
     "docs/ARCHITECTURE.md"
+  ],
+  "recommended_next_work": [
+    "keep Phase 10 work in dry-run readiness reporting",
+    "review Phase 7 and Phase 10 gates before any future implementation",
+    "do not enable real actions without a new explicit user request"
   ]
 }

@@ -93,6 +93,12 @@ Recommended next work remains docs, tests, auditability, and dry-run
 regression protection unless a future request explicitly satisfies the Phase
 10 checklist.
 
+Phase 10.1 adds a deterministic readiness superstructure: a read-only
+`phase10_readiness.py` report builder, `GET /phase10-readiness/demo`, and a
+cockpit panel for GO/NO-GO status, expected no-go blockers, safety invariants,
+required gates, verification commands, important files, and AI handoff copy.
+It remains NO-GO by default and does not enable real actions.
+
 ## Completed
 
 - Observation / Understanding
@@ -127,6 +133,7 @@ regression protection unless a future request explicitly satisfies the Phase
 - Phase 9.8 Phase 9 Replay Validation Cockpit UX Polish
 - Project Health Snapshot / Release-prep Handoff
 - Phase 10 Readiness / Release-candidate Hardening Docs
+- Phase 10.1 Readiness Report And Cockpit Panel
 - AI Handoff Context
 - Safety Invariants
 - Read-only Project Status Helper
@@ -178,6 +185,8 @@ regression protection unless a future request explicitly satisfies the Phase
 - Phase 10 readiness is documentation, tests, auditability, handoff, and
   release-candidate hardening only. Phase 10 real actions are not implemented
   yet.
+- Phase 10.1 readiness cockpit is read-only/debug-only. It reports NO-GO by
+  default and is not execution permission.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -718,6 +727,24 @@ Goal: consider narrow desktop control only after the Phase 7 checklist, Phase
   fails.
 - Keep real actions disabled until a future user request explicitly approves a
   named Phase 10 experiment and all go/no-go checklist items pass.
+
+## Phase 10.1: Readiness Cockpit And AI Handoff Superstructure
+
+Status: implemented as read-only readiness reporting.
+
+Goal: make readiness state visible without enabling real desktop control.
+
+- Build deterministic Phase 10 readiness reports with `go_for_phase10 = false`
+  by default.
+- Expose `/phase10-readiness/demo` as fixture-like read-only report data.
+- Display status, no-go reasons, required gates, readiness checks, safety
+  invariants, forbidden actions/APIs, verification commands, important files,
+  recommended next work, and AI handoff summary in the cockpit.
+- Keep all controls local-only after load: group filter, expand/collapse, and
+  copy helpers.
+- Do not add execute buttons, approval buttons, real-action toggles, sandbox
+  action triggers, `/execute` calls, or action-performing endpoints.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions.
 
 ## Historical Drafts
 

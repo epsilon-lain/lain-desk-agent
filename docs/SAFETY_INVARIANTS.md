@@ -23,6 +23,7 @@ developers.
 - No approval button that triggers real action.
 - No real-action toggle.
 - No sandbox action trigger.
+- No Phase 10 readiness UI trigger for real action.
 - UI controls for sandbox, Phase 9, export, import, validation, replay,
   filtering, grouping, expand/collapse, and copy are local-only or read-only
   report loading.
@@ -32,6 +33,10 @@ developers.
 
 - `dry_run` remains default.
 - `real_action_enabled` remains false by default.
+- `real_actions_enabled` remains false.
+- `phase10_real_actions_implemented` remains false.
+- `go_for_phase10` remains false by default.
+- No real-action adapter exists in Phase 10.1.
 - `real_action_attempted` remains false in Phase 8 and Phase 9 dry-run reports.
 - Non-dry-run requests with real action disabled are skipped, not executed.
 - Sandbox scope remains one named test window and one named target.
@@ -88,3 +93,7 @@ No Phase 10 real-action implementation may begin unless
 `docs/PHASE_10_READINESS_CHECKLIST.md` is explicitly satisfied by a new user
 request. Until then, Phase 10 readiness work is docs, tests, auditability,
 handoff, and dry-run regression protection only.
+
+Phase 10.1 readiness reporting is also not permission. The readiness report,
+GO/NO-GO display, endpoint, and cockpit panel must remain read-only/debug-only,
+must not call `/execute`, and must not add a real-action UI trigger.

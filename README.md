@@ -13,12 +13,17 @@ The current repository is in Phase 10 readiness / release-candidate hardening.
 Phase 10 real actions are not implemented yet; sandbox and replay work remains
 dry-run, read-only, and debug-only.
 
+Phase 10.1 adds a deterministic readiness report and cockpit panel. It reports
+NO-GO by default, explains expected blockers, and does not grant execution
+permission.
+
 Start with:
 
 - [`docs/PROJECT_HEALTH_SNAPSHOT.md`](docs/PROJECT_HEALTH_SNAPSHOT.md)
 - [`docs/PHASE_10_READINESS_CHECKLIST.md`](docs/PHASE_10_READINESS_CHECKLIST.md)
 - [`docs/AI_HANDOFF_CONTEXT.md`](docs/AI_HANDOFF_CONTEXT.md)
 - [`docs/SAFETY_INVARIANTS.md`](docs/SAFETY_INVARIANTS.md)
+- [`docs/project_status_snapshot.json`](docs/project_status_snapshot.json)
 
 ## Current State
 
@@ -34,6 +39,7 @@ The cockpit can:
 - run an approved `wait` self-test
 - show Runtime Status, Execution Policy, events, planner trace, and readiness
   debug summaries
+- show a read-only Phase 10 readiness report and AI handoff summary
 
 Current proposal action types are:
 
@@ -181,6 +187,7 @@ Do not commit or paste real API keys. See
 - [`docs/PHASE_10_READINESS_CHECKLIST.md`](docs/PHASE_10_READINESS_CHECKLIST.md)
 - [`docs/AI_HANDOFF_CONTEXT.md`](docs/AI_HANDOFF_CONTEXT.md)
 - [`docs/SAFETY_INVARIANTS.md`](docs/SAFETY_INVARIANTS.md)
+- [`docs/project_status_snapshot.json`](docs/project_status_snapshot.json)
 - [`docs/SAFETY.md`](docs/SAFETY.md)
 - [`docs/DEV_CHECKLIST.md`](docs/DEV_CHECKLIST.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)

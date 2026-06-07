@@ -300,6 +300,9 @@ gate. The checklist in `docs/PHASE_10_READINESS_CHECKLIST.md` is an additional
 pre-implementation review layer; it does not grant execution permission and it
 does not enable real desktop actions.
 
+Phase 10.1 readiness cockpit reports deterministic GO/NO-GO status only. A
+NO-GO or GO display does not satisfy this Phase 7 gate by itself.
+
 ## Checklist Before Any Phase 8 Real-action Experiment
 
 Before implementing real actuation inside a minimal sandbox experiment:

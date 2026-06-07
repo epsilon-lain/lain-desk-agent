@@ -12,6 +12,7 @@ README_DOC = PROJECT_ROOT / "README.md"
 ARCHITECTURE_DOC = PROJECT_ROOT / "docs" / "ARCHITECTURE.md"
 PROJECT_STATUS_SCRIPT = PROJECT_ROOT / "scripts" / "project_status.ps1"
 UI_APP_JS = PROJECT_ROOT / "ui" / "app.js"
+PHASE10_READINESS_MODULE = PROJECT_ROOT / "src" / "lain_desk_agent" / "phase10_readiness.py"
 PHASE8_RUNTIME_FILES = [
     PROJECT_ROOT / "src" / "lain_desk_agent" / "sandbox_experiment.py",
     PROJECT_ROOT / "src" / "lain_desk_agent" / "sandbox_evaluation.py",
@@ -41,6 +42,9 @@ class SafetyInvariantsTests(unittest.TestCase):
             "proposal is not execution",
             "cockpit display is not authorization",
             "phase 10 real-action implementation",
+            "go_for_phase10",
+            "phase10_real_actions_implemented",
+            "no real-action adapter",
             "verify.ps1",
             "safety_scan.py",
         ]:
@@ -98,6 +102,30 @@ class SafetyInvariantsTests(unittest.TestCase):
                 with self.subTest(path=path.name, fragment=fragment):
                     self.assertNotIn(fragment, source)
 
+    def test_phase10_readiness_module_has_no_execution_calls_or_imports(self) -> None:
+        source = PHASE10_READINESS_MODULE.read_text(encoding="utf-8")
+
+        for forbidden in [
+            "import pyautogui",
+            "from pyautogui",
+            "import pynput",
+            "from pynput",
+            "import keyboard",
+            "from keyboard",
+            "import mouse",
+            "from mouse",
+            "import win32api",
+            "from win32api",
+            "execute_action_contract",
+            "fetch(",
+            '"/execute"',
+            "'/execute'",
+            "real_action_enabled = True",
+            "realActionEnabled = true",
+        ]:
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, source)
+
     def test_sandbox_and_phase9_ui_sections_do_not_trigger_execution(self) -> None:
         source = UI_APP_JS.read_text(encoding="utf-8")
         sandbox_ui = _source_between(
@@ -133,6 +161,35 @@ class SafetyInvariantsTests(unittest.TestCase):
             ]:
                 with self.subTest(section=name, fragment=fragment):
                     self.assertNotIn(fragment, section)
+
+    def test_phase10_readiness_ui_section_does_not_trigger_execution(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        phase10_ui = _source_between(
+            source,
+            "async function loadPhase10Readiness",
+            "function setPhase9ExperimentSummary",
+        )
+
+        self.assertIn('fetch("/phase10-readiness/demo")', phase10_ui)
+        for forbidden in [
+            'fetch("/execute"',
+            "fetch('/execute'",
+            'fetch("/approval"',
+            "fetch('/approval'",
+            "runWaitExecutionSelfTest",
+            "recordApprovalDecision",
+            "real_action_enabled = true",
+            "realActionEnabled = true",
+            "pyautogui",
+            "pynput",
+            "win32api",
+            "SendInput",
+            "mouse_event",
+            "xdotool",
+            "AppleScript",
+        ]:
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, phase10_ui)
 
     def test_project_status_helper_is_read_only(self) -> None:
         text = PROJECT_STATUS_SCRIPT.read_text(encoding="utf-8")

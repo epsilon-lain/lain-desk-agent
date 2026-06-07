@@ -15,6 +15,8 @@ dry-run, read-only, debug-only cockpit with wait-only execution.
   validation, and cockpit debugging.
 - Phase 10 status: readiness planning only; no real desktop action adapter
   exists.
+- Phase 10.1 status: read-only readiness report and cockpit panel exist; they
+  report NO-GO by default and do not grant execution permission.
 
 ## Hard Safety Boundary
 
@@ -123,6 +125,37 @@ target risk/confidence, readiness status, and verification plan fields that the
 future experiment would emit.
 
 Dry-run remains the default. `real_action_enabled` remains false by default.
+
+## Phase 10.1 Readiness Cockpit Status
+
+Phase 10.1 adds:
+
+- `src/lain_desk_agent/phase10_readiness.py`
+- `GET /phase10-readiness/demo`
+- a read-only cockpit Phase 10 readiness panel
+- copy helpers for AI handoff summary, readiness JSON, no-go reasons, and
+  safety invariants
+
+The Phase 10.1 report is deterministic and current-state only. It must keep:
+
+- `go_for_phase10 = false`
+- `real_actions_enabled = false`
+- `phase10_real_actions_implemented = false`
+- `dry_run = true`
+- `read_only = true`
+- `debug_only = true`
+
+Expected no-go reasons include:
+
+- `phase10_real_actions_not_implemented`
+- `real_actions_disabled`
+- `manual_phase10_approval_not_recorded`
+- `real_action_adapter_absent`
+- `live_sandbox_scope_not_selected`
+- `live_post_action_verification_not_implemented`
+
+These no-go reasons are expected readiness blockers, not runtime errors.
+Real actions are still disabled.
 
 ## Sandbox Scope Requirements
 

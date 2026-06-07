@@ -27,6 +27,8 @@ class ProjectHealthSnapshotTests(unittest.TestCase):
             "no real desktop actions",
             "phase 9",
             "phase 10 readiness",
+            "phase 10.1 readiness cockpit",
+            "go_for_phase10 = false",
             "safety boundary",
             "no /execute",
             "no real-action toggle",
@@ -55,11 +57,18 @@ class ProjectHealthSnapshotTests(unittest.TestCase):
         payload = json.loads(STATUS_JSON.read_text(encoding="utf-8"))
 
         self.assertEqual(payload["project"], "lain-desk-agent")
+        self.assertEqual(payload["schema_version"], "project_status_snapshot_v2")
         self.assertIs(payload["real_actions_enabled"], False)
+        self.assertIs(payload["phase10_real_actions_implemented"], False)
+        self.assertIs(payload["go_for_phase10"], False)
         self.assertIs(payload["dry_run_default"], True)
+        self.assertIs(payload["read_only_default"], True)
+        self.assertIs(payload["debug_only_default"], True)
         self.assertIn("docs/PHASE_10_READINESS_CHECKLIST.md", payload["important_docs"])
+        self.assertIn("docs/project_status_snapshot.json", payload["important_docs"])
         self.assertIn("no real desktop actions", payload["safety_boundary"])
         self.assertIn("readiness is not permission", payload["safety_boundary"])
+        self.assertIn(".\\scripts\\verify.ps1", payload["verification_commands"])
 
 
 if __name__ == "__main__":
