@@ -110,11 +110,15 @@ export/import/replay is not execution, AI handoff is not AI control, and real
 desktop actions remain disabled.
 
 Phase 10.3 adds a readiness regression pack and release-candidate guardrails.
-It documents the NO-GO release-candidate boundary and adds tests for forbidden
-desktop actuation, unsafe cockpit controls, unsafe `/execute` UI paths,
-Phase 10 false-by-default report flags, project status snapshot shape, and the
-read-only project status helper. It is docs and tests only; no runtime
-permission, endpoint, action adapter, or cockpit execution control is added.
+It documents the NO-GO release-candidate boundary, adds pure deterministic
+release-candidate bundle validation helpers, exposes guardrail status through
+the existing read-only global status data, and adds a browser-local cockpit
+validation panel with filters, grouped drill-down, expand/collapse, and copy
+helpers. It also adds tests for forbidden desktop actuation, unsafe cockpit
+controls, unsafe `/execute` UI paths, Phase 10 false-by-default report flags,
+project status snapshot shape, backend validation scenarios, and the read-only
+project status helper. No runtime permission, new backend endpoint, action
+adapter, or cockpit execution control is added.
 
 ## Completed
 
@@ -209,8 +213,9 @@ permission, endpoint, action adapter, or cockpit execution control is added.
 - Phase 10.2 global status cockpit is read-only/debug-only. It reports NO-GO
   and handoff context for visibility only; it is not authorization, execution,
   permission, or AI control.
-- Phase 10.3 release-candidate guardrails are docs and regression tests only.
-  They do not authorize, implement, or enable real desktop action.
+- Phase 10.3 release-candidate guardrails are deterministic validation,
+  browser-local display, docs, and regression tests only. They do not
+  authorize, implement, or enable real desktop action.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -797,25 +802,37 @@ control.
 
 ## Phase 10.3: Readiness Regression Pack And Release-candidate Guardrails
 
-Status: implemented as documentation and regression tests only.
+Status: implemented as deterministic read-only validation, browser-local
+cockpit display, documentation, and regression tests only.
 
 Goal: prevent release-candidate drift before any future explicit Phase 10
 real-action approval.
 
+- Add `src/lain_desk_agent/phase10_guardrails.py` and
+  `src/lain_desk_agent/phase10_experiment.py` as pure read-only guardrail
+  validation helpers.
 - Add `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md` as the concise
   release-candidate boundary for future Codex sessions and developers.
+- Add a browser-local Phase 10.3 cockpit panel for pasted release-candidate
+  bundle validation, health counts, filters, grouped drill-down,
+  expand/collapse, and copy helpers.
+- Include Phase 10.3 guardrail status in the existing read-only Global Status
+  report data; do not add a new endpoint.
 - Add `tests/test_release_candidate_guardrails.py` to verify runtime and UI
   guardrails, Phase 10 NO-GO report state, project status snapshot shape, and
   read-only project status helper behavior.
+- Add `tests/test_phase10_guardrails.py` for release-candidate bundle
+  validation, UI hooks, copy helper hooks, local-only filter hooks, and
+  read-only source checks.
 - Keep the project dry-run/read-only/debug-only.
 - Keep `go_for_phase10 = false`, `real_actions_enabled = false`, and
   `phase10_real_actions_implemented = false`.
 - Keep readiness as non-permission, cockpit display as non-authorization,
   export/import/replay as non-execution, and AI handoff as non-control.
 - Do not add or enable desktop actuation, approval/execute controls,
-  real-action toggles, mutation endpoints, action adapters, `/execute` UI
-  paths outside the existing wait-only self-test, or permission/capability/
-  execution-policy changes.
+  real-action toggles, mutation endpoints, new backend endpoints, action
+  adapters, `/execute` UI paths outside the existing wait-only self-test, or
+  permission/capability/execution-policy changes.
 
 ## Historical Drafts
 

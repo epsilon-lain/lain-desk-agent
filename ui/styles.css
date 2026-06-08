@@ -1918,6 +1918,90 @@ button {
   border-color: rgba(88, 214, 141, 0.34);
 }
 
+.phase10-guardrails-panel[data-state="warning"],
+.phase10-guardrails-panel[data-state="error"] {
+  border-color: rgba(255, 115, 95, 0.42);
+}
+
+.phase10-guardrails-panel[data-state="ready"] {
+  border-color: rgba(88, 214, 141, 0.34);
+}
+
+.phase10-guardrail-input {
+  min-height: 128px;
+}
+
+.phase10-guardrail-actions {
+  align-items: stretch;
+}
+
+.phase10-guardrail-health-strip {
+  border: 1px solid rgba(134, 184, 220, 0.18);
+  border-radius: 8px;
+  padding: 7px;
+  background: rgba(2, 8, 14, 0.16);
+}
+
+.phase10-guardrail-filters {
+  margin-top: 10px;
+}
+
+.phase10-guardrail-filter-chip[data-phase10-replay-validation-filter] {
+  border-color: rgba(134, 184, 220, 0.22);
+}
+
+.phase10-guardrail-filter-chip[aria-pressed="true"] {
+  border-color: rgba(135, 244, 255, 0.66);
+  background: rgba(22, 98, 120, 0.28);
+  color: var(--text);
+}
+
+.phase10-guardrail-validation-groups {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin-top: 10px;
+}
+
+.phase10-guardrail-validation-groups[hidden] {
+  display: none;
+}
+
+.phase10-guardrail-validation-section {
+  min-width: 0;
+  border: 1px solid rgba(134, 184, 220, 0.18);
+  border-radius: 8px;
+  padding: 7px;
+  background: rgba(2, 8, 14, 0.22);
+}
+
+.phase10-guardrail-validation-section[data-tone="risk"] {
+  border-color: rgba(255, 115, 95, 0.58);
+}
+
+.phase10-guardrail-validation-section[data-tone="warn"] {
+  border-color: rgba(255, 198, 109, 0.48);
+}
+
+.phase10-guardrail-validation-section[data-tone="ok"] {
+  border-color: rgba(88, 214, 141, 0.36);
+}
+
+.phase10-guardrail-section-meta {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.phase10-guardrail-validation-list li[data-phase10-replay-validation-issue] {
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+}
+
+.phase10-guardrail-validation-details pre {
+  max-height: 260px;
+}
+
 .phase10-readiness-strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

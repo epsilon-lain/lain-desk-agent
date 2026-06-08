@@ -20,6 +20,10 @@ from .phase10_readiness import (
     PHASE10_NO_GO_REASONS,
     build_phase10_readiness_report,
 )
+from .phase10_guardrails import (
+    build_phase10_guardrail_validation_report,
+    build_phase10_release_candidate_bundle,
+)
 
 
 PHASE10_GLOBAL_STATUS_REPORT_VERSION = "phase10_global_status_v1"
@@ -31,6 +35,8 @@ PHASE10_GLOBAL_PROJECT_PHASE = (
 
 PHASE10_GLOBAL_VERIFICATION_COMMANDS = (
     ".\\scripts\\verify.ps1",
+    "python -m unittest discover -s tests -p test_phase10_guardrails.py",
+    "python -m unittest discover -s tests -p test_release_candidate_guardrails.py",
     "python scripts\\safety_scan.py",
     "node --check ui/app.js",
     "git diff --check",
@@ -41,6 +47,7 @@ PHASE10_GLOBAL_IMPORTANT_DOCS = (
     "README.md",
     "docs/PROJECT_HEALTH_SNAPSHOT.md",
     "docs/PHASE_10_READINESS_CHECKLIST.md",
+    "docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md",
     "docs/AI_HANDOFF_CONTEXT.md",
     "docs/SAFETY_INVARIANTS.md",
     "docs/project_status_snapshot.json",
@@ -51,6 +58,8 @@ PHASE10_GLOBAL_IMPORTANT_DOCS = (
 PHASE10_GLOBAL_IMPORTANT_RUNTIME_FILES = (
     "src/lain_desk_agent/phase10_global_status.py",
     "src/lain_desk_agent/phase10_readiness.py",
+    "src/lain_desk_agent/phase10_guardrails.py",
+    "src/lain_desk_agent/phase10_experiment.py",
     "src/lain_desk_agent/phase9_experiment.py",
     "src/lain_desk_agent/main.py",
     "ui/index.html",
@@ -81,9 +90,11 @@ def build_phase10_global_status_report() -> dict[str, Any]:
         list(readiness_report.get("no_go_reasons") or PHASE10_NO_GO_REASONS)
     )
     phase9_validation_state = _phase9_export_import_replay_validation_state()
+    phase10_guardrail_state = _phase10_guardrail_validation_state()
     ai_handoff_summary = _global_ai_handoff_summary(
         no_go_reasons,
         phase9_validation_state,
+        phase10_guardrail_state,
     )
 
     return {
@@ -108,6 +119,7 @@ def build_phase10_global_status_report() -> dict[str, Any]:
         "forbidden_apis": list(PHASE10_FORBIDDEN_APIS),
         "phase10_readiness_state": _phase10_readiness_state(readiness_report),
         "phase9_export_import_replay_validation_state": phase9_validation_state,
+        "phase10_guardrail_validation_state": phase10_guardrail_state,
         "ai_handoff_summary": ai_handoff_summary,
         "recommended_next_work": _recommended_next_work(),
         "external_llm_calls": False,
@@ -136,6 +148,9 @@ def build_phase10_global_ai_handoff_payload() -> dict[str, Any]:
         "phase9_export_import_replay_validation_state": dict(
             report["phase9_export_import_replay_validation_state"]
         ),
+        "phase10_guardrail_validation_state": dict(
+            report["phase10_guardrail_validation_state"]
+        ),
         "verification_commands": list(report["verification_commands"]),
         "important_docs": list(report["important_docs"]),
         "important_runtime_files": list(report["important_runtime_files"]),
@@ -149,6 +164,7 @@ def build_phase10_global_status_summary() -> dict[str, Any]:
 
     report = build_phase10_global_status_report()
     phase9_state = report["phase9_export_import_replay_validation_state"]
+    phase10_guardrail_state = report["phase10_guardrail_validation_state"]
     return {
         "summary_version": PHASE10_GLOBAL_SUMMARY_VERSION,
         "project_phase": report["project_phase"],
@@ -164,7 +180,59 @@ def build_phase10_global_status_summary() -> dict[str, Any]:
         "no_go_reason_count": len(report["no_go_reasons"]),
         "phase9_validation_status": phase9_state["validation_status"],
         "phase9_replay_status": phase9_state["replay_status"],
+        "phase10_guardrail_validation_status": phase10_guardrail_state[
+            "validation_status"
+        ],
         "verification_expectation": "all listed commands are expected to pass",
+    }
+
+
+def _phase10_guardrail_validation_state() -> dict[str, Any]:
+    bundle = build_phase10_release_candidate_bundle()
+    report = build_phase10_guardrail_validation_report(bundle)
+    validation = report["validation"]
+    summary = validation.get("validation_summary")
+    if not isinstance(summary, dict):
+        summary = {}
+    validation_bundle = validation.get("validation_bundle")
+    if not isinstance(validation_bundle, dict):
+        validation_bundle = {}
+
+    return {
+        "source": "deterministic_phase10_guardrail_fixture",
+        "bundle_type": str(bundle.get("bundle_type") or ""),
+        "bundle_version": str(bundle.get("bundle_version") or ""),
+        "validation_status": str(validation.get("status") or "unknown"),
+        "validation_passed": validation.get("valid") is True,
+        "validation_error_count": len(_list_value(validation.get("errors"))),
+        "validation_warning_count": len(_list_value(validation.get("warnings"))),
+        "unsafe_flag_count": len(_list_value(validation.get("unsafe_flags_detected"))),
+        "audit_order_issue_count": len(
+            [
+                check
+                for check in _list_value(validation.get("audit_order_checks"))
+                if isinstance(check, dict) and check.get("passed") is not True
+            ]
+        ),
+        "consistency_issue_count": len(
+            [
+                check
+                for check in _list_value(validation.get("consistency_checks"))
+                if isinstance(check, dict) and check.get("passed") is not True
+            ]
+        ),
+        "sensitive_key_finding_count": len(
+            _list_value(validation.get("sensitive_key_findings"))
+        ),
+        "replay_allowed_as_read_only": summary.get("replay_allowed_as_read_only")
+        is True,
+        "recommended_debug_focus": str(validation.get("recommended_debug_focus") or ""),
+        "validation_bundle_version": str(validation_bundle.get("bundle_version") or ""),
+        "real_actions_enabled": False,
+        "phase10_real_actions_implemented": False,
+        "go_for_phase10": False,
+        "state_mutation": False,
+        "execution_attempted": False,
     }
 
 
@@ -230,6 +298,7 @@ def _phase10_readiness_state(readiness_report: dict[str, Any]) -> dict[str, Any]
 def _global_ai_handoff_summary(
     no_go_reasons: list[str],
     phase9_validation_state: dict[str, Any],
+    phase10_guardrail_state: dict[str, Any],
 ) -> str:
     return (
         "Phase 10.2 adds a global status cockpit and AI handoff dashboard for "
@@ -238,7 +307,9 @@ def _global_ai_handoff_summary(
         "implemented, and go_for_phase10 is false. Phase 9 export/import/replay "
         f"validation is {phase9_validation_state['validation_status']} and replay "
         f"is {phase9_validation_state['replay_status']} as deterministic local "
-        "debug data. Readiness is not permission, cockpit display is not "
+        "debug data. Phase 10.3 guardrail validation is "
+        f"{phase10_guardrail_state['validation_status']} as deterministic "
+        "read-only release-candidate data. Readiness is not permission, cockpit display is not "
         "authorization, export/import/replay is not execution, and AI handoff "
         f"is not AI control. Current no-go reasons: {', '.join(no_go_reasons)}."
     )
@@ -256,6 +327,7 @@ def _completed_phase_summary() -> list[str]:
         "Phase 10 readiness documentation and project health handoff",
         "Phase 10.1 read-only readiness cockpit",
         "Phase 10.2 global status cockpit and AI handoff dashboard",
+        "Phase 10.3 release-candidate guardrail validation",
     ]
 
 
@@ -268,6 +340,7 @@ def _safety_boundary() -> list[str]:
         "no readiness result grants permission",
         "no export/import/replay path executes actions",
         "no AI handoff payload controls the agent",
+        "Phase 10.3 guardrail validation is read-only and browser-local in the cockpit",
         "no live OS state inspection for this report",
         "no runtime state mutation from this report",
     ]
@@ -286,6 +359,7 @@ def _safety_invariants() -> list[str]:
         "Capability Registry remains separate from AI handoff",
         "Phase 9 imported bundles remain untrusted local input",
         "Phase 9 replay remains read-only",
+        "Phase 10.3 guardrail validation remains read-only",
         "validation errors do not mutate runtime state",
     ]
 
@@ -313,6 +387,7 @@ def _current_cockpit_capabilities() -> list[str]:
         "Phase 9 export/import/replay validation display",
         "Phase 10.1 readiness display",
         "Phase 10.2 global status and AI handoff display",
+        "Phase 10.3 release-candidate guardrail validation display",
         "local-only filters, expand/collapse, and copy helpers",
     ]
 
@@ -320,6 +395,7 @@ def _current_cockpit_capabilities() -> list[str]:
 def _recommended_next_work() -> list[str]:
     return [
         "Keep Phase 10.2 as visibility, handoff, docs, and regression protection.",
+        "Keep Phase 10.3 guardrail validation deterministic, local-only, and read-only.",
         "Preserve the dry-run/read-only/debug-only cockpit boundary.",
         "Keep Phase 9 replay validation stable and deterministic.",
         "Run the verification command set after UI or safety-related edits.",

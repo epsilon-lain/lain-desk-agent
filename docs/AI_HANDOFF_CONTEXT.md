@@ -35,7 +35,8 @@ Cockpit display is not authorization.
 The project is post-Phase 9.x dry-run sandbox hardening and in Phase 10
 readiness / release-candidate preparation. The latest runtime cockpit
 visibility layer is Phase 10.2 Global Status / AI Handoff. The latest
-release-candidate protection layer is Phase 10.3 guardrails.
+release-candidate protection layer is Phase 10.3 deterministic guardrail
+validation.
 
 Phase 10 real actions are not implemented yet.
 
@@ -73,6 +74,10 @@ Phase 10 real actions are not implemented yet.
   readiness report; NO-GO by default.
 - `src/lain_desk_agent/phase10_global_status.py`: deterministic Phase 10.2
   global status and AI handoff report; NO-GO by default.
+- `src/lain_desk_agent/phase10_guardrails.py`: deterministic Phase 10.3
+  release-candidate bundle validation helpers; read-only only.
+- `src/lain_desk_agent/phase10_experiment.py`: Phase 10.3 read-only guardrail
+  facade; not an action adapter.
 - `src/lain_desk_agent/main.py`: HTTP endpoints; sandbox/Phase 9 endpoints are
   deterministic read-only report endpoints.
 - `ui/app.js`, `ui/index.html`, `ui/styles.css`: cockpit UI and local-only
@@ -81,6 +86,7 @@ Phase 10 real actions are not implemented yet.
 - `scripts/verify.ps1`: standard verification chain.
 - `scripts/project_status.ps1`: read-only project health command helper.
 - `tests/test_release_candidate_guardrails.py`: Phase 10.3 regression pack.
+- `tests/test_phase10_guardrails.py`: Phase 10.3 validation and cockpit hooks.
 
 ## Important Test Commands
 
@@ -91,6 +97,7 @@ git diff --check
 node --check ui/app.js
 python -m unittest discover -s tests
 python -m unittest discover -s tests -p test_release_candidate_guardrails.py
+python -m unittest discover -s tests -p test_phase10_guardrails.py
 ```
 
 ## What Not To Touch
@@ -164,16 +171,20 @@ authorization, execution, or control.
 
 ## Phase 10.3 Release-candidate Guardrails
 
-Phase 10.3 adds documentation and regression tests only. It protects the
-current NO-GO release-candidate boundary and does not add endpoints, cockpit
-execution controls, real-action toggles, permission changes, mutation paths,
-or desktop actuation.
+Phase 10.3 adds deterministic release-candidate bundle validation helpers,
+browser-local cockpit validation, documentation, and regression tests. It
+protects the current NO-GO release-candidate boundary and does not add backend
+endpoints, cockpit execution controls, real-action toggles, permission
+changes, mutation paths, or desktop actuation.
 
 Future AI should interpret the guardrails like this:
 
 - the guardrail document is not approval
 - passing tests is not permission
+- a valid guardrail bundle is not permission
 - project status is not authorization
+- cockpit filtering, grouping, drill-down, and copy helpers are local display
+  behavior only
 - the only existing UI `/execute` fetch is the approved wait self-test
 - any new sandbox, replay, readiness, global-status, or AI handoff `/execute`
   path is a regression
@@ -202,8 +213,8 @@ Replay is read-only.
 ## Known Safe Next Steps
 
 - Add docs and tests for release preparation.
-- Add or refine Phase 10.3 regression tests without changing runtime
-  permission.
+- Add or refine Phase 10.3 validation/tests without changing runtime
+  permission or adding endpoints.
 - Improve AI handoff wording.
 - Add read-only validation coverage.
 - Add cockpit readability polish that only changes local display.
@@ -241,10 +252,10 @@ docs/PROJECT_HEALTH_SNAPSHOT.md, docs/SAFETY_INVARIANTS.md, and
 docs/PHASE_10_READINESS_CHECKLIST.md, and
 docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md before editing. Phase 10.1
 readiness is NO-GO by default, Phase 10.2 global status is NO-GO by default,
-and Phase 10.3 is regression protection only; do not make any of them GO by
-enabling real actions. Preserve proposal is not execution, readiness is not
-permission, cockpit display is not authorization, export/import/replay is not
-execution, AI handoff is not AI control, and imported bundles are untrusted
-input. Run verify.ps1, safety_scan.py, git diff --check, node --check
-ui/app.js, and the Phase 10.3 guardrail test.
+and Phase 10.3 is deterministic local validation only; do not make any of them
+GO by enabling real actions. Preserve proposal is not execution, readiness is
+not permission, cockpit display is not authorization, export/import/replay is
+not execution, AI handoff is not AI control, and imported bundles are
+untrusted input. Run verify.ps1, safety_scan.py, git diff --check, node --check
+ui/app.js, and both Phase 10.3 guardrail tests.
 ```

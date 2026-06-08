@@ -680,6 +680,88 @@
               <dl class="planner-evaluation-summary" id="phase10GlobalStatusSummary" hidden></dl>
               <div class="phase10-readiness-groups" id="phase10GlobalStatusGroups" hidden></div>
             </section>
+            <section
+              class="planner-evaluation-panel phase10-guardrails-panel"
+              id="phase10GuardrailsPanel"
+              aria-label="Phase 10 release-candidate guardrails"
+            >
+              <div class="planner-evaluation-header">
+                <div>
+                  <p class="planner-evaluation-title">Phase 10.3 guardrails</p>
+                  <p class="planner-evaluation-helper">
+                    Browser-local release-candidate validation. No endpoint, permission, or desktop action.
+                  </p>
+                </div>
+                <button class="planner-evaluation-button" id="loadPhase10GuardrailDemo" type="button">
+                  Load local demo
+                </button>
+              </div>
+              <label class="phase9-replay-input-label" for="phase10GuardrailBundleInput">
+                Release-candidate bundle JSON
+                <textarea
+                  class="phase9-replay-input phase10-guardrail-input"
+                  id="phase10GuardrailBundleInput"
+                  rows="6"
+                  spellcheck="false"
+                  placeholder="Paste phase10_release_candidate_bundle JSON here"
+                ></textarea>
+              </label>
+              <div class="sandbox-evaluation-detail-actions phase10-guardrail-actions" aria-label="Phase 10 guardrail controls">
+                <button class="planner-evaluation-button" id="validatePhase10GuardrailBundle" type="button">
+                  Validate bundle
+                </button>
+                <button class="planner-evaluation-button" id="copyPhase10GuardrailValidationSummary" type="button">
+                  Copy validation summary
+                </button>
+                <button class="planner-evaluation-button" id="copyPhase10GuardrailValidationErrors" type="button">
+                  Copy validation errors
+                </button>
+                <button class="planner-evaluation-button" id="copyPhase10GuardrailDebugFocus" type="button">
+                  Copy debug focus
+                </button>
+                <button class="planner-evaluation-button" id="copyPhase10GuardrailValidationJson" type="button">
+                  Copy replay validation JSON
+                </button>
+                <button class="planner-evaluation-button" id="expandPhase10GuardrailGroups" type="button">
+                  Expand validation groups
+                </button>
+                <button class="planner-evaluation-button" id="collapsePhase10GuardrailGroups" type="button">
+                  Collapse validation groups
+                </button>
+                <button class="planner-evaluation-button" id="clearPhase10GuardrailBundle" type="button">
+                  Clear bundle
+                </button>
+              </div>
+              <p class="sandbox-evaluation-copy-status" id="phase10GuardrailStatus">
+                No release-candidate bundle loaded.
+              </p>
+              <ul class="phase9-replay-errors phase10-guardrail-errors" id="phase10GuardrailErrors" hidden></ul>
+              <div
+                class="sandbox-evaluation-counts phase10-guardrail-health-strip"
+                id="phase10GuardrailValidationCounts"
+                data-phase10-replay-validation-health-strip="true"
+                hidden
+              ></div>
+              <dl class="planner-evaluation-summary" id="phase10GuardrailSummary" hidden></dl>
+              <div
+                class="sandbox-evaluation-quick-filters phase10-guardrail-filters"
+                id="phase10GuardrailValidationFilters"
+                hidden
+              ></div>
+              <div
+                class="phase10-guardrail-validation-groups"
+                id="phase10GuardrailValidationGroups"
+                hidden
+              ></div>
+              <details
+                class="phase9-replay-validation-details phase10-guardrail-validation-details"
+                id="phase10GuardrailValidationDetails"
+                hidden
+              >
+                <summary>Replay validation JSON</summary>
+                <pre id="phase10GuardrailValidationJson"></pre>
+              </details>
+            </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
               <p id="safetyBrakeMessage">No safety decision yet.</p>
               <div class="safety-buttons" id="safetyButtons" hidden>

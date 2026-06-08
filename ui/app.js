@@ -168,6 +168,25 @@ const phase10GlobalStatusCopyStatus = document.querySelector("#phase10GlobalStat
 const phase10GlobalStatusStrip = document.querySelector("#phase10GlobalStatusStrip");
 const phase10GlobalStatusSummary = document.querySelector("#phase10GlobalStatusSummary");
 const phase10GlobalStatusGroups = document.querySelector("#phase10GlobalStatusGroups");
+const phase10GuardrailsPanel = document.querySelector("#phase10GuardrailsPanel");
+const loadPhase10GuardrailDemo = document.querySelector("#loadPhase10GuardrailDemo");
+const phase10GuardrailBundleInput = document.querySelector("#phase10GuardrailBundleInput");
+const validatePhase10GuardrailBundle = document.querySelector("#validatePhase10GuardrailBundle");
+const copyPhase10GuardrailValidationSummary = document.querySelector("#copyPhase10GuardrailValidationSummary");
+const copyPhase10GuardrailValidationErrors = document.querySelector("#copyPhase10GuardrailValidationErrors");
+const copyPhase10GuardrailDebugFocus = document.querySelector("#copyPhase10GuardrailDebugFocus");
+const copyPhase10GuardrailValidationJson = document.querySelector("#copyPhase10GuardrailValidationJson");
+const expandPhase10GuardrailGroups = document.querySelector("#expandPhase10GuardrailGroups");
+const collapsePhase10GuardrailGroups = document.querySelector("#collapsePhase10GuardrailGroups");
+const clearPhase10GuardrailBundle = document.querySelector("#clearPhase10GuardrailBundle");
+const phase10GuardrailStatus = document.querySelector("#phase10GuardrailStatus");
+const phase10GuardrailErrors = document.querySelector("#phase10GuardrailErrors");
+const phase10GuardrailValidationCounts = document.querySelector("#phase10GuardrailValidationCounts");
+const phase10GuardrailSummary = document.querySelector("#phase10GuardrailSummary");
+const phase10GuardrailValidationFilters = document.querySelector("#phase10GuardrailValidationFilters");
+const phase10GuardrailValidationGroups = document.querySelector("#phase10GuardrailValidationGroups");
+const phase10GuardrailValidationDetails = document.querySelector("#phase10GuardrailValidationDetails");
+const phase10GuardrailValidationJson = document.querySelector("#phase10GuardrailValidationJson");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -407,6 +426,87 @@ const PHASE9_REPLAY_VALIDATION_FILTERS = {
     description: "show failed consistency checks",
   },
 };
+const PHASE10_GUARDRAIL_BUNDLE_TYPE = "phase10_release_candidate_bundle";
+const PHASE10_GUARDRAIL_BUNDLE_VERSION = "phase10_release_candidate_bundle_v1";
+const PHASE10_GUARDRAIL_REPORT_VERSION = "phase10_guardrail_report_v1";
+const PHASE10_GUARDRAIL_PROJECT_PHASE = "phase_10_3_release_candidate_guardrails";
+const PHASE10_GUARDRAIL_REQUIRED_BUNDLE_FIELDS = [
+  "bundle_type",
+  "bundle_version",
+  "report_version",
+  "project_phase",
+  "phase10_report",
+  "ai_handoff_summary",
+  "safety_boundary_statement",
+];
+const PHASE10_GUARDRAIL_REQUIRED_REPORT_FIELDS = [
+  "report_version",
+  "project_phase",
+  "dry_run",
+  "read_only",
+  "debug_only",
+  "real_actions_enabled",
+  "phase10_real_actions_implemented",
+  "go_for_phase10",
+  "gate_blockers",
+  "readiness",
+  "approval",
+  "audit_event_names",
+  "audit_timeline",
+  "scope",
+  "consistency",
+];
+const PHASE10_GUARDRAIL_AUDIT_ORDER = [
+  "phase10_guardrail_bundle_loaded",
+  "phase10_guardrail_safety_boundary_checked",
+  "phase10_guardrail_readiness_checked",
+  "phase10_guardrail_scope_checked",
+  "phase10_guardrail_no_go_recorded",
+  "phase10_guardrail_read_only_replay_allowed",
+];
+const PHASE10_GUARDRAIL_FORBIDDEN_ACTION_TYPES = [
+  "click",
+  "type",
+  "type_text",
+  "hotkey",
+  "press",
+  "scroll",
+  "switch_app",
+];
+const PHASE10_GUARDRAIL_VALIDATION_FILTERS = {
+  all: {
+    label: "all",
+    description: "show every release-candidate validation group",
+  },
+  errors: {
+    label: "errors",
+    description: "show blocking validation errors",
+  },
+  warnings: {
+    label: "warnings",
+    description: "show structured validation warnings",
+  },
+  unsafe: {
+    label: "unsafe",
+    description: "show unsafe flag findings",
+  },
+  audit: {
+    label: "audit",
+    description: "show audit-order issues",
+  },
+  sensitive: {
+    label: "sensitive",
+    description: "show sensitive key findings",
+  },
+  consistency: {
+    label: "consistency",
+    description: "show failed consistency checks",
+  },
+  readiness: {
+    label: "readiness",
+    description: "show readiness and gate blocker findings",
+  },
+};
 const DEMO_SCENARIOS = {
   browser_search: {
     defaultTask: "Search",
@@ -449,6 +549,9 @@ let currentPhase9ReplayReport = null;
 let currentPhase9ReplayValidationFilter = "all";
 let currentPhase10ReadinessReport = null;
 let currentPhase10GlobalStatusReport = null;
+let currentPhase10GuardrailBundle = null;
+let currentPhase10GuardrailValidation = null;
+let currentPhase10GuardrailValidationFilter = "all";
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 setDemoScenarioSelectionDefaults();
@@ -513,6 +616,7 @@ renderPlannerEvaluation();
 renderSandboxEvaluation();
 renderPhase9Experiment();
 renderPhase10Readiness();
+renderPhase10Guardrails();
 renderPermissionProfile();
 renderCapabilities();
 fetchRuntimeStatus({ silent: true });
@@ -627,6 +731,42 @@ copyPhase10GlobalVerificationCommands.addEventListener("click", async () => {
 
 copyPhase10GlobalSafetyBoundary.addEventListener("click", async () => {
   await copyPhase10GlobalStatusPayload("safety_boundary");
+});
+
+loadPhase10GuardrailDemo.addEventListener("click", () => {
+  loadPhase10GuardrailDemoBundle();
+});
+
+validatePhase10GuardrailBundle.addEventListener("click", () => {
+  validatePhase10GuardrailBundleFromInput();
+});
+
+copyPhase10GuardrailValidationSummary.addEventListener("click", async () => {
+  await copyPhase10GuardrailPayload("validation_summary");
+});
+
+copyPhase10GuardrailValidationErrors.addEventListener("click", async () => {
+  await copyPhase10GuardrailPayload("validation_errors");
+});
+
+copyPhase10GuardrailDebugFocus.addEventListener("click", async () => {
+  await copyPhase10GuardrailPayload("debug_focus");
+});
+
+copyPhase10GuardrailValidationJson.addEventListener("click", async () => {
+  await copyPhase10GuardrailPayload("validation_json");
+});
+
+expandPhase10GuardrailGroups.addEventListener("click", () => {
+  setPhase10GuardrailGroupsOpen(true);
+});
+
+collapsePhase10GuardrailGroups.addEventListener("click", () => {
+  setPhase10GuardrailGroupsOpen(false);
+});
+
+clearPhase10GuardrailBundle.addEventListener("click", () => {
+  clearPhase10GuardrailValidation();
 });
 
 for (const phase9FilterControl of [
@@ -2817,6 +2957,7 @@ function renderPhase10GlobalStatus(report = null) {
     ["Real actions enabled", formatSandboxBool(report.real_actions_enabled)],
     ["Phase 10 implemented", formatSandboxBool(report.phase10_real_actions_implemented)],
     ["Phase 9 replay", report.phase9_export_import_replay_validation_state?.replay_status || "unknown"],
+    ["Phase 10.3 guardrails", report.phase10_guardrail_validation_state?.validation_status || "unknown"],
     ["No-go reasons", String(sandboxCodes(report.no_go_reasons).length)],
   ]);
   renderPhase10GlobalStatusGroups(report);
@@ -2837,6 +2978,7 @@ function renderPhase10GlobalStatusError(error) {
 function renderPhase10GlobalStatusStrip(report) {
   phase10GlobalStatusStrip.replaceChildren();
   const phase9State = report.phase9_export_import_replay_validation_state || {};
+  const guardrailState = report.phase10_guardrail_validation_state || {};
   const items = [
     ["status", report.go_for_phase10 === true ? "GO" : "NO-GO", report.go_for_phase10 === true ? "ok" : "risk"],
     ["dry-run", formatSandboxBool(report.dry_run), report.dry_run ? "ok" : "risk"],
@@ -2854,6 +2996,11 @@ function renderPhase10GlobalStatusStrip(report) {
     ],
     ["Phase 9 validation", phase9State.validation_status || "unknown", phase9State.validation_passed ? "ok" : "warn"],
     ["Phase 9 replay", phase9State.replay_status || "unknown", phase9State.replay_allowed_as_read_only ? "ok" : "warn"],
+    [
+      "Phase 10.3 guardrails",
+      guardrailState.validation_status || "unknown",
+      guardrailState.validation_passed ? "ok" : "warn",
+    ],
   ];
 
   for (const [label, value, tone] of items) {
@@ -2928,6 +3075,13 @@ function phase10GlobalStatusSections(report) {
       title: "Phase 9 export/import/replay validation",
       tone: "ok",
       items: phase10GlobalObjectItems(report.phase9_export_import_replay_validation_state),
+    },
+    {
+      key: "phase10_guardrail_validation_state",
+      filterKey: "verification",
+      title: "Phase 10.3 release-candidate guardrails",
+      tone: "ok",
+      items: phase10GlobalObjectItems(report.phase10_guardrail_validation_state),
     },
     {
       key: "verification_commands",
@@ -3163,6 +3317,783 @@ function phase10GlobalStatusCopyStatusText(payloadKind) {
     return "Global safety boundary copied.";
   }
   return "Global status JSON copied.";
+}
+
+function renderPhase10Guardrails(validation = currentPhase10GuardrailValidation) {
+  if (!validation) {
+    phase10GuardrailsPanel.dataset.state = "empty";
+    phase10GuardrailStatus.textContent = "No release-candidate bundle loaded.";
+    phase10GuardrailErrors.hidden = true;
+    phase10GuardrailErrors.replaceChildren();
+    phase10GuardrailValidationCounts.hidden = true;
+    phase10GuardrailValidationCounts.replaceChildren();
+    phase10GuardrailSummary.hidden = true;
+    phase10GuardrailSummary.replaceChildren();
+    phase10GuardrailValidationFilters.hidden = true;
+    phase10GuardrailValidationFilters.replaceChildren();
+    phase10GuardrailValidationGroups.hidden = true;
+    phase10GuardrailValidationGroups.replaceChildren();
+    phase10GuardrailValidationDetails.hidden = true;
+    phase10GuardrailValidationJson.textContent = "";
+    return;
+  }
+
+  const summary = validation.validation_summary || {};
+  phase10GuardrailsPanel.dataset.state = validation.valid ? "ready" : "warning";
+  phase10GuardrailsPanel.dataset.phase10ReplayValidationStatus = validation.status || "unknown";
+  phase10GuardrailStatus.textContent = validation.valid
+    ? "Release-candidate guardrail validation passed. Replay remains read-only."
+    : "Release-candidate guardrail validation failed. Review local findings below.";
+  renderPhase10GuardrailErrors(validation.errors || []);
+  renderPhase10GuardrailValidationCounts(validation);
+  renderPhase10GuardrailValidationFilters(validation);
+  renderPhase10GuardrailValidationGroups(validation);
+  setPhase10GuardrailSummary([
+    ["Validation", validation.status || "unknown"],
+    ["Bundle version", validation.bundle_version || "unknown"],
+    ["Report version", validation.report_version || "unknown"],
+    ["Errors", formatSandboxCodeList(validation.error_codes)],
+    ["Warnings", formatSandboxCodeList(validation.warning_codes)],
+    ["Unsafe flags", formatSandboxCodeList(validation.unsafe_flags_detected)],
+    ["Audit order", phase9ReplayCheckStatus(validation.audit_order_checks)],
+    ["Sensitive keys", formatSandboxCodeList(validation.sensitive_key_findings)],
+    ["Replay allowed", formatSandboxBool(summary.replay_allowed_as_read_only === true)],
+    ["Debug focus", summary.recommended_debug_focus || validation.recommended_debug_focus || "none"],
+  ]);
+  phase10GuardrailSummary.hidden = false;
+  renderPhase10GuardrailValidationDetails(validation);
+}
+
+function loadPhase10GuardrailDemoBundle() {
+  const bundle = buildPhase10GuardrailDemoBundle();
+  phase10GuardrailBundleInput.value = JSON.stringify(bundle, null, 2);
+  currentPhase10GuardrailBundle = bundle;
+  currentPhase10GuardrailValidation = validatePhase10GuardrailBundleObject(bundle);
+  currentPhase10GuardrailValidationFilter = "all";
+  renderPhase10Guardrails(currentPhase10GuardrailValidation);
+}
+
+function validatePhase10GuardrailBundleFromInput() {
+  try {
+    const bundle = parsePhase10GuardrailBundleInput();
+    currentPhase10GuardrailBundle = bundle;
+    currentPhase10GuardrailValidation = validatePhase10GuardrailBundleObject(bundle);
+    currentPhase10GuardrailValidationFilter = "all";
+    renderPhase10Guardrails(currentPhase10GuardrailValidation);
+  } catch (error) {
+    renderPhase10GuardrailParseError(error);
+  }
+}
+
+function parsePhase10GuardrailBundleInput() {
+  const text = phase10GuardrailBundleInput.value.trim();
+  if (!text) {
+    throw new Error("Paste a Phase 10.3 release-candidate bundle first.");
+  }
+  return JSON.parse(text);
+}
+
+function clearPhase10GuardrailValidation() {
+  phase10GuardrailBundleInput.value = "";
+  currentPhase10GuardrailBundle = null;
+  currentPhase10GuardrailValidation = null;
+  currentPhase10GuardrailValidationFilter = "all";
+  renderPhase10Guardrails(null);
+}
+
+function renderPhase10GuardrailParseError(error) {
+  currentPhase10GuardrailBundle = null;
+  currentPhase10GuardrailValidation = phase10GuardrailValidationResult(
+    {},
+    [{ code: "missing_bundle_field", field: "bundle_json", detail: error.message || String(error) }],
+    [],
+    [],
+    []
+  );
+  phase10GuardrailsPanel.dataset.state = "error";
+  renderPhase10Guardrails(currentPhase10GuardrailValidation);
+}
+
+function buildPhase10GuardrailDemoBundle() {
+  const noGoReasons = sandboxCodes(
+    currentPhase10GlobalStatusReport?.no_go_reasons || [
+      "phase10_real_actions_not_implemented",
+      "real_actions_disabled",
+      "manual_phase10_approval_not_recorded",
+      "real_action_adapter_absent",
+    ]
+  );
+  const report = {
+    report_version: PHASE10_GUARDRAIL_REPORT_VERSION,
+    project_phase: PHASE10_GUARDRAIL_PROJECT_PHASE,
+    dry_run: true,
+    read_only: true,
+    debug_only: true,
+    real_action_enabled: false,
+    real_actions_enabled: false,
+    phase10_real_actions_implemented: false,
+    go_for_phase10: false,
+    gate_blockers: noGoReasons,
+    readiness: {
+      status: "no_go",
+      ready: false,
+      blockers: noGoReasons,
+      readiness_is_permission: false,
+    },
+    approval: {
+      explicit_phase10_approval: false,
+      approval_status: "not_recorded",
+      approval_bound_to_contract: false,
+    },
+    audit_event_names: PHASE10_GUARDRAIL_AUDIT_ORDER.slice(),
+    audit_timeline: PHASE10_GUARDRAIL_AUDIT_ORDER.map((eventName, index) => ({
+      order: index + 1,
+      event_name: eventName,
+      module: "phase10_guardrails",
+      outcome: "recorded",
+    })),
+    scope: {
+      scope_type: "release_candidate_guardrails",
+      one_window_only: true,
+      one_target_only: true,
+      sandbox_window_selected: false,
+      target_selected: false,
+      allowed_action_types: [],
+      forbidden_action_types: PHASE10_GUARDRAIL_FORBIDDEN_ACTION_TYPES.slice(),
+      desktop_control_apis_allowed: false,
+      new_backend_endpoints: false,
+    },
+    consistency: {
+      readiness_is_permission: false,
+      cockpit_display_authorization: false,
+      export_import_replay_execution: false,
+      ai_handoff_control: false,
+      permission_policy_changed: false,
+    },
+  };
+
+  return {
+    bundle_type: PHASE10_GUARDRAIL_BUNDLE_TYPE,
+    bundle_version: PHASE10_GUARDRAIL_BUNDLE_VERSION,
+    report_version: PHASE10_GUARDRAIL_REPORT_VERSION,
+    project_phase: PHASE10_GUARDRAIL_PROJECT_PHASE,
+    phase10_report: report,
+    ai_handoff_summary:
+      "Phase 10.3 guardrails validate release-candidate data locally. Readiness is not permission, cockpit display is not authorization, export/import/replay is not execution, and AI handoff is not AI control.",
+    safety_boundary_statement:
+      "Phase 10.3 release-candidate guardrails are dry-run/read-only/debug-only. No real desktop actions, no action-performing endpoint, no approval/execute/real-action controls, and no permission changes are allowed.",
+  };
+}
+
+function validatePhase10GuardrailBundleObject(bundle) {
+  const errors = [];
+  const warnings = [];
+  const consistencyChecks = [];
+  const auditOrderChecks = [];
+
+  if (!phase9IsPlainObject(bundle)) {
+    phase10GuardrailAddValidationError(errors, "missing_bundle_field", "bundle", "Release-candidate bundle must be a JSON object.");
+    return phase10GuardrailValidationResult(bundle, errors, warnings, consistencyChecks, auditOrderChecks);
+  }
+
+  for (const fieldName of PHASE10_GUARDRAIL_REQUIRED_BUNDLE_FIELDS) {
+    if (!(fieldName in bundle)) {
+      phase10GuardrailAddValidationError(errors, "missing_bundle_field", fieldName, "Required top-level release-candidate bundle field is missing.");
+    }
+  }
+
+  const sensitivePaths = phase9SensitiveKeyPaths(bundle);
+  if (sensitivePaths.length) {
+    phase10GuardrailAddValidationError(errors, "suspicious_sensitive_key", sensitivePaths.slice(0, 5).join(", "), "Bundle contains key names that look like private material.");
+  }
+
+  if (bundle.bundle_type !== PHASE10_GUARDRAIL_BUNDLE_TYPE) {
+    phase10GuardrailAddValidationError(errors, "unsupported_bundle_type", "bundle_type", `Expected ${PHASE10_GUARDRAIL_BUNDLE_TYPE}.`);
+  }
+  if (bundle.bundle_version !== PHASE10_GUARDRAIL_BUNDLE_VERSION) {
+    phase10GuardrailAddValidationError(errors, "unsupported_bundle_version", "bundle_version", `Expected ${PHASE10_GUARDRAIL_BUNDLE_VERSION}.`);
+  }
+  if (bundle.report_version !== PHASE10_GUARDRAIL_REPORT_VERSION) {
+    phase10GuardrailAddValidationError(errors, "invalid_report_version", "report_version", `Expected ${PHASE10_GUARDRAIL_REPORT_VERSION}.`);
+  }
+  if (bundle.project_phase !== PHASE10_GUARDRAIL_PROJECT_PHASE) {
+    phase10GuardrailAddValidationError(errors, "unsupported_project_phase", "project_phase", `Expected ${PHASE10_GUARDRAIL_PROJECT_PHASE}.`);
+  }
+
+  const report = phase9IsPlainObject(bundle.phase10_report) ? bundle.phase10_report : null;
+  if (!report) {
+    phase10GuardrailAddValidationError(errors, "missing_phase10_report", "phase10_report", "Bundle must contain a Phase 10 guardrail report object.");
+    return phase10GuardrailValidationResult(bundle, errors, warnings, consistencyChecks, auditOrderChecks);
+  }
+
+  for (const fieldName of PHASE10_GUARDRAIL_REQUIRED_REPORT_FIELDS) {
+    if (!(fieldName in report)) {
+      phase10GuardrailAddValidationError(errors, "missing_bundle_field", `phase10_report.${fieldName}`, "Required Phase 10 guardrail report field is missing.");
+    }
+  }
+
+  validatePhase10GuardrailFlags(report, errors);
+  validatePhase10GuardrailReadiness(report, errors, consistencyChecks);
+  validatePhase10GuardrailApproval(report, errors, consistencyChecks);
+  validatePhase10GuardrailScope(report, errors, consistencyChecks);
+  validatePhase10GuardrailAuditOrder(report, errors, auditOrderChecks);
+  validatePhase10GuardrailConsistency(report, errors, consistencyChecks);
+  validatePhase10GuardrailBoundary(bundle, errors, consistencyChecks);
+
+  for (const finding of phase10GuardrailExecutePathFindings(bundle)) {
+    phase10GuardrailAddValidationError(errors, "execute_path_in_bundle", finding, "Release-candidate guardrail bundles must not define action-performing paths.");
+  }
+
+  return phase10GuardrailValidationResult(bundle, errors, warnings, consistencyChecks, auditOrderChecks);
+}
+
+function validatePhase10GuardrailFlags(report, errors) {
+  if (report.dry_run !== true || report.read_only !== true || report.debug_only !== true) {
+    phase10GuardrailAddValidationError(errors, "non_dry_run_bundle", "phase10_report.dry_run", "Phase 10.3 bundles must remain dry-run/read-only/debug-only.");
+    phase10GuardrailAddValidationError(errors, "unsafe_bundle_flags", "phase10_report.dry_run", "Unsafe runtime mode flag detected.");
+  }
+  if (report.real_actions_enabled === true || report.real_action_enabled === true) {
+    phase10GuardrailAddValidationError(errors, "real_action_enabled_in_bundle", "phase10_report.real_actions_enabled", "Release-candidate bundles must keep real actions disabled.");
+    phase10GuardrailAddValidationError(errors, "unsafe_bundle_flags", "phase10_report.real_actions_enabled", "Unsafe real-action flag detected.");
+  }
+  if (report.phase10_real_actions_implemented === true) {
+    phase10GuardrailAddValidationError(errors, "phase10_real_actions_implemented_in_bundle", "phase10_report.phase10_real_actions_implemented", "Phase 10.3 guardrails must not claim real actions are implemented.");
+  }
+  if (report.go_for_phase10 === true) {
+    phase10GuardrailAddValidationError(errors, "go_for_phase10_in_bundle", "phase10_report.go_for_phase10", "Phase 10.3 guardrail bundles must remain NO-GO.");
+  }
+}
+
+function validatePhase10GuardrailReadiness(report, errors, consistencyChecks) {
+  const blockers = sandboxCodes(report.gate_blockers);
+  const readiness = phase9IsPlainObject(report.readiness) ? report.readiness : {};
+  const readinessBlockers = sandboxCodes(readiness.blockers);
+  const readinessReady = readiness.ready === true || ["go", "ready"].includes(String(readiness.status || "").toLowerCase());
+
+  phase10GuardrailRecordCheck(consistencyChecks, "gate_blockers_present_for_no_go", blockers.length > 0, "missing_gate_blockers", "phase10_report.gate_blockers", "NO-GO release-candidate bundles must include gate blockers.", errors);
+  phase10GuardrailRecordCheck(consistencyChecks, "readiness_not_ready", !readinessReady, "readiness_go_in_bundle", "phase10_report.readiness", "Readiness cannot be GO in Phase 10.3 guardrail bundles.", errors);
+  phase10GuardrailRecordCheck(consistencyChecks, "readiness_blockers_match_gate_blockers", phase10GuardrailSameCodeSet(blockers, readinessBlockers), "readiness_blocker_mismatch", "phase10_report.readiness.blockers", "Readiness blockers must match gate blockers for reproducible handoff.", errors);
+}
+
+function validatePhase10GuardrailApproval(report, errors, consistencyChecks) {
+  const approval = phase9IsPlainObject(report.approval) ? report.approval : {};
+  const approved = approval.explicit_phase10_approval === true || approval.approved === true || ["approved", "granted"].includes(String(approval.approval_status || "").toLowerCase());
+  phase10GuardrailRecordCheck(consistencyChecks, "approval_not_granted", !approved, "approval_implies_real_action", "phase10_report.approval", "Phase 10.3 guardrail validation must not import real-action approval.", errors);
+}
+
+function validatePhase10GuardrailScope(report, errors, consistencyChecks) {
+  const scope = phase9IsPlainObject(report.scope) ? report.scope : {};
+  const allowedActions = sandboxCodes(scope.allowed_action_types);
+  const unsafeActions = allowedActions.filter((action) => PHASE10_GUARDRAIL_FORBIDDEN_ACTION_TYPES.includes(action));
+  phase10GuardrailRecordCheck(consistencyChecks, "scope_is_limited", scope.one_window_only === true && scope.one_target_only === true, "scope_not_limited", "phase10_report.scope", "Release-candidate scope must remain one-window and one-target limited.", errors);
+  phase10GuardrailRecordCheck(consistencyChecks, "no_desktop_actions_allowed", !unsafeActions.length && scope.desktop_control_apis_allowed !== true, "unsafe_action_type", "phase10_report.scope.allowed_action_types", "Release-candidate guardrails must not allow desktop action types.", errors);
+  phase10GuardrailRecordCheck(consistencyChecks, "no_new_backend_endpoints", scope.new_backend_endpoints !== true, "mutation_endpoint_in_bundle", "phase10_report.scope.new_backend_endpoints", "Phase 10.3 must not add backend endpoints for guardrail validation.", errors);
+}
+
+function validatePhase10GuardrailAuditOrder(report, errors, auditOrderChecks) {
+  const eventNames = sandboxCodes(report.audit_event_names);
+  const timeline = Array.isArray(report.audit_timeline) ? report.audit_timeline : [];
+  const timelineNames = [];
+  let previousOrder = 0;
+
+  if (!timeline.length) {
+    phase10GuardrailAddValidationError(errors, "missing_audit_timeline", "phase10_report.audit_timeline", "Release-candidate guardrail bundles require audit timeline data.");
+    return;
+  }
+
+  timeline.forEach((event, index) => {
+    const fieldPath = `phase10_report.audit_timeline[${index}]`;
+    if (!phase9IsPlainObject(event)) {
+      phase10GuardrailAddValidationError(errors, "malformed_audit_event", fieldPath, "Audit entries must be objects.");
+      return;
+    }
+    if (!event.event_name) {
+      phase10GuardrailAddValidationError(errors, "malformed_audit_event", `${fieldPath}.event_name`, "Audit event name is missing.");
+    } else {
+      timelineNames.push(String(event.event_name));
+    }
+    if (!Number.isInteger(event.order) || event.order <= previousOrder) {
+      phase10GuardrailAddValidationError(errors, "inconsistent_audit_order", `${fieldPath}.order`, "Audit order must be strictly increasing.");
+    }
+    if (Number.isInteger(event.order)) {
+      previousOrder = event.order;
+    }
+  });
+
+  phase10GuardrailRecordCheck(auditOrderChecks, "audit_event_names_match_timeline", JSON.stringify(eventNames) === JSON.stringify(timelineNames), "inconsistent_audit_order", "phase10_report.audit_event_names", "audit_event_names must match audit_timeline event order.", errors);
+  const positions = new Map(eventNames.map((eventName, index) => [eventName, index]));
+  PHASE10_GUARDRAIL_AUDIT_ORDER.forEach((eventName) => {
+    phase10GuardrailRecordCheck(auditOrderChecks, `${eventName}_present`, positions.has(eventName), "missing_required_audit_event", "phase10_report.audit_event_names", `${eventName} is required for Phase 10.3 guardrail validation.`, errors);
+  });
+  PHASE10_GUARDRAIL_AUDIT_ORDER.slice(0, -1).forEach((eventName, index) => {
+    const nextEvent = PHASE10_GUARDRAIL_AUDIT_ORDER[index + 1];
+    if (positions.has(eventName) && positions.has(nextEvent)) {
+      phase10GuardrailRecordCheck(auditOrderChecks, `${eventName}_before_${nextEvent}`, positions.get(eventName) < positions.get(nextEvent), "inconsistent_audit_order", "phase10_report.audit_event_names", `${eventName} must occur before ${nextEvent}.`, errors);
+    }
+  });
+}
+
+function validatePhase10GuardrailConsistency(report, errors, consistencyChecks) {
+  const consistency = phase9IsPlainObject(report.consistency) ? report.consistency : {};
+  [
+    ["readiness_is_permission", "readiness_treated_as_permission", "Readiness must remain non-permission."],
+    ["cockpit_display_authorization", "cockpit_display_treated_as_authorization", "Cockpit display must remain non-authorization."],
+    ["export_import_replay_execution", "replay_treated_as_execution", "Export/import/replay must remain non-execution."],
+    ["ai_handoff_control", "ai_handoff_treated_as_control", "AI handoff must remain non-control."],
+    ["permission_policy_changed", "permission_policy_changed", "Permission policy must not change in Phase 10.3."],
+  ].forEach(([key, code, detail]) => {
+    phase10GuardrailRecordCheck(consistencyChecks, `${key}_is_false`, consistency[key] === false, code, `phase10_report.consistency.${key}`, detail, errors);
+  });
+}
+
+function validatePhase10GuardrailBoundary(bundle, errors, consistencyChecks) {
+  const boundary = String(bundle.safety_boundary_statement || "").toLowerCase();
+  [
+    ["dry-run", "missing_safety_boundary_statement"],
+    ["read-only", "missing_safety_boundary_statement"],
+    ["no real desktop actions", "missing_safety_boundary_statement"],
+    ["no action-performing endpoint", "missing_safety_boundary_statement"],
+    ["no permission changes", "missing_safety_boundary_statement"],
+  ].forEach(([phrase, code]) => {
+    phase10GuardrailRecordCheck(consistencyChecks, `safety_boundary_mentions_${phrase}`, boundary.includes(phrase), code, "safety_boundary_statement", `Safety boundary must mention ${phrase}.`, errors);
+  });
+}
+
+function renderPhase10GuardrailErrors(errors) {
+  phase10GuardrailErrors.replaceChildren();
+  if (!Array.isArray(errors) || !errors.length) {
+    phase10GuardrailErrors.hidden = true;
+    return;
+  }
+  phase10GuardrailErrors.hidden = false;
+  for (const error of errors) {
+    const item = document.createElement("li");
+    item.dataset.phase10ReplayValidationError = "true";
+    item.dataset.errorCode = error.code || "unknown";
+    item.textContent = `${error.code || "unknown"}: ${error.field || "bundle"} - ${error.detail || "validation failed"}`;
+    phase10GuardrailErrors.appendChild(item);
+  }
+}
+
+function renderPhase10GuardrailValidationCounts(validation = {}) {
+  const summary = validation.validation_summary || {};
+  const failedAuditChecks = phase9ReplayFailedChecks(validation.audit_order_checks).length;
+  const failedConsistencyChecks = phase9ReplayFailedChecks(validation.consistency_checks).length;
+  const sensitiveKeyCount = sandboxCodes(validation.sensitive_key_findings).length;
+  const rows = [
+    ["validation", validation.valid ? "passed" : "failed", validation.valid ? "ok" : "risk"],
+    ["errors", String(sandboxCodes(validation.error_codes).length), validation.valid ? "neutral" : "risk"],
+    ["warnings", String(sandboxCodes(validation.warning_codes).length), sandboxCodes(validation.warning_codes).length ? "warn" : "neutral"],
+    ["unsafe", String(sandboxCodes(validation.unsafe_flags_detected).length), sandboxCodes(validation.unsafe_flags_detected).length ? "risk" : "neutral"],
+    ["audit", failedAuditChecks ? `${failedAuditChecks} failed` : "ok", failedAuditChecks ? "risk" : "ok"],
+    ["sensitive", String(sensitiveKeyCount), sensitiveKeyCount ? "risk" : "neutral"],
+    ["consistency", failedConsistencyChecks ? `${failedConsistencyChecks} failed` : "ok", failedConsistencyChecks ? "risk" : "ok"],
+    ["read-only", summary.replay_allowed_as_read_only === true ? "allowed" : "blocked", summary.replay_allowed_as_read_only === true ? "ok" : "risk"],
+  ];
+
+  phase10GuardrailValidationCounts.replaceChildren();
+  phase10GuardrailValidationCounts.hidden = false;
+  for (const [label, value, tone] of rows) {
+    const chip = document.createElement("div");
+    const countValue = document.createElement("span");
+    const countLabel = document.createElement("span");
+    chip.className = "sandbox-evaluation-count";
+    chip.dataset.phase10ReplayValidationCount = label;
+    chip.dataset.tone = tone;
+    chip.title = summary.recommended_debug_focus || validation.recommended_debug_focus || "";
+    countValue.className = "sandbox-evaluation-count-value";
+    countValue.textContent = value;
+    countLabel.className = "sandbox-evaluation-count-label";
+    countLabel.textContent = label;
+    chip.append(countValue, countLabel);
+    phase10GuardrailValidationCounts.appendChild(chip);
+  }
+}
+
+function renderPhase10GuardrailValidationFilters(validation = {}) {
+  const sections = phase10GuardrailValidationSections(validation);
+  const availableKeys = new Set(sections.map((section) => section.key).concat("all"));
+  if (!availableKeys.has(currentPhase10GuardrailValidationFilter)) {
+    currentPhase10GuardrailValidationFilter = "all";
+  }
+  phase10GuardrailValidationFilters.replaceChildren();
+  phase10GuardrailValidationFilters.hidden = false;
+  for (const [filterKey, filter] of Object.entries(PHASE10_GUARDRAIL_VALIDATION_FILTERS)) {
+    const count = filterKey === "all"
+      ? sections.reduce((total, section) => total + section.count, 0)
+      : (sections.find((section) => section.key === filterKey)?.count || 0);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "sandbox-evaluation-quick-filter phase10-guardrail-filter-chip";
+    button.dataset.phase10ReplayValidationFilter = filterKey;
+    button.title = filter.description;
+    button.setAttribute("aria-pressed", String(currentPhase10GuardrailValidationFilter === filterKey));
+    button.textContent = `${filter.label} (${count})`;
+    button.addEventListener("click", () => {
+      currentPhase10GuardrailValidationFilter =
+        currentPhase10GuardrailValidationFilter === filterKey ? "all" : filterKey;
+      renderPhase10GuardrailValidationGroups(validation);
+      renderPhase10GuardrailValidationFilters(validation);
+    });
+    phase10GuardrailValidationFilters.appendChild(button);
+  }
+}
+
+function renderPhase10GuardrailValidationGroups(validation = {}) {
+  const sections = phase10GuardrailValidationSections(validation).filter((section) =>
+    currentPhase10GuardrailValidationFilter === "all"
+      ? true
+      : section.key === currentPhase10GuardrailValidationFilter
+  );
+  phase10GuardrailValidationGroups.replaceChildren();
+  phase10GuardrailValidationGroups.hidden = false;
+  phase10GuardrailValidationGroups.dataset.phase10ReplayValidationGroups = "true";
+  phase10GuardrailValidationGroups.dataset.activeFilter = currentPhase10GuardrailValidationFilter;
+  if (!sections.length) {
+    phase10GuardrailValidationGroups.appendChild(phase10GuardrailValidationEmptySection());
+    return;
+  }
+  for (const section of sections) {
+    phase10GuardrailValidationGroups.appendChild(phase10GuardrailValidationSection(section));
+  }
+}
+
+function phase10GuardrailValidationSections(validation = {}) {
+  const failedAuditChecks = phase9ReplayFailedChecks(validation.audit_order_checks);
+  const failedConsistencyChecks = phase9ReplayFailedChecks(validation.consistency_checks);
+  const unsafeFlags = sandboxCodes(validation.unsafe_flags_detected);
+  const sensitiveFindings = sandboxCodes(validation.sensitive_key_findings);
+  const readinessItems = phase10GuardrailReadinessIssueItems(validation);
+  const debugFocus = String(validation.recommended_debug_focus || validation.validation_summary?.recommended_debug_focus || "");
+  return [
+    { key: "errors", title: "Errors", tone: "risk", group: "outcome", emptyText: "No blocking validation errors.", items: phase9ReplayIssueItems(validation.errors, "error") },
+    { key: "warnings", title: "Warnings", tone: "warn", group: "outcome", emptyText: "No validation warnings.", items: phase9ReplayIssueItems(validation.warnings, "warning") },
+    { key: "unsafe", title: "Unsafe flags", tone: unsafeFlags.length ? "risk" : "neutral", group: "risk", emptyText: "No unsafe flags detected.", items: unsafeFlags.map((code) => ({ code, field: "unsafe_flags_detected", detail: code })) },
+    { key: "audit", title: "Audit-order issues", tone: failedAuditChecks.length ? "risk" : "ok", group: "functionality", emptyText: "No audit-order issues.", items: phase9ReplayCheckItems(failedAuditChecks) },
+    { key: "sensitive", title: "Sensitive key findings", tone: sensitiveFindings.length ? "risk" : "neutral", group: "risk", emptyText: "No sensitive key findings.", items: sensitiveFindings.map((path) => ({ code: "sensitive_key", field: path, detail: "Sensitive-looking key path in imported bundle." })) },
+    { key: "consistency", title: "Consistency issues", tone: failedConsistencyChecks.length ? "risk" : "ok", group: "functionality", emptyText: "No consistency issues.", items: phase9ReplayCheckItems(failedConsistencyChecks) },
+    { key: "readiness", title: "Readiness and gate blockers", tone: readinessItems.length ? "warn" : "ok", group: "module", emptyText: "No readiness blocker mismatch.", items: readinessItems },
+    { key: "debug_focus", title: "Recommended debug focus", tone: "neutral", group: "outcome", emptyText: "No recommended debug focus.", items: debugFocus ? [{ code: "recommended_debug_focus", field: "validation_summary", detail: debugFocus }] : [] },
+  ].map((section) => ({ ...section, count: section.items.length }));
+}
+
+function phase10GuardrailReadinessIssueItems(validation = {}) {
+  const bundle = currentPhase10GuardrailBundle || {};
+  const report = phase9IsPlainObject(bundle.phase10_report) ? bundle.phase10_report : {};
+  const blockers = sandboxCodes(report.gate_blockers);
+  const readiness = phase9IsPlainObject(report.readiness) ? report.readiness : {};
+  const readinessBlockers = sandboxCodes(readiness.blockers);
+  const items = blockers.map((code) => ({ code, field: "phase10_report.gate_blockers", detail: "Expected NO-GO blocker remains present." }));
+  if (!phase10GuardrailSameCodeSet(blockers, readinessBlockers)) {
+    items.push({ code: "readiness_blocker_mismatch", field: "phase10_report.readiness.blockers", detail: "Readiness blockers and gate blockers differ." });
+  }
+  return items;
+}
+
+function phase10GuardrailValidationSection(section) {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const chip = document.createElement("span");
+  const meta = document.createElement("span");
+  const list = document.createElement("ul");
+  details.className = "phase10-guardrail-validation-section";
+  details.dataset.phase10ReplayValidationSection = section.key;
+  details.dataset.phase10ReplayValidationGroup = section.group || "general";
+  details.dataset.tone = section.tone || "neutral";
+  summary.className = "phase9-replay-validation-section-summary";
+  chip.className = "sandbox-evaluation-status-chip";
+  chip.dataset.status = section.tone === "risk" ? "blocked" : section.tone === "warn" ? "skipped" : "pass";
+  chip.textContent = `${section.title}: ${section.count}`;
+  meta.className = "phase10-guardrail-section-meta";
+  meta.textContent = section.group || "general";
+  summary.append(chip, meta);
+  list.className = "phase9-replay-validation-list phase10-guardrail-validation-list";
+  if (!section.items.length) {
+    const item = document.createElement("li");
+    item.className = "phase9-replay-validation-empty";
+    item.textContent = section.emptyText;
+    list.appendChild(item);
+  } else {
+    for (const issue of section.items) {
+      const item = phase9ReplayValidationIssueItem(issue, section.key);
+      item.dataset.phase10ReplayValidationIssue = section.key;
+      list.appendChild(item);
+    }
+  }
+  details.append(summary, list);
+  return details;
+}
+
+function phase10GuardrailValidationEmptySection() {
+  const container = plannerEvaluationEmptyState("No Phase 10.3 validation sections match the active filter.");
+  container.dataset.phase10ReplayValidationEmpty = "true";
+  return container;
+}
+
+function setPhase10GuardrailGroupsOpen(open) {
+  const detailsNodes = phase10GuardrailValidationGroups.querySelectorAll(
+    "details[data-phase10-replay-validation-section]"
+  );
+  detailsNodes.forEach((details) => {
+    details.open = open;
+  });
+}
+
+function renderPhase10GuardrailValidationDetails(validation = {}) {
+  phase10GuardrailValidationDetails.hidden = false;
+  phase10GuardrailValidationDetails.dataset.phase10ReplayValidationDetails = "true";
+  phase10GuardrailValidationJson.textContent = JSON.stringify(
+    {
+      validation_summary: validation.validation_summary || {},
+      errors: validation.errors || [],
+      warnings: validation.warnings || [],
+      failed_consistency_checks: phase9ReplayFailedChecks(validation.consistency_checks),
+      failed_audit_order_checks: phase9ReplayFailedChecks(validation.audit_order_checks),
+      sensitive_key_findings: validation.sensitive_key_findings || [],
+      validation_bundle: validation.validation_bundle || {},
+      recommended_debug_focus: validation.recommended_debug_focus || "",
+    },
+    null,
+    2
+  );
+}
+
+function setPhase10GuardrailSummary(rows) {
+  phase10GuardrailSummary.replaceChildren();
+  for (const [label, value] of rows) {
+    phase10GuardrailSummary.appendChild(plannerEvaluationFact(label, value));
+  }
+}
+
+function phase10GuardrailValidationResult(bundle, errors, warnings, consistencyChecks = [], auditOrderChecks = []) {
+  const errorCodes = Array.from(new Set((errors || []).map((error) => error.code)));
+  const warningCodes = Array.from(new Set((warnings || []).map((warning) => warning.code)));
+  const sensitiveKeyFindings = phase9SensitiveKeyPaths(bundle);
+  const unsafeFlagsDetected = phase10GuardrailUnsafeFlags(errorCodes, warningCodes, sensitiveKeyFindings);
+  const replayAllowedAsReadOnly = !errorCodes.length;
+  const report = phase9IsPlainObject(bundle?.phase10_report) ? bundle.phase10_report : {};
+  const recommendedDebugFocus = phase10GuardrailDebugFocus(errorCodes, warningCodes, sandboxCodes(report.gate_blockers));
+  const validationSummary = {
+    validation_passed: replayAllowedAsReadOnly,
+    validation_errors: errorCodes,
+    validation_warnings: warningCodes,
+    unsafe_flags_detected: unsafeFlagsDetected,
+    consistency_checks: consistencyChecks,
+    audit_order_checks: auditOrderChecks,
+    sensitive_key_findings: sensitiveKeyFindings,
+    replay_allowed_as_read_only: replayAllowedAsReadOnly,
+    recommended_debug_focus: recommendedDebugFocus,
+  };
+  return {
+    valid: replayAllowedAsReadOnly,
+    status: replayAllowedAsReadOnly ? "valid" : "blocked",
+    error_codes: errorCodes,
+    errors,
+    warning_codes: warningCodes,
+    warnings,
+    validation_passed: replayAllowedAsReadOnly,
+    validation_errors: errorCodes,
+    validation_warnings: warningCodes,
+    bundle_version: phase9IsPlainObject(bundle) ? String(bundle.bundle_version || "") : "",
+    report_version: phase9IsPlainObject(bundle) ? String(bundle.report_version || report.report_version || "") : "",
+    safety_boundary_confirmed: phase10GuardrailSafetyBoundaryConfirmed(bundle) && replayAllowedAsReadOnly,
+    unsafe_flags_detected: unsafeFlagsDetected,
+    consistency_checks: consistencyChecks,
+    audit_order_checks: auditOrderChecks,
+    sensitive_key_findings: sensitiveKeyFindings,
+    replay_allowed_as_read_only: replayAllowedAsReadOnly,
+    recommended_debug_focus: recommendedDebugFocus,
+    validation_summary: validationSummary,
+    validation_bundle: phase10GuardrailValidationBundle(bundle, validationSummary, errors, warnings),
+  };
+}
+
+function phase10GuardrailValidationBundle(bundle, validationSummary, errors, warnings) {
+  return {
+    bundle_type: "phase10_guardrail_validation_bundle",
+    bundle_version: "phase10_guardrail_validation_bundle_v1",
+    source_bundle_redacted: phase10GuardrailRedactedBundle(bundle),
+    validation_summary: validationSummary,
+    errors,
+    warnings,
+    dry_run: true,
+    read_only: true,
+    debug_only: true,
+    real_desktop_actions: false,
+    state_mutation: false,
+    execution_attempted: false,
+  };
+}
+
+function phase10GuardrailRecordCheck(checks, name, passed, code, field, detail, errors) {
+  checks.push({ name, passed: Boolean(passed), code: passed ? "" : code, field, detail: passed ? "" : detail });
+  if (!passed) {
+    phase10GuardrailAddValidationError(errors, code, field, detail);
+  }
+}
+
+function phase10GuardrailAddValidationError(errors, code, field, detail) {
+  errors.push({ code, field, detail });
+}
+
+function phase10GuardrailSameCodeSet(left, right) {
+  return JSON.stringify(Array.from(new Set(left)).sort()) === JSON.stringify(Array.from(new Set(right)).sort());
+}
+
+function phase10GuardrailExecutePathFindings(value, path = "") {
+  const findings = [];
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      findings.push(...phase10GuardrailExecutePathFindings(item, path ? `${path}[${index}]` : `[${index}]`));
+    });
+    return findings;
+  }
+  if (!phase9IsPlainObject(value)) {
+    return findings;
+  }
+  for (const [key, item] of Object.entries(value)) {
+    const currentPath = path ? `${path}.${key}` : key;
+    const keyLower = key.toLowerCase();
+    const endpointLike = ["endpoint", "path", "route", "url", "fetch"].some((fragment) => keyLower.includes(fragment));
+    if (endpointLike && typeof item === "string" && item.includes("/" + "execute")) {
+      findings.push(currentPath);
+    }
+    findings.push(...phase10GuardrailExecutePathFindings(item, currentPath));
+  }
+  return findings;
+}
+
+function phase10GuardrailUnsafeFlags(errorCodes, warningCodes, sensitiveKeyFindings) {
+  const unsafeCodes = new Set([
+    "unsafe_bundle_flags",
+    "real_action_enabled_in_bundle",
+    "phase10_real_actions_implemented_in_bundle",
+    "go_for_phase10_in_bundle",
+    "readiness_go_in_bundle",
+    "approval_implies_real_action",
+    "unsafe_action_type",
+    "execute_path_in_bundle",
+    "mutation_endpoint_in_bundle",
+    "permission_policy_changed",
+    "suspicious_sensitive_key",
+  ]);
+  const flags = errorCodes.concat(warningCodes).filter((code) => unsafeCodes.has(code));
+  if (sensitiveKeyFindings.length && !flags.includes("suspicious_sensitive_key")) {
+    flags.push("suspicious_sensitive_key");
+  }
+  return Array.from(new Set(flags));
+}
+
+function phase10GuardrailDebugFocus(errorCodes, warningCodes, gateBlockers) {
+  const codes = new Set(errorCodes.concat(warningCodes, gateBlockers));
+  const focusRules = [
+    ["suspicious_sensitive_key", "remove private or credential-like fields from the bundle"],
+    ["unsafe_bundle_flags", "inspect dry-run and real-action flags"],
+    ["real_action_enabled_in_bundle", "confirm real actions remain disabled"],
+    ["go_for_phase10_in_bundle", "confirm Phase 10 remains NO-GO"],
+    ["readiness_go_in_bundle", "inspect readiness status and blockers"],
+    ["approval_implies_real_action", "remove approval-like real-action state"],
+    ["inconsistent_audit_order", "inspect audit event ordering"],
+    ["missing_required_audit_event", "restore required guardrail audit events"],
+    ["unsafe_action_type", "remove desktop action types from scope"],
+    ["execute_path_in_bundle", "remove action-performing endpoint references"],
+    ["permission_policy_changed", "restore permission policy separation"],
+    ["phase10_real_actions_not_implemented", "confirm no real-action implementation is present"],
+    ["real_actions_disabled", "confirm disabled real-action state is expected"],
+  ];
+  const focus = focusRules.filter(([code]) => codes.has(code)).map(([, recommendation]) => recommendation);
+  return focus.length ? focus.slice(0, 4).join("; ") : "review guardrail validation summary and audit order";
+}
+
+function phase10GuardrailSafetyBoundaryConfirmed(bundle) {
+  const boundary = String(bundle?.safety_boundary_statement || "").toLowerCase();
+  return ["dry-run", "read-only", "no real desktop actions", "no action-performing endpoint", "no permission changes"].every((phrase) => boundary.includes(phrase));
+}
+
+function phase10GuardrailRedactedBundle(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => phase10GuardrailRedactedBundle(item));
+  }
+  if (!phase9IsPlainObject(value)) {
+    return value;
+  }
+  const redacted = {};
+  for (const [key, item] of Object.entries(value)) {
+    const normalizedKey = key.toLowerCase();
+    redacted[key] = PHASE9_REPLAY_SENSITIVE_KEY_FRAGMENTS.some((fragment) => normalizedKey.includes(fragment))
+      ? "[redacted-sensitive-key]"
+      : phase10GuardrailRedactedBundle(item);
+  }
+  return redacted;
+}
+
+async function copyPhase10GuardrailPayload(payloadKind) {
+  phase10GuardrailStatus.textContent = "Preparing guardrail copy payload...";
+  const payload = phase10GuardrailCopyPayload(payloadKind);
+  if (!payload) {
+    phase10GuardrailStatus.textContent = "No Phase 10.3 guardrail validation loaded yet.";
+    return;
+  }
+  if (!navigator.clipboard?.writeText) {
+    phase10GuardrailStatus.textContent = "Clipboard unavailable in this browser.";
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(typeof payload === "string" ? payload : JSON.stringify(payload, null, 2));
+    phase10GuardrailStatus.textContent = phase10GuardrailCopyStatusText(payloadKind);
+  } catch (error) {
+    phase10GuardrailStatus.textContent = `Copy failed: ${error.message || String(error)}`;
+  }
+}
+
+function phase10GuardrailCopyPayload(payloadKind) {
+  const validation = currentPhase10GuardrailValidation;
+  const summary = validation?.validation_summary || {};
+  if (!validation) {
+    return null;
+  }
+  if (payloadKind === "validation_summary") {
+    return summary;
+  }
+  if (payloadKind === "validation_errors") {
+    return {
+      errors: validation.errors || [],
+      error_codes: validation.error_codes || [],
+      warnings: validation.warnings || [],
+      warning_codes: validation.warning_codes || [],
+      unsafe_flags_detected: validation.unsafe_flags_detected || [],
+    };
+  }
+  if (payloadKind === "debug_focus") {
+    return String(validation.recommended_debug_focus || summary.recommended_debug_focus || "none");
+  }
+  return validation;
+}
+
+function copyPhase10GuardrailValidationSummaryPayload() {
+  return phase10GuardrailCopyPayload("validation_summary");
+}
+
+function copyPhase10GuardrailValidationErrorsPayload() {
+  return phase10GuardrailCopyPayload("validation_errors");
+}
+
+function copyPhase10GuardrailDebugFocusPayload() {
+  return phase10GuardrailCopyPayload("debug_focus");
+}
+
+function copyPhase10GuardrailValidationJsonPayload() {
+  return phase10GuardrailCopyPayload("validation_json");
+}
+
+function phase10GuardrailCopyStatusText(payloadKind) {
+  const labels = {
+    validation_summary: "Phase 10.3 validation summary copied.",
+    validation_errors: "Phase 10.3 validation errors copied.",
+    debug_focus: "Phase 10.3 debug focus copied.",
+    validation_json: "Phase 10.3 replay validation JSON copied.",
+  };
+  return labels[payloadKind] || "Phase 10.3 guardrail payload copied.";
 }
 
 function setPhase9ExperimentSummary(rows) {

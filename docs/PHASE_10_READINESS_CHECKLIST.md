@@ -20,9 +20,10 @@ dry-run, read-only, debug-only cockpit with wait-only execution.
 - Phase 10.2 status: read-only Global Status / AI Handoff cockpit dashboard
   exists; it reports NO-GO project health and validation context and does not
   grant execution permission.
-- Phase 10.3 status: release-candidate guardrail documentation and regression
-  tests exist; they protect the current NO-GO boundary and do not grant
-  execution permission.
+- Phase 10.3 status: release-candidate guardrail validation helpers,
+  browser-local cockpit validation, documentation, and regression tests exist;
+  they protect the current NO-GO boundary and do not grant execution
+  permission.
 
 ## Hard Safety Boundary
 
@@ -197,12 +198,18 @@ not execution. AI handoff is not AI control.
 
 Phase 10.3 adds:
 
+- `src/lain_desk_agent/phase10_guardrails.py`
+- `src/lain_desk_agent/phase10_experiment.py`
 - `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md`
 - `tests/test_release_candidate_guardrails.py`
+- `tests/test_phase10_guardrails.py`
+- a browser-local cockpit panel for release-candidate bundle validation
 - regression checks for runtime/UI guardrails, Phase 10 report defaults,
-  project status snapshot shape, and the read-only project status helper
+  release-candidate bundle validation, project status snapshot shape, and the
+  read-only project status helper
 
-Phase 10.3 is regression protection only. It must keep:
+Phase 10.3 is deterministic validation and regression protection only. It must
+keep:
 
 - `go_for_phase10 = false`
 - `real_actions_enabled = false`
@@ -213,9 +220,19 @@ Phase 10.3 is regression protection only. It must keep:
 - AI handoff is not AI control
 
 Phase 10.3 must not add real-action adapters, approval/execute controls,
-real-action toggles, mutation endpoints, `/execute` UI paths outside the
-existing wait-only self-test, or Capability Registry / Permission Profile /
-Execution Policy changes.
+real-action toggles, mutation endpoints, new backend endpoints, `/execute` UI
+paths outside the existing wait-only self-test, or Capability Registry /
+Permission Profile / Execution Policy changes.
+
+Phase 10.3 validation may produce:
+
+- `validation_summary`
+- `validation_bundle`
+- `recommended_debug_focus`
+- grouped errors, warnings, unsafe flags, audit-order checks, sensitive key
+  findings, readiness findings, and consistency checks
+
+These outputs are handoff/debug data only. They are not authorization.
 
 ## Sandbox Scope Requirements
 
@@ -262,6 +279,7 @@ Forbidden APIs include:
 
 - `.\scripts\verify.ps1`
 - `python -m unittest discover -s tests -p test_release_candidate_guardrails.py`
+- `python -m unittest discover -s tests -p test_phase10_guardrails.py`
 - `python scripts\safety_scan.py`
 - `git diff --check`
 - `node --check ui/app.js`

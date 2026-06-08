@@ -17,6 +17,7 @@
   "ai_handoff_dashboard": true,
   "release_candidate_guardrails": true,
   "phase10_3_regression_pack": true,
+  "phase10_guardrail_validation": "deterministic_browser_local_read_only",
   "phase9_export_import_replay_validation": "deterministic_read_only",
   "safety_boundary": [
     "no real desktop actions",
@@ -30,11 +31,13 @@
     "export/import/replay is not execution",
     "AI handoff is not AI control",
     "global status is visibility only",
-    "phase 10.3 guardrails are not approval"
+    "phase 10.3 guardrails are not approval",
+    "phase 10.3 valid bundles are not permission"
   ],
   "verification_commands": [
     ".\\scripts\\verify.ps1",
     "python -m unittest discover -s tests -p test_release_candidate_guardrails.py",
+    "python -m unittest discover -s tests -p test_phase10_guardrails.py",
     "python scripts\\safety_scan.py",
     "git diff --check",
     "node --check ui/app.js",
@@ -46,6 +49,7 @@
     "review docs/PHASE_10_READINESS_CHECKLIST.md",
     "review docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md",
     "confirm no sandbox or replay UI calls /execute",
+    "confirm Phase 10.3 cockpit validation remains browser-local",
     "confirm the Phase 10.2 global status panel has no execution controls",
     "confirm Execution Policy, Permission Profile, and Capability Registry remain unchanged"
   ],
@@ -65,6 +69,8 @@
   "important_runtime_files": [
     "src/lain_desk_agent/phase10_global_status.py",
     "src/lain_desk_agent/phase10_readiness.py",
+    "src/lain_desk_agent/phase10_guardrails.py",
+    "src/lain_desk_agent/phase10_experiment.py",
     "src/lain_desk_agent/phase9_experiment.py",
     "src/lain_desk_agent/main.py",
     "ui/index.html",
@@ -72,6 +78,7 @@
     "ui/styles.css"
   ],
   "important_tests": [
+    "tests/test_phase10_guardrails.py",
     "tests/test_release_candidate_guardrails.py",
     "tests/test_phase10_readiness.py",
     "tests/test_phase10_global_status.py",
@@ -85,7 +92,7 @@
   ],
   "recommended_next_work": [
     "keep Phase 10 work in dry-run readiness and global status reporting",
-    "keep Phase 10.3 guardrails as docs and regression tests only",
+    "keep Phase 10.3 guardrails as deterministic browser-local validation and regression tests only",
     "review Phase 7 and Phase 10 gates before any future implementation",
     "do not enable real actions without a new explicit user request"
   ]

@@ -1,8 +1,10 @@
 # Phase 10.3 Release-candidate Guardrails
 
-Phase 10.3 is regression protection only. It adds documentation and tests for
-the current release-candidate boundary; it does not implement, authorize, or
-enable real desktop actions.
+Phase 10.3 is regression protection and deterministic local validation only.
+It adds pure release-candidate bundle validation helpers, a browser-local
+cockpit validation panel, documentation, and tests for the current
+release-candidate boundary; it does not implement, authorize, or enable real
+desktop actions.
 
 ## Current Status
 
@@ -80,7 +82,9 @@ look ready:
 - audit, rollback, emergency stop, and verification requirements
 
 Future sessions may add docs, deterministic tests, read-only reports, and
-debugging clarity while preserving the current boundary.
+debugging clarity while preserving the current boundary. Browser-local bundle
+validation may inspect pasted JSON, but it must not call a backend endpoint or
+turn copied validation data into execution.
 
 ## Required Verification
 
@@ -88,6 +92,7 @@ Run these before handing off release-candidate guardrail work:
 
 ```powershell
 python -m unittest discover -s tests -p test_release_candidate_guardrails.py
+python -m unittest discover -s tests -p test_phase10_guardrails.py
 .\scripts\verify.ps1
 python scripts\safety_scan.py
 git diff --check
@@ -99,6 +104,7 @@ python -m unittest discover -s tests
 
 Expected result: the release candidate remains dry-run/read-only/debug-only,
 Phase 10 reports remain NO-GO by default, real desktop actions remain disabled,
-and the guardrail tests fail loudly if future code adds desktop actuation,
-real-action cockpit controls, unsafe `/execute` UI paths, or true-by-default
-real-action flags.
+the cockpit validates release-candidate bundles locally only, and the guardrail
+tests fail loudly if future code adds desktop actuation, real-action cockpit
+controls, unsafe `/execute` UI paths, backend execution endpoints, or
+true-by-default real-action flags.

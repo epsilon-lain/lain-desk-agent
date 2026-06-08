@@ -25,10 +25,10 @@ next work. It is visibility only: readiness is not permission, cockpit display
 is not authorization, export/import/replay is not execution, AI handoff is not
 AI control, and real desktop actions remain disabled.
 
-Phase 10.3 adds release-candidate guardrail documentation and regression tests.
-It is protection against accidental drift only; it does not add execution
-permission, desktop control, mutation endpoints, approval controls, or
-real-action toggles.
+Phase 10.3 adds deterministic release-candidate guardrail validation, a
+browser-local cockpit validation panel, documentation, and regression tests. It
+does not add execution permission, desktop control, backend endpoints, mutation
+endpoints, approval controls, or real-action toggles.
 
 Start with:
 
@@ -55,6 +55,7 @@ The cockpit can:
   debug summaries
 - show a read-only Phase 10 readiness report and AI handoff summary
 - show a read-only Phase 10.2 global status cockpit and AI handoff dashboard
+- validate Phase 10.3 release-candidate bundles locally in the browser
 - run Phase 10.3 guardrail tests for release-candidate regression protection
 
 Current proposal action types are:
@@ -81,7 +82,7 @@ Current executable action types:
 - API keys and secrets must not be committed, logged, or pasted into docs.
 - `/proposal` never executes desktop input.
 - `/execute` remains wait-only.
-- Phase 10.3 guardrails are tests and docs only, not permission.
+- Phase 10.3 guardrails are local validation and tests only, not permission.
 
 ## Run The Cockpit
 
@@ -131,6 +132,7 @@ Target the Phase 10.3 guardrail pack directly with:
 
 ```powershell
 python -m unittest discover -s tests -p test_release_candidate_guardrails.py
+python -m unittest discover -s tests -p test_phase10_guardrails.py
 ```
 
 Optional read-only project health helper:

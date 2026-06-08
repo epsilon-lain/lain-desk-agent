@@ -34,9 +34,10 @@ Latest expected state:
   safety, readiness, Phase 9 export/import/replay validation state,
   verification expectations, and AI handoff context, but it remains
   read-only/dry-run/debug-only and does not grant execution permission.
-- Phase 10.3 release-candidate guardrails add documentation and regression
-  tests for the current NO-GO boundary, but they remain docs/tests only and do
-  not grant execution permission.
+- Phase 10.3 release-candidate guardrails add deterministic bundle validation
+  helpers, browser-local cockpit validation, documentation, and regression
+  tests for the current NO-GO boundary, but they remain read-only/local
+  validation only and do not grant execution permission.
 
 ## Current Safety Boundary
 
@@ -106,6 +107,7 @@ The cockpit cannot:
 - Treat the Phase 10.2 Global Status / AI Handoff dashboard as permission,
   authorization, execution, or AI control.
 - Treat the Phase 10.3 guardrail pack as approval to implement real actions.
+- Treat a valid Phase 10.3 guardrail bundle as permission to execute.
 
 ## Completed Phase Summary
 
@@ -136,7 +138,8 @@ The cockpit cannot:
   NO-GO global status report, read-only endpoint, project health summary,
   Phase 9 validation state, local filters, and copy helpers.
 - Phase 10.3 readiness regression pack and release-candidate guardrails:
-  NO-GO guardrail document and source-level regression tests.
+  deterministic guardrail validation helpers, browser-local cockpit
+  validation, NO-GO guardrail document, and source-level regression tests.
 
 ## Test And Verification Commands
 
@@ -164,6 +167,7 @@ python -m unittest discover -s tests -p test_project_health_snapshot.py
 python scripts\safety_scan.py
 node --check ui/app.js
 python -m unittest discover -s tests -p test_release_candidate_guardrails.py
+python -m unittest discover -s tests -p test_phase10_guardrails.py
 ```
 
 Read-only project status helper:
@@ -188,8 +192,8 @@ The expected release-prep state is:
   live desktop access.
 - Phase 10.2 global status tests remain deterministic and do not require live
   desktop access.
-- Phase 10.3 guardrail tests remain deterministic and do not require live
-  desktop access.
+- Phase 10.3 guardrail validation and tests remain deterministic and do not
+  require live desktop access.
 
 ## Known Non-goals
 
@@ -253,9 +257,11 @@ dashboard is visibility only. Readiness is not permission, cockpit display is
 not authorization, export/import/replay is not execution, and AI handoff is
 not AI control.
 
-Phase 10.3 guardrail status: regression protection only. The guardrail pack
-does not add endpoints, permission changes, real-action controls, mutation
-paths, desktop actuation, or authorization.
+Phase 10.3 guardrail status: deterministic validation and regression
+protection only. The guardrail pack validates pasted release-candidate bundles
+locally, returns validation summaries and debug focus, and does not add
+endpoints, permission changes, real-action controls, mutation paths, desktop
+actuation, or authorization.
 
 ## Recommended Next Work
 
@@ -272,9 +278,10 @@ paths, desktop actuation, or authorization.
   handoff bundle for future Phase 10 discussions.
 - Use `/phase10-global-status/demo` and the Phase 10.2 cockpit panel as a
   compact read-only handoff layer for current project health and no-go state.
-- Use `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md` and
-  `tests/test_release_candidate_guardrails.py` for release-candidate
-  regression protection.
+- Use `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md`,
+  `tests/test_release_candidate_guardrails.py`, and
+  `tests/test_phase10_guardrails.py` for release-candidate regression
+  protection.
 - Defer all real-action work until Phase 10 is explicitly approved and scoped.
 
 ## AI Handoff Summary
@@ -288,8 +295,8 @@ For the next AI handoff:
   import/replay validation, and cockpit readability.
 - Phase 10.2 is about deterministic global status visibility and AI handoff,
   not desktop control.
-- Phase 10.3 is about release-candidate regression protection, not desktop
-  control.
+- Phase 10.3 is about deterministic release-candidate validation and
+  regression protection, not desktop control.
 - Imported bundles are untrusted local input.
 - Prefer docs and tests for release-prep work unless the user explicitly asks
   for runtime changes.
@@ -320,4 +327,4 @@ For the next AI handoff:
 17. Read `docs/PHASE_10_READINESS_CHECKLIST.md` before Phase 10 work.
 18. The Phase 10.1 readiness panel reports NO-GO by default.
 19. The Phase 10.2 global status panel reports NO-GO by default.
-20. The Phase 10.3 guardrail pack is docs/tests only.
+20. The Phase 10.3 guardrail pack is local validation/tests only.

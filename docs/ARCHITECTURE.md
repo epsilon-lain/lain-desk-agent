@@ -647,20 +647,31 @@ AI handoff is not AI control. Real desktop actions remain disabled.
 
 ### Phase 10.3 Readiness Regression Pack And Release-candidate Guardrails
 
-Phase 10.3 adds no new runtime path. It documents the release-candidate
-NO-GO boundary in `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md` and adds
-`tests/test_release_candidate_guardrails.py` as a regression pack for the
-current safety posture.
+Phase 10.3 adds no action-performing runtime path. It documents the
+release-candidate NO-GO boundary in
+`docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md`, adds
+`src/lain_desk_agent/phase10_guardrails.py` and
+`src/lain_desk_agent/phase10_experiment.py` as pure deterministic validation
+helpers, and adds `tests/test_release_candidate_guardrails.py` plus
+`tests/test_phase10_guardrails.py` as regression packs for the current safety
+posture.
+
+The guardrail validator checks imported release-candidate bundles for gate
+blockers, readiness, approval state, audit ordering, scope limits, sensitive
+key findings, and consistency. It returns a Phase 9-compatible validation
+summary, reproducible validation bundle, and recommended debug focus. The
+cockpit panel validates pasted bundles in browser memory only and provides
+local filters, grouped drill-down, expand/collapse, and copy helpers.
 
 The guardrail tests inspect runtime/UI source for forbidden desktop actuation
 drift, unsafe cockpit controls, unsafe `/execute` UI paths outside the
 existing wait-only self-test, true-by-default Phase 10 real-action flags,
-Phase 10 report state, project status snapshot shape, and the read-only
-project status helper.
+Phase 10 report state, project status snapshot shape, backend validation
+scenarios, browser-local UI hooks, and the read-only project status helper.
 
-Phase 10.3 is not a capability layer. It does not add endpoints, mutation
-paths, approval/execute controls, action adapters, permission broadening, or
-desktop control APIs. The runtime pipeline is unchanged.
+Phase 10.3 is not a capability layer. It does not add backend endpoints,
+mutation paths, approval/execute controls, action adapters, permission
+broadening, or desktop control APIs. The action runtime pipeline is unchanged.
 
 ## Safety boundaries
 
@@ -717,8 +728,9 @@ The current safety boundaries are intentionally narrow:
 - Phase 10.2 global status cockpit is read-only/debug-only and reports NO-GO
   handoff context; it is not authorization, execution permission, or AI
   control, and it never attempts real desktop action.
-- Phase 10.3 release-candidate guardrails are documentation and regression
-  tests only; they do not authorize or implement real desktop action.
+- Phase 10.3 release-candidate guardrails are pure validation helpers,
+  browser-local display, documentation, and regression tests only; they do not
+  authorize or implement real desktop action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.

@@ -28,6 +28,8 @@ developers.
 - No Phase 10 readiness UI trigger for real action.
 - No Phase 10 global status UI trigger for real action.
 - No Phase 10.3 guardrail UI trigger for real action.
+- Phase 10.3 guardrail cockpit validation is browser-local and must not add a
+  backend endpoint.
 - UI controls for sandbox, Phase 9, export, import, validation, replay,
   readiness, global status, filtering, grouping, expand/collapse, and copy are
   local-only or read-only report loading.
@@ -43,6 +45,8 @@ developers.
 - No real-action adapter exists in Phase 10.1.
 - No real-action adapter exists in Phase 10.2.
 - No real-action adapter exists in Phase 10.3.
+- Phase 10.3 validation may inspect imported release-candidate bundles, but it
+  must keep `replay_allowed_as_read_only` separate from execution permission.
 - `real_action_attempted` remains false in Phase 8 and Phase 9 dry-run reports.
 - Non-dry-run requests with real action disabled are skipped, not executed.
 - Sandbox scope remains one named test window and one named target.
@@ -89,6 +93,8 @@ developers.
 - `.\scripts\verify.ps1` must pass.
 - `python -m unittest discover -s tests -p test_release_candidate_guardrails.py`
   must pass for Phase 10.3 guardrail work.
+- `python -m unittest discover -s tests -p test_phase10_guardrails.py` must
+  pass for Phase 10.3 validation or cockpit work.
 - `python scripts\safety_scan.py` must pass.
 - `git diff --check` must pass.
 - `node --check ui/app.js` must pass.
@@ -114,8 +120,9 @@ debug-only, must report NO-GO while real actions are disabled, must not call
 permission, cockpit display is not authorization, export/import/replay is not
 execution, and AI handoff is not AI control.
 
-Phase 10.3 release-candidate guardrails are regression protection only. The
-guardrail document and tests must remain dry-run/read-only/debug-only, must not
-add endpoints or cockpit execution controls, must not broaden permissions, and
-must not make readiness, global status, export/import/replay, or AI handoff
-act like authorization.
+Phase 10.3 release-candidate guardrails are deterministic validation and
+regression protection only. The guardrail helpers, cockpit panel, document, and
+tests must remain dry-run/read-only/debug-only, must not add backend endpoints
+or cockpit execution controls, must not broaden permissions, and must not make
+readiness, global status, export/import/replay, or AI handoff act like
+authorization.
