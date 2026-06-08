@@ -7,10 +7,12 @@ developers.
 ## Runtime And API Invariants
 
 - No real desktop actions.
-- No real desktop APIs may be imported or called in runtime code.
-- No `pyautogui`, `pynput`, `keyboard`, `mouse`, `win32api`, `ctypes`
-  `SendInput` / `mouse_event`, `xdotool`, AppleScript UI scripting, or
-  equivalent real desktop control API.
+- No real desktop actuation APIs may be imported or called in runtime code.
+- No `pyautogui` click/move/write/press/hotkey/scroll actuation, `pynput`,
+  `keyboard`, `mouse`, `win32api`, `ctypes` `SendInput` / `mouse_event`,
+  `xdotool`, AppleScript UI scripting, or equivalent real desktop control API.
+- The existing observer dependency on `pyautogui` is read-only screenshot,
+  cursor, and screen-size capture only; it must not grow actuation calls.
 - No sandbox path calls `/execute`.
 - No Phase 9 export/import/replay path calls `/execute`.
 - No mutation endpoint performs sandbox action.
@@ -25,6 +27,7 @@ developers.
 - No sandbox action trigger.
 - No Phase 10 readiness UI trigger for real action.
 - No Phase 10 global status UI trigger for real action.
+- No Phase 10.3 guardrail UI trigger for real action.
 - UI controls for sandbox, Phase 9, export, import, validation, replay,
   readiness, global status, filtering, grouping, expand/collapse, and copy are
   local-only or read-only report loading.
@@ -39,6 +42,7 @@ developers.
 - `go_for_phase10` remains false by default.
 - No real-action adapter exists in Phase 10.1.
 - No real-action adapter exists in Phase 10.2.
+- No real-action adapter exists in Phase 10.3.
 - `real_action_attempted` remains false in Phase 8 and Phase 9 dry-run reports.
 - Non-dry-run requests with real action disabled are skipped, not executed.
 - Sandbox scope remains one named test window and one named target.
@@ -83,6 +87,8 @@ developers.
 ## Test And Verification Invariants
 
 - `.\scripts\verify.ps1` must pass.
+- `python -m unittest discover -s tests -p test_release_candidate_guardrails.py`
+  must pass for Phase 10.3 guardrail work.
 - `python scripts\safety_scan.py` must pass.
 - `git diff --check` must pass.
 - `node --check ui/app.js` must pass.
@@ -107,3 +113,9 @@ debug-only, must report NO-GO while real actions are disabled, must not call
 `/execute`, and must not add a real-action UI trigger. Readiness is not
 permission, cockpit display is not authorization, export/import/replay is not
 execution, and AI handoff is not AI control.
+
+Phase 10.3 release-candidate guardrails are regression protection only. The
+guardrail document and tests must remain dry-run/read-only/debug-only, must not
+add endpoints or cockpit execution controls, must not broaden permissions, and
+must not make readiness, global status, export/import/replay, or AI handoff
+act like authorization.

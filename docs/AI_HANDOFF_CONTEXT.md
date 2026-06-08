@@ -32,9 +32,10 @@ Cockpit display is not authorization.
 
 ## Current Phase
 
-The project is post-Phase 9.x dry-run sandbox hardening and entering Phase 10
-readiness / release-candidate preparation. The latest cockpit visibility layer
-is Phase 10.2 Global Status / AI Handoff.
+The project is post-Phase 9.x dry-run sandbox hardening and in Phase 10
+readiness / release-candidate preparation. The latest runtime cockpit
+visibility layer is Phase 10.2 Global Status / AI Handoff. The latest
+release-candidate protection layer is Phase 10.3 guardrails.
 
 Phase 10 real actions are not implemented yet.
 
@@ -47,9 +48,11 @@ Phase 10 real actions are not implemented yet.
 - no execute button, real-action approval button, sandbox action trigger, or
   real-action toggle
 - no real-action toggle
-- no `pyautogui`, `pynput`, `keyboard`, `mouse`, `win32api`, `ctypes`
-  `SendInput` / `mouse_event`, `xdotool`, AppleScript UI scripting, or other
-  real desktop control API
+- no `pyautogui` click/move/write/press/hotkey/scroll actuation, `pynput`,
+  `keyboard`, `mouse`, `win32api`, `ctypes` `SendInput` / `mouse_event`,
+  `xdotool`, AppleScript UI scripting, or other real desktop actuation API
+- the existing `pyautogui` observer dependency is read-only screenshot,
+  cursor, and screen-size capture only
 - no permission broadening in Execution Policy, Permission Profile, Capability
   Registry, or permission matrix
 
@@ -58,6 +61,7 @@ Phase 10 real actions are not implemented yet.
 - `README.md`: quick project entry point.
 - `docs/PROJECT_HEALTH_SNAPSHOT.md`: current health and release-prep snapshot.
 - `docs/PHASE_10_READINESS_CHECKLIST.md`: gate before future Phase 10 work.
+- `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md`: Phase 10.3 guardrails.
 - `docs/SAFETY_INVARIANTS.md`: invariants that must not regress.
 - `docs/PHASE_7_SANDBOX_ACTION_DESIGN.md`: original sandbox gate design.
 - `docs/PHASE_9_MINIMAL_SANDBOX_EXPERIMENT_DESIGN.md`: Phase 9 dry-run design.
@@ -76,6 +80,7 @@ Phase 10 real actions are not implemented yet.
 - `scripts/safety_scan.py`: runtime desktop actuation scan.
 - `scripts/verify.ps1`: standard verification chain.
 - `scripts/project_status.ps1`: read-only project health command helper.
+- `tests/test_release_candidate_guardrails.py`: Phase 10.3 regression pack.
 
 ## Important Test Commands
 
@@ -85,6 +90,7 @@ python scripts\safety_scan.py
 git diff --check
 node --check ui/app.js
 python -m unittest discover -s tests
+python -m unittest discover -s tests -p test_release_candidate_guardrails.py
 ```
 
 ## What Not To Touch
@@ -156,6 +162,26 @@ Future AI should interpret the report like this:
 Future AI must not treat the Phase 10.2 global status dashboard as permission,
 authorization, execution, or control.
 
+## Phase 10.3 Release-candidate Guardrails
+
+Phase 10.3 adds documentation and regression tests only. It protects the
+current NO-GO release-candidate boundary and does not add endpoints, cockpit
+execution controls, real-action toggles, permission changes, mutation paths,
+or desktop actuation.
+
+Future AI should interpret the guardrails like this:
+
+- the guardrail document is not approval
+- passing tests is not permission
+- project status is not authorization
+- the only existing UI `/execute` fetch is the approved wait self-test
+- any new sandbox, replay, readiness, global-status, or AI handoff `/execute`
+  path is a regression
+
+Future AI must not weaken the guardrail tests, safety scan, Phase 7 gate,
+Phase 9 gate, replay validation, Capability Registry, Permission Profile, or
+Execution Policy to make Phase 10 appear ready.
+
 ## Phase 9 Export / Import / Replay Pipeline
 
 ```text
@@ -176,6 +202,8 @@ Replay is read-only.
 ## Known Safe Next Steps
 
 - Add docs and tests for release preparation.
+- Add or refine Phase 10.3 regression tests without changing runtime
+  permission.
 - Improve AI handoff wording.
 - Add read-only validation coverage.
 - Add cockpit readability polish that only changes local display.
@@ -192,6 +220,7 @@ Replay is read-only.
 - Treating proposal or validation as execution.
 - Changing Capability Registry, Permission Profile, or Execution Policy to
   allow broad desktop control.
+- Weakening Phase 10.3 guardrails to make a real-action change easier.
 
 ## Exact Instruction For Future AI
 
@@ -209,11 +238,13 @@ paths. Real click/type/hotkey/scroll/switch_app are disabled. Do not add real
 desktop APIs, /execute paths from sandbox/replay UI, approval buttons for real
 action, real-action toggles, or permission changes. Read
 docs/PROJECT_HEALTH_SNAPSHOT.md, docs/SAFETY_INVARIANTS.md, and
-docs/PHASE_10_READINESS_CHECKLIST.md before editing. Phase 10.1 readiness is
-NO-GO by default, and Phase 10.2 global status is also NO-GO by default; do
-not make either one GO by enabling real actions. Preserve proposal is not
-execution, readiness is not permission, cockpit display is not authorization,
-export/import/replay is not execution, AI handoff is not AI control, and
-imported bundles are untrusted input. Run verify.ps1, safety_scan.py,
-git diff --check, and node --check ui/app.js.
+docs/PHASE_10_READINESS_CHECKLIST.md, and
+docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md before editing. Phase 10.1
+readiness is NO-GO by default, Phase 10.2 global status is NO-GO by default,
+and Phase 10.3 is regression protection only; do not make any of them GO by
+enabling real actions. Preserve proposal is not execution, readiness is not
+permission, cockpit display is not authorization, export/import/replay is not
+execution, AI handoff is not AI control, and imported bundles are untrusted
+input. Run verify.ps1, safety_scan.py, git diff --check, node --check
+ui/app.js, and the Phase 10.3 guardrail test.
 ```

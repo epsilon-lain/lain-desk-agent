@@ -20,8 +20,8 @@ function Invoke-ReadOnlyStatusStep {
 
 Push-Location $RepoRoot
 try {
-    Write-Host "[project-status] Phase 10.2 global status cockpit is read-only/dry-run/debug-only"
-    Write-Host "[project-status] Global status is visibility only; real desktop actions remain disabled"
+    Write-Host "[project-status] Phase 10.3 guardrails are read-only/dry-run/debug-only"
+    Write-Host "[project-status] Guardrails are regression protection only; real desktop actions remain disabled"
 
     Invoke-ReadOnlyStatusStep "git status --short" {
         git status --short

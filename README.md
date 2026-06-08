@@ -9,8 +9,8 @@ keyboard control.
 
 ## Project Health
 
-The current repository is in Phase 10.2 global status / release-candidate
-handoff hardening.
+The current repository is in Phase 10.3 readiness regression pack /
+release-candidate guardrail hardening.
 Phase 10 real actions are not implemented yet; sandbox and replay work remains
 dry-run, read-only, and debug-only.
 
@@ -25,10 +25,16 @@ next work. It is visibility only: readiness is not permission, cockpit display
 is not authorization, export/import/replay is not execution, AI handoff is not
 AI control, and real desktop actions remain disabled.
 
+Phase 10.3 adds release-candidate guardrail documentation and regression tests.
+It is protection against accidental drift only; it does not add execution
+permission, desktop control, mutation endpoints, approval controls, or
+real-action toggles.
+
 Start with:
 
 - [`docs/PROJECT_HEALTH_SNAPSHOT.md`](docs/PROJECT_HEALTH_SNAPSHOT.md)
 - [`docs/PHASE_10_READINESS_CHECKLIST.md`](docs/PHASE_10_READINESS_CHECKLIST.md)
+- [`docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md`](docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md)
 - [`docs/AI_HANDOFF_CONTEXT.md`](docs/AI_HANDOFF_CONTEXT.md)
 - [`docs/SAFETY_INVARIANTS.md`](docs/SAFETY_INVARIANTS.md)
 - [`docs/project_status_snapshot.json`](docs/project_status_snapshot.json)
@@ -49,6 +55,7 @@ The cockpit can:
   debug summaries
 - show a read-only Phase 10 readiness report and AI handoff summary
 - show a read-only Phase 10.2 global status cockpit and AI handoff dashboard
+- run Phase 10.3 guardrail tests for release-candidate regression protection
 
 Current proposal action types are:
 
@@ -74,6 +81,7 @@ Current executable action types:
 - API keys and secrets must not be committed, logged, or pasted into docs.
 - `/proposal` never executes desktop input.
 - `/execute` remains wait-only.
+- Phase 10.3 guardrails are tests and docs only, not permission.
 
 ## Run The Cockpit
 
@@ -118,6 +126,18 @@ git diff --check
 The safety scan checks runtime code under `src/` for obvious real desktop
 actuation calls. The GitHub Actions CI runs the same core compile, test, and
 JavaScript parse checks on push and pull request.
+
+Target the Phase 10.3 guardrail pack directly with:
+
+```powershell
+python -m unittest discover -s tests -p test_release_candidate_guardrails.py
+```
+
+Optional read-only project health helper:
+
+```powershell
+.\scripts\project_status.ps1
+```
 
 ## Verify Proposal-only / Wait-only Behavior
 
@@ -192,14 +212,16 @@ Do not commit or paste real API keys. See
 - Do not store secrets, API keys, terminal logs, or pasted chat logs in the
   repository.
 - Do not treat historical draft docs as current safety policy.
-- Do not treat Phase 10.2 global status, readiness, cockpit display,
-  export/import/replay, or AI handoff as permission or control.
+- Do not treat Phase 10.2 global status, Phase 10.3 guardrails, readiness,
+  cockpit display, export/import/replay, or AI handoff as permission or
+  control.
 
 ## Current Docs
 
 - [`docs/PROJECT_HEALTH_SNAPSHOT.md`](docs/PROJECT_HEALTH_SNAPSHOT.md) -
   current dry-run cockpit health snapshot and AI handoff summary.
 - [`docs/PHASE_10_READINESS_CHECKLIST.md`](docs/PHASE_10_READINESS_CHECKLIST.md)
+- [`docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md`](docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md)
 - [`docs/AI_HANDOFF_CONTEXT.md`](docs/AI_HANDOFF_CONTEXT.md)
 - [`docs/SAFETY_INVARIANTS.md`](docs/SAFETY_INVARIANTS.md)
 - [`docs/project_status_snapshot.json`](docs/project_status_snapshot.json)

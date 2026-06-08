@@ -217,7 +217,7 @@ class Phase10ReadinessDocTests(unittest.TestCase):
         payload = json.loads(STATUS_JSON.read_text(encoding="utf-8"))
 
         self.assertEqual(payload["schema_version"], "project_status_snapshot_v3")
-        self.assertIn("Phase 10.2", payload["project_phase"])
+        self.assertIn("Phase 10.3", payload["project_phase"])
         self.assertIs(payload["dry_run_default"], True)
         self.assertIs(payload["read_only_default"], True)
         self.assertIs(payload["debug_only_default"], True)

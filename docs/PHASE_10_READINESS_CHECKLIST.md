@@ -20,6 +20,9 @@ dry-run, read-only, debug-only cockpit with wait-only execution.
 - Phase 10.2 status: read-only Global Status / AI Handoff cockpit dashboard
   exists; it reports NO-GO project health and validation context and does not
   grant execution permission.
+- Phase 10.3 status: release-candidate guardrail documentation and regression
+  tests exist; they protect the current NO-GO boundary and do not grant
+  execution permission.
 
 ## Hard Safety Boundary
 
@@ -32,9 +35,11 @@ dry-run, read-only, debug-only cockpit with wait-only execution.
 - No mutation endpoint may perform desktop action.
 - No global status, readiness, handoff, export, import, replay, or validation
   display may grant authorization.
-- No `pyautogui`, `pynput`, `keyboard`, `mouse`, `win32api`, `ctypes`
-  `SendInput` / `mouse_event`, `xdotool`, AppleScript UI scripting, or other
-  real desktop control API may be imported or called.
+- No `pyautogui` click/move/write/press/hotkey/scroll actuation, `pynput`,
+  `keyboard`, `mouse`, `win32api`, `ctypes` `SendInput` / `mouse_event`,
+  `xdotool`, AppleScript UI scripting, or other real desktop control API may
+  be imported or called. The existing `pyautogui` observer path is read-only
+  screenshot, cursor, and screen-size capture only.
 - Execution Policy, Permission Profile, Capability Registry, and permission
   matrix must not be modified to allow real actions during readiness work.
 - Safety Gate, Action Contract, Click Readiness, Phase 7 Gate, Phase 9 Gate,
@@ -188,6 +193,30 @@ grant execution permission. Real desktop actions remain disabled. Readiness is
 not permission. Cockpit display is not authorization. Export/import/replay is
 not execution. AI handoff is not AI control.
 
+## Phase 10.3 Release-candidate Guardrail Status
+
+Phase 10.3 adds:
+
+- `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md`
+- `tests/test_release_candidate_guardrails.py`
+- regression checks for runtime/UI guardrails, Phase 10 report defaults,
+  project status snapshot shape, and the read-only project status helper
+
+Phase 10.3 is regression protection only. It must keep:
+
+- `go_for_phase10 = false`
+- `real_actions_enabled = false`
+- `phase10_real_actions_implemented = false`
+- readiness is not permission
+- cockpit display is not authorization
+- export/import/replay is not execution
+- AI handoff is not AI control
+
+Phase 10.3 must not add real-action adapters, approval/execute controls,
+real-action toggles, mutation endpoints, `/execute` UI paths outside the
+existing wait-only self-test, or Capability Registry / Permission Profile /
+Execution Policy changes.
+
 ## Sandbox Scope Requirements
 
 The first Phase 10 experiment scope must be:
@@ -232,6 +261,7 @@ Forbidden APIs include:
 ## Required Tests Before Phase 10 Implementation
 
 - `.\scripts\verify.ps1`
+- `python -m unittest discover -s tests -p test_release_candidate_guardrails.py`
 - `python scripts\safety_scan.py`
 - `git diff --check`
 - `node --check ui/app.js`
@@ -248,6 +278,7 @@ Forbidden APIs include:
 - Review `docs/PHASE_7_SANDBOX_ACTION_DESIGN.md`.
 - Review `docs/PHASE_9_MINIMAL_SANDBOX_EXPERIMENT_DESIGN.md`.
 - Review `docs/SAFETY_INVARIANTS.md`.
+- Review `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md`.
 - Confirm cockpit UI has no real-action trigger.
 - Confirm no default permission grants real desktop action.
 - Confirm safety scan still fails on obvious desktop actuation samples.
@@ -302,5 +333,7 @@ Future AI / Codex sessions must:
 - Run `.\scripts\verify.ps1`, `python scripts\safety_scan.py`,
   `git diff --check`, and `node --check ui/app.js`.
 - Read `docs/AI_HANDOFF_CONTEXT.md` before making Phase 10-related changes.
+- Read `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md` before release-candidate
+  guardrail or Phase 10 readiness changes.
 - Do not enable real actions unless this Phase 10 readiness checklist is
   explicitly satisfied by a new user request.

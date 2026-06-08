@@ -1,10 +1,10 @@
 {
   "schema_version": "project_status_snapshot_v3",
   "project": "lain-desk-agent",
-  "phase": "phase_10_2_global_status_cockpit",
-  "project_phase": "Phase 10.2 global status cockpit / AI handoff dashboard",
+  "phase": "phase_10_3_release_candidate_guardrails",
+  "project_phase": "Phase 10.3 readiness regression pack / release-candidate guardrails",
   "next_phase": "future_phase_10_real_action_experiment_only_if_explicitly_approved",
-  "latest_completed_phase": "Phase 10.2 global status cockpit and AI handoff dashboard",
+  "latest_completed_phase": "Phase 10.3 readiness regression pack and release-candidate guardrails",
   "real_actions_enabled": false,
   "phase10_real_actions_implemented": false,
   "go_for_phase10": false,
@@ -15,6 +15,8 @@
   "debug_only_sandbox_and_replay": true,
   "global_status_cockpit": true,
   "ai_handoff_dashboard": true,
+  "release_candidate_guardrails": true,
+  "phase10_3_regression_pack": true,
   "phase9_export_import_replay_validation": "deterministic_read_only",
   "safety_boundary": [
     "no real desktop actions",
@@ -27,10 +29,12 @@
     "cockpit display is not authorization",
     "export/import/replay is not execution",
     "AI handoff is not AI control",
-    "global status is visibility only"
+    "global status is visibility only",
+    "phase 10.3 guardrails are not approval"
   ],
   "verification_commands": [
     ".\\scripts\\verify.ps1",
+    "python -m unittest discover -s tests -p test_release_candidate_guardrails.py",
     "python scripts\\safety_scan.py",
     "git diff --check",
     "node --check ui/app.js",
@@ -40,6 +44,7 @@
   "safety_scan_command": "python scripts\\safety_scan.py",
   "manual_checks": [
     "review docs/PHASE_10_READINESS_CHECKLIST.md",
+    "review docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md",
     "confirm no sandbox or replay UI calls /execute",
     "confirm the Phase 10.2 global status panel has no execution controls",
     "confirm Execution Policy, Permission Profile, and Capability Registry remain unchanged"
@@ -48,6 +53,7 @@
     "README.md",
     "docs/PROJECT_HEALTH_SNAPSHOT.md",
     "docs/PHASE_10_READINESS_CHECKLIST.md",
+    "docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md",
     "docs/AI_HANDOFF_CONTEXT.md",
     "docs/SAFETY_INVARIANTS.md",
     "docs/project_status_snapshot.json",
@@ -65,6 +71,12 @@
     "ui/app.js",
     "ui/styles.css"
   ],
+  "important_tests": [
+    "tests/test_release_candidate_guardrails.py",
+    "tests/test_phase10_readiness.py",
+    "tests/test_phase10_global_status.py",
+    "tests/test_project_health_snapshot.py"
+  ],
   "read_only_endpoints": [
     "/phase10-readiness/demo",
     "/phase10-global-status/demo",
@@ -73,6 +85,7 @@
   ],
   "recommended_next_work": [
     "keep Phase 10 work in dry-run readiness and global status reporting",
+    "keep Phase 10.3 guardrails as docs and regression tests only",
     "review Phase 7 and Phase 10 gates before any future implementation",
     "do not enable real actions without a new explicit user request"
   ]

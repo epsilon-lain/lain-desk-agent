@@ -109,6 +109,13 @@ readiness is not permission, cockpit display is not authorization,
 export/import/replay is not execution, AI handoff is not AI control, and real
 desktop actions remain disabled.
 
+Phase 10.3 adds a readiness regression pack and release-candidate guardrails.
+It documents the NO-GO release-candidate boundary and adds tests for forbidden
+desktop actuation, unsafe cockpit controls, unsafe `/execute` UI paths,
+Phase 10 false-by-default report flags, project status snapshot shape, and the
+read-only project status helper. It is docs and tests only; no runtime
+permission, endpoint, action adapter, or cockpit execution control is added.
+
 ## Completed
 
 - Observation / Understanding
@@ -145,6 +152,7 @@ desktop actions remain disabled.
 - Phase 10 Readiness / Release-candidate Hardening Docs
 - Phase 10.1 Readiness Report And Cockpit Panel
 - Phase 10.2 Global Status Cockpit And AI Handoff Dashboard
+- Phase 10.3 Readiness Regression Pack And Release-candidate Guardrails
 - AI Handoff Context
 - Safety Invariants
 - Read-only Project Status Helper
@@ -201,6 +209,8 @@ desktop actions remain disabled.
 - Phase 10.2 global status cockpit is read-only/debug-only. It reports NO-GO
   and handoff context for visibility only; it is not authorization, execution,
   permission, or AI control.
+- Phase 10.3 release-candidate guardrails are docs and regression tests only.
+  They do not authorize, implement, or enable real desktop action.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -784,6 +794,28 @@ control.
 - Do not add execute buttons, approval buttons, real-action toggles, sandbox
   action triggers, `/execute` calls, or action-performing endpoints.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions.
+
+## Phase 10.3: Readiness Regression Pack And Release-candidate Guardrails
+
+Status: implemented as documentation and regression tests only.
+
+Goal: prevent release-candidate drift before any future explicit Phase 10
+real-action approval.
+
+- Add `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md` as the concise
+  release-candidate boundary for future Codex sessions and developers.
+- Add `tests/test_release_candidate_guardrails.py` to verify runtime and UI
+  guardrails, Phase 10 NO-GO report state, project status snapshot shape, and
+  read-only project status helper behavior.
+- Keep the project dry-run/read-only/debug-only.
+- Keep `go_for_phase10 = false`, `real_actions_enabled = false`, and
+  `phase10_real_actions_implemented = false`.
+- Keep readiness as non-permission, cockpit display as non-authorization,
+  export/import/replay as non-execution, and AI handoff as non-control.
+- Do not add or enable desktop actuation, approval/execute controls,
+  real-action toggles, mutation endpoints, action adapters, `/execute` UI
+  paths outside the existing wait-only self-test, or permission/capability/
+  execution-policy changes.
 
 ## Historical Drafts
 
