@@ -9,13 +9,21 @@ keyboard control.
 
 ## Project Health
 
-The current repository is in Phase 10 readiness / release-candidate hardening.
+The current repository is in Phase 10.2 global status / release-candidate
+handoff hardening.
 Phase 10 real actions are not implemented yet; sandbox and replay work remains
 dry-run, read-only, and debug-only.
 
 Phase 10.1 adds a deterministic readiness report and cockpit panel. It reports
 NO-GO by default, explains expected blockers, and does not grant execution
 permission.
+
+Phase 10.2 adds a read-only Global Status / AI Handoff cockpit dashboard. It
+summarizes Phase 10 readiness, project health, safety invariants, Phase 9
+export/import/replay validation, verification expectations, and recommended
+next work. It is visibility only: readiness is not permission, cockpit display
+is not authorization, export/import/replay is not execution, AI handoff is not
+AI control, and real desktop actions remain disabled.
 
 Start with:
 
@@ -40,6 +48,7 @@ The cockpit can:
 - show Runtime Status, Execution Policy, events, planner trace, and readiness
   debug summaries
 - show a read-only Phase 10 readiness report and AI handoff summary
+- show a read-only Phase 10.2 global status cockpit and AI handoff dashboard
 
 Current proposal action types are:
 
@@ -58,6 +67,7 @@ Current executable action types:
   are disabled and non-executable.
 - Preview-only contracts are never executable.
 - Click Readiness is a blocker and diagnostic surface, not permission to click.
+- Global Status is a visibility and handoff surface, not execution permission.
 - The AI Planner is proposal-only.
 - LLM output must pass validation before it can become a proposal.
 - Screenshots, `screenshot_path`, and `image_bytes` are not sent to the LLM.
@@ -117,6 +127,7 @@ Start the server, then use:
 Invoke-RestMethod "http://127.0.0.1:8000/runtime/status"
 Invoke-RestMethod "http://127.0.0.1:8000/execution-policy"
 Invoke-RestMethod "http://127.0.0.1:8000/planner-evaluation/demo"
+Invoke-RestMethod "http://127.0.0.1:8000/phase10-global-status/demo"
 ```
 
 Expected:
@@ -125,6 +136,8 @@ Expected:
 - Execution Policy reports only `wait` executable under the current profile.
 - Planner Evaluation returns demo scenarios only and does not observe the real
   desktop, call OpenAI, or execute actions.
+- Phase 10 Global Status returns deterministic dry-run/read-only/debug-only
+  handoff data only and reports NO-GO by default.
 - `browser_search` may produce a preview-only click contract, but Click
   Readiness remains blocked.
 - `dangerous_send` and `dangerous_delete` show high-risk readiness blockers.
@@ -179,6 +192,8 @@ Do not commit or paste real API keys. See
 - Do not store secrets, API keys, terminal logs, or pasted chat logs in the
   repository.
 - Do not treat historical draft docs as current safety policy.
+- Do not treat Phase 10.2 global status, readiness, cockpit display,
+  export/import/replay, or AI handoff as permission or control.
 
 ## Current Docs
 

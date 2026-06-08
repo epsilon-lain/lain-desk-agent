@@ -1910,6 +1910,14 @@ button {
   border-color: rgba(255, 115, 95, 0.36);
 }
 
+.phase10-global-status-panel[data-state="warning"] {
+  border-color: rgba(255, 115, 95, 0.42);
+}
+
+.phase10-global-status-panel[data-state="ready"] {
+  border-color: rgba(88, 214, 141, 0.34);
+}
+
 .phase10-readiness-strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

@@ -17,6 +17,9 @@ dry-run, read-only, debug-only cockpit with wait-only execution.
   exists.
 - Phase 10.1 status: read-only readiness report and cockpit panel exist; they
   report NO-GO by default and do not grant execution permission.
+- Phase 10.2 status: read-only Global Status / AI Handoff cockpit dashboard
+  exists; it reports NO-GO project health and validation context and does not
+  grant execution permission.
 
 ## Hard Safety Boundary
 
@@ -27,6 +30,8 @@ dry-run, read-only, debug-only cockpit with wait-only execution.
   or real-action toggle may be added.
 - No real-action toggle.
 - No mutation endpoint may perform desktop action.
+- No global status, readiness, handoff, export, import, replay, or validation
+  display may grant authorization.
 - No `pyautogui`, `pynput`, `keyboard`, `mouse`, `win32api`, `ctypes`
   `SendInput` / `mouse_event`, `xdotool`, AppleScript UI scripting, or other
   real desktop control API may be imported or called.
@@ -156,6 +161,32 @@ Expected no-go reasons include:
 
 These no-go reasons are expected readiness blockers, not runtime errors.
 Real actions are still disabled.
+
+## Phase 10.2 Global Status Cockpit Status
+
+Phase 10.2 adds:
+
+- `src/lain_desk_agent/phase10_global_status.py`
+- `GET /phase10-global-status/demo`
+- a read-only Global Status / AI Handoff cockpit panel
+- local-only filters for show all, readiness, safety, docs, verification,
+  AI handoff, and no-go reasons
+- copy helpers for global status JSON, AI handoff summary, no-go reasons,
+  verification commands, and safety boundary
+
+The Phase 10.2 report is deterministic and current-state only. It must keep:
+
+- `go_for_phase10 = false`
+- `real_actions_enabled = false`
+- `phase10_real_actions_implemented = false`
+- `dry_run = true`
+- `read_only = true`
+- `debug_only = true`
+
+Phase 10.2 is visibility, handoff, and readiness tracking only. It does not
+grant execution permission. Real desktop actions remain disabled. Readiness is
+not permission. Cockpit display is not authorization. Export/import/replay is
+not execution. AI handoff is not AI control.
 
 ## Sandbox Scope Requirements
 

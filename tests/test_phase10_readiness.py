@@ -213,17 +213,18 @@ class Phase10ReadinessDocTests(unittest.TestCase):
         self.assertIn(".phase10-readiness-chip", styles)
         self.assertIn(".phase10-readiness-section", styles)
 
-    def test_project_status_snapshot_v2_records_phase10_no_go(self) -> None:
+    def test_project_status_snapshot_v3_records_phase10_no_go(self) -> None:
         payload = json.loads(STATUS_JSON.read_text(encoding="utf-8"))
 
-        self.assertEqual(payload["schema_version"], "project_status_snapshot_v2")
-        self.assertIn("Phase 10.1", payload["project_phase"])
+        self.assertEqual(payload["schema_version"], "project_status_snapshot_v3")
+        self.assertIn("Phase 10.2", payload["project_phase"])
         self.assertIs(payload["dry_run_default"], True)
         self.assertIs(payload["read_only_default"], True)
         self.assertIs(payload["debug_only_default"], True)
         self.assertIs(payload["real_actions_enabled"], False)
         self.assertIs(payload["phase10_real_actions_implemented"], False)
         self.assertIs(payload["go_for_phase10"], False)
+        self.assertIs(payload["global_status_cockpit"], True)
         self.assertIn(".\\scripts\\verify.ps1", payload["verification_commands"])
 
     def test_phase10_readiness_doc_exists_and_states_not_implemented(self) -> None:
@@ -243,6 +244,7 @@ class Phase10ReadinessDocTests(unittest.TestCase):
             "proposal is not execution",
             "cockpit display is not authorization",
             "phase 10.1 readiness cockpit status",
+            "phase 10.2 global status cockpit status",
             "go_for_phase10 = false",
             "real actions are still disabled",
         ]:

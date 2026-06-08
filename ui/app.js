@@ -152,6 +152,22 @@ const phase10ReadinessCopyStatus = document.querySelector("#phase10ReadinessCopy
 const phase10ReadinessStrip = document.querySelector("#phase10ReadinessStrip");
 const phase10ReadinessSummary = document.querySelector("#phase10ReadinessSummary");
 const phase10ReadinessGroups = document.querySelector("#phase10ReadinessGroups");
+const phase10GlobalStatusPanel = document.querySelector("#phase10GlobalStatusPanel");
+const loadPhase10GlobalStatusButton = document.querySelector("#loadPhase10GlobalStatus");
+const phase10GlobalStatusStatus = document.querySelector("#phase10GlobalStatusStatus");
+const phase10GlobalStatusControls = document.querySelector("#phase10GlobalStatusControls");
+const phase10GlobalStatusFilter = document.querySelector("#phase10GlobalStatusFilter");
+const expandPhase10GlobalStatusGroups = document.querySelector("#expandPhase10GlobalStatusGroups");
+const collapsePhase10GlobalStatusGroups = document.querySelector("#collapsePhase10GlobalStatusGroups");
+const copyPhase10GlobalStatusJson = document.querySelector("#copyPhase10GlobalStatusJson");
+const copyPhase10GlobalAIHandoffSummary = document.querySelector("#copyPhase10GlobalAIHandoffSummary");
+const copyPhase10GlobalNoGoReasons = document.querySelector("#copyPhase10GlobalNoGoReasons");
+const copyPhase10GlobalVerificationCommands = document.querySelector("#copyPhase10GlobalVerificationCommands");
+const copyPhase10GlobalSafetyBoundary = document.querySelector("#copyPhase10GlobalSafetyBoundary");
+const phase10GlobalStatusCopyStatus = document.querySelector("#phase10GlobalStatusCopyStatus");
+const phase10GlobalStatusStrip = document.querySelector("#phase10GlobalStatusStrip");
+const phase10GlobalStatusSummary = document.querySelector("#phase10GlobalStatusSummary");
+const phase10GlobalStatusGroups = document.querySelector("#phase10GlobalStatusGroups");
 const safetyActionArea = document.querySelector("#safetyActionArea");
 const safetyBrakeMessage = document.querySelector("#safetyBrakeMessage");
 const safetyButtons = document.querySelector("#safetyButtons");
@@ -432,6 +448,7 @@ let currentPhase9ImportedBundle = null;
 let currentPhase9ReplayReport = null;
 let currentPhase9ReplayValidationFilter = "all";
 let currentPhase10ReadinessReport = null;
+let currentPhase10GlobalStatusReport = null;
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 setDemoScenarioSelectionDefaults();
@@ -548,8 +565,16 @@ loadPhase10ReadinessButton.addEventListener("click", async () => {
   await loadPhase10Readiness();
 });
 
+loadPhase10GlobalStatusButton.addEventListener("click", async () => {
+  await loadPhase10GlobalStatus();
+});
+
 phase10ReadinessGroupFilter.addEventListener("change", () => {
   renderPhase10Readiness(currentPhase10ReadinessReport);
+});
+
+phase10GlobalStatusFilter.addEventListener("change", () => {
+  renderPhase10GlobalStatus(currentPhase10GlobalStatusReport);
 });
 
 expandPhase10ReadinessGroups.addEventListener("click", () => {
@@ -558,6 +583,14 @@ expandPhase10ReadinessGroups.addEventListener("click", () => {
 
 collapsePhase10ReadinessGroups.addEventListener("click", () => {
   setPhase10ReadinessGroupsOpen(false);
+});
+
+expandPhase10GlobalStatusGroups.addEventListener("click", () => {
+  setPhase10GlobalStatusGroupsOpen(true);
+});
+
+collapsePhase10GlobalStatusGroups.addEventListener("click", () => {
+  setPhase10GlobalStatusGroupsOpen(false);
 });
 
 copyPhase10AIHandoffSummary.addEventListener("click", async () => {
@@ -574,6 +607,26 @@ copyPhase10NoGoReasons.addEventListener("click", async () => {
 
 copyPhase10SafetyInvariants.addEventListener("click", async () => {
   await copyPhase10ReadinessPayload("safety_invariants");
+});
+
+copyPhase10GlobalStatusJson.addEventListener("click", async () => {
+  await copyPhase10GlobalStatusPayload("global_status_json");
+});
+
+copyPhase10GlobalAIHandoffSummary.addEventListener("click", async () => {
+  await copyPhase10GlobalStatusPayload("ai_handoff_summary");
+});
+
+copyPhase10GlobalNoGoReasons.addEventListener("click", async () => {
+  await copyPhase10GlobalStatusPayload("no_go_reasons");
+});
+
+copyPhase10GlobalVerificationCommands.addEventListener("click", async () => {
+  await copyPhase10GlobalStatusPayload("verification_commands");
+});
+
+copyPhase10GlobalSafetyBoundary.addEventListener("click", async () => {
+  await copyPhase10GlobalStatusPayload("safety_boundary");
 });
 
 for (const phase9FilterControl of [
@@ -2695,6 +2748,421 @@ function phase10ReadinessCopyStatusText(payloadKind) {
     return "Phase 10 safety invariants copied.";
   }
   return "Phase 10 readiness JSON copied.";
+}
+
+async function loadPhase10GlobalStatus() {
+  phase10GlobalStatusPanel.dataset.state = "running";
+  loadPhase10GlobalStatusButton.disabled = true;
+  phase10GlobalStatusStatus.textContent = "Loading global status report...";
+  phase10GlobalStatusControls.hidden = true;
+  phase10GlobalStatusCopyStatus.hidden = true;
+  phase10GlobalStatusStrip.hidden = true;
+  phase10GlobalStatusSummary.hidden = true;
+  phase10GlobalStatusGroups.hidden = true;
+  phase10GlobalStatusGroups.replaceChildren();
+  statusText.textContent = "loading global status...";
+
+  try {
+    const response = await fetch("/phase10-global-status/demo");
+    if (!response.ok) {
+      throw new Error(`Global status failed: HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    renderPhase10GlobalStatus(payload);
+    statusText.textContent = "Global status loaded";
+  } catch (error) {
+    renderPhase10GlobalStatusError(error);
+    statusText.textContent = "Global status failed";
+  } finally {
+    loadPhase10GlobalStatusButton.disabled = false;
+  }
+}
+
+function renderPhase10GlobalStatus(report = null) {
+  currentPhase10GlobalStatusReport = report;
+  phase10GlobalStatusCopyStatus.hidden = true;
+  phase10GlobalStatusStrip.replaceChildren();
+  phase10GlobalStatusSummary.replaceChildren();
+  phase10GlobalStatusGroups.replaceChildren();
+
+  if (!report) {
+    phase10GlobalStatusPanel.dataset.state = "empty";
+    phase10GlobalStatusStatus.textContent = "Not loaded yet.";
+    phase10GlobalStatusControls.hidden = true;
+    phase10GlobalStatusStrip.hidden = true;
+    phase10GlobalStatusSummary.hidden = true;
+    phase10GlobalStatusGroups.hidden = true;
+    return;
+  }
+
+  const noGo = report.go_for_phase10 !== true;
+  phase10GlobalStatusPanel.dataset.state = noGo ? "warning" : "ready";
+  phase10GlobalStatusPanel.dataset.phase10GlobalGoForPhase10 = String(report.go_for_phase10 === true);
+  phase10GlobalStatusStatus.textContent = noGo
+    ? "Global status loaded: NO-GO. This dashboard is visibility only."
+    : "Global status loaded: GO reported. Dashboard display still grants no authorization.";
+  phase10GlobalStatusControls.hidden = false;
+  phase10GlobalStatusStrip.hidden = false;
+  phase10GlobalStatusSummary.hidden = false;
+  phase10GlobalStatusGroups.hidden = false;
+
+  renderPhase10GlobalStatusStrip(report);
+  setPhase10GlobalStatusSummary([
+    ["Report", report.report_version || "phase10_global_status_v1"],
+    ["Project phase", report.project_phase || "Phase 10.2 global status"],
+    ["GO/NO-GO", noGo ? "NO-GO" : "GO"],
+    ["Dry-run", formatSandboxBool(report.dry_run)],
+    ["Read-only", formatSandboxBool(report.read_only)],
+    ["Debug-only", formatSandboxBool(report.debug_only)],
+    ["Real actions enabled", formatSandboxBool(report.real_actions_enabled)],
+    ["Phase 10 implemented", formatSandboxBool(report.phase10_real_actions_implemented)],
+    ["Phase 9 replay", report.phase9_export_import_replay_validation_state?.replay_status || "unknown"],
+    ["No-go reasons", String(sandboxCodes(report.no_go_reasons).length)],
+  ]);
+  renderPhase10GlobalStatusGroups(report);
+}
+
+function renderPhase10GlobalStatusError(error) {
+  currentPhase10GlobalStatusReport = null;
+  phase10GlobalStatusPanel.dataset.state = "error";
+  phase10GlobalStatusStatus.textContent = "Global status report could not be loaded.";
+  phase10GlobalStatusControls.hidden = true;
+  phase10GlobalStatusCopyStatus.hidden = true;
+  phase10GlobalStatusStrip.hidden = true;
+  phase10GlobalStatusSummary.hidden = true;
+  phase10GlobalStatusGroups.hidden = false;
+  phase10GlobalStatusGroups.replaceChildren(plannerEvaluationEmptyState(error.message || String(error)));
+}
+
+function renderPhase10GlobalStatusStrip(report) {
+  phase10GlobalStatusStrip.replaceChildren();
+  const phase9State = report.phase9_export_import_replay_validation_state || {};
+  const items = [
+    ["status", report.go_for_phase10 === true ? "GO" : "NO-GO", report.go_for_phase10 === true ? "ok" : "risk"],
+    ["dry-run", formatSandboxBool(report.dry_run), report.dry_run ? "ok" : "risk"],
+    ["read-only", formatSandboxBool(report.read_only), report.read_only ? "ok" : "risk"],
+    ["debug-only", formatSandboxBool(report.debug_only), report.debug_only ? "ok" : "risk"],
+    [
+      "real actions",
+      report.real_actions_enabled === true ? "enabled" : "disabled",
+      report.real_actions_enabled === true ? "risk" : "ok",
+    ],
+    [
+      "Phase 10 implemented",
+      formatSandboxBool(report.phase10_real_actions_implemented),
+      report.phase10_real_actions_implemented === true ? "warn" : "ok",
+    ],
+    ["Phase 9 validation", phase9State.validation_status || "unknown", phase9State.validation_passed ? "ok" : "warn"],
+    ["Phase 9 replay", phase9State.replay_status || "unknown", phase9State.replay_allowed_as_read_only ? "ok" : "warn"],
+  ];
+
+  for (const [label, value, tone] of items) {
+    const chip = document.createElement("div");
+    const valueNode = document.createElement("span");
+    const labelNode = document.createElement("span");
+    chip.className = "phase10-readiness-chip";
+    chip.dataset.phase10GlobalStatusChip = label;
+    chip.dataset.tone = tone;
+    valueNode.className = "phase10-readiness-chip-value";
+    valueNode.textContent = value;
+    labelNode.className = "phase10-readiness-chip-label";
+    labelNode.textContent = label;
+    chip.append(valueNode, labelNode);
+    phase10GlobalStatusStrip.appendChild(chip);
+  }
+}
+
+function setPhase10GlobalStatusSummary(rows) {
+  phase10GlobalStatusSummary.replaceChildren();
+  for (const [label, value] of rows) {
+    phase10GlobalStatusSummary.appendChild(plannerEvaluationFact(label, value));
+  }
+}
+
+function renderPhase10GlobalStatusGroups(report) {
+  const filter = phase10GlobalStatusFilter.value || "all";
+  const sections = phase10GlobalStatusSections(report).filter(
+    (section) => filter === "all" || section.filterKey === filter
+  );
+  phase10GlobalStatusGroups.replaceChildren();
+  phase10GlobalStatusGroups.dataset.activeFilter = filter;
+
+  if (!sections.length) {
+    phase10GlobalStatusGroups.appendChild(
+      plannerEvaluationEmptyState("No global status groups match the active filter.")
+    );
+    return;
+  }
+
+  for (const section of sections) {
+    phase10GlobalStatusGroups.appendChild(phase10GlobalStatusSection(section));
+  }
+}
+
+function phase10GlobalStatusSections(report) {
+  return [
+    {
+      key: "no_go_reasons",
+      filterKey: "no_go",
+      title: "NO-GO reasons",
+      tone: "risk",
+      items: sandboxCodes(report.no_go_reasons),
+    },
+    {
+      key: "phase10_readiness_state",
+      filterKey: "readiness",
+      title: "Phase 10 readiness",
+      tone: "warn",
+      items: phase10GlobalObjectItems(report.phase10_readiness_state),
+    },
+    {
+      key: "completed_phase_summary",
+      filterKey: "readiness",
+      title: "Completed phases",
+      tone: "ok",
+      items: sandboxCodes(report.completed_phase_summary),
+    },
+    {
+      key: "phase9_validation_state",
+      filterKey: "verification",
+      title: "Phase 9 export/import/replay validation",
+      tone: "ok",
+      items: phase10GlobalObjectItems(report.phase9_export_import_replay_validation_state),
+    },
+    {
+      key: "verification_commands",
+      filterKey: "verification",
+      title: "Verification commands",
+      tone: "ok",
+      items: sandboxCodes(report.verification_commands),
+    },
+    {
+      key: "verification_expectations",
+      filterKey: "verification",
+      title: "Verification status expectations",
+      tone: "ok",
+      items: phase10GlobalExpectationItems(report.verification_command_status_expectations),
+    },
+    {
+      key: "safety_boundary",
+      filterKey: "safety",
+      title: "Safety boundary",
+      tone: "risk",
+      items: sandboxCodes(report.safety_boundary),
+    },
+    {
+      key: "safety_invariants",
+      filterKey: "safety",
+      title: "Safety invariants",
+      tone: "ok",
+      items: sandboxCodes(report.safety_invariants),
+    },
+    {
+      key: "forbidden_actions",
+      filterKey: "safety",
+      title: "Forbidden actions",
+      tone: "risk",
+      items: sandboxCodes(report.forbidden_actions),
+    },
+    {
+      key: "forbidden_apis",
+      filterKey: "safety",
+      title: "Forbidden APIs",
+      tone: "risk",
+      items: sandboxCodes(report.forbidden_apis),
+    },
+    {
+      key: "important_docs",
+      filterKey: "docs",
+      title: "Important docs",
+      tone: "neutral",
+      items: sandboxCodes(report.important_docs),
+    },
+    {
+      key: "important_runtime_files",
+      filterKey: "docs",
+      title: "Important runtime files",
+      tone: "neutral",
+      items: sandboxCodes(report.important_runtime_files),
+    },
+    {
+      key: "current_cockpit_capabilities",
+      filterKey: "docs",
+      title: "Current cockpit capabilities",
+      tone: "neutral",
+      items: sandboxCodes(report.current_cockpit_capabilities),
+    },
+    {
+      key: "ai_handoff_summary",
+      filterKey: "ai_handoff",
+      title: "AI handoff summary",
+      tone: "neutral",
+      items: [report.ai_handoff_summary || "No AI handoff summary available."],
+    },
+    {
+      key: "recommended_next_work",
+      filterKey: "ai_handoff",
+      title: "Recommended next work",
+      tone: "neutral",
+      items: sandboxCodes(report.recommended_next_work),
+    },
+  ];
+}
+
+function phase10GlobalStatusSection(section) {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const list = document.createElement("ul");
+
+  details.className = "phase10-readiness-section";
+  details.dataset.phase10GlobalStatusGroup = section.key;
+  details.dataset.phase10GlobalStatusFilterKey = section.filterKey;
+  details.dataset.tone = section.tone || "neutral";
+  details.open = true;
+  summary.className = "phase10-readiness-section-summary";
+  summary.textContent = `${section.title} (${section.items.length})`;
+  list.className = "phase10-readiness-list";
+
+  for (const item of section.items) {
+    const li = document.createElement("li");
+    li.dataset.phase10GlobalStatusItem = "true";
+    li.textContent = item;
+    list.appendChild(li);
+  }
+
+  details.append(summary, list);
+  return details;
+}
+
+function phase10GlobalObjectItems(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return [];
+  }
+  return Object.entries(value).map(([key, itemValue]) => {
+    const label = key.replaceAll("_", " ");
+    return `${label}: ${phase10GlobalStatusValueText(itemValue)}`;
+  });
+}
+
+function phase10GlobalExpectationItems(expectations) {
+  if (!Array.isArray(expectations)) {
+    return [];
+  }
+  return expectations.map((expectation) => {
+    const command = expectation?.command || "command";
+    const expectedStatus = expectation?.expected_status || "unknown";
+    const meaning = expectation?.meaning || "";
+    return `${command}: ${expectedStatus} - ${meaning}`;
+  });
+}
+
+function phase10GlobalStatusValueText(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => phase10GlobalStatusValueText(item)).join(", ");
+  }
+  if (value && typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "boolean") {
+    return formatSandboxBool(value);
+  }
+  return String(value ?? "");
+}
+
+function setPhase10GlobalStatusGroupsOpen(open) {
+  const detailsNodes = phase10GlobalStatusGroups.querySelectorAll(
+    "details[data-phase10-global-status-group]"
+  );
+  for (const details of detailsNodes) {
+    details.open = open;
+  }
+}
+
+async function copyPhase10GlobalStatusPayload(payloadKind) {
+  phase10GlobalStatusCopyStatus.hidden = false;
+  if (!currentPhase10GlobalStatusReport) {
+    phase10GlobalStatusCopyStatus.textContent = "No global status report loaded.";
+    return;
+  }
+  if (!navigator.clipboard?.writeText) {
+    phase10GlobalStatusCopyStatus.textContent = "Clipboard unavailable in this browser.";
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(phase10GlobalStatusPayloadText(payloadKind));
+    phase10GlobalStatusCopyStatus.textContent = phase10GlobalStatusCopyStatusText(payloadKind);
+  } catch (error) {
+    phase10GlobalStatusCopyStatus.textContent = `Copy failed: ${error.message || String(error)}`;
+  }
+}
+
+function phase10GlobalStatusPayloadText(payloadKind) {
+  const payload = phase10GlobalStatusPayload(payloadKind);
+  return typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+}
+
+function phase10GlobalStatusPayload(payloadKind) {
+  if (payloadKind === "ai_handoff_summary") {
+    return copyPhase10GlobalAIHandoffPayload();
+  }
+  if (payloadKind === "no_go_reasons") {
+    return copyPhase10GlobalNoGoReasonsPayload();
+  }
+  if (payloadKind === "verification_commands") {
+    return copyPhase10GlobalVerificationCommandsPayload();
+  }
+  if (payloadKind === "safety_boundary") {
+    return copyPhase10GlobalSafetyBoundaryPayload();
+  }
+  return copyPhase10GlobalStatusJsonPayload();
+}
+
+function copyPhase10GlobalStatusJsonPayload() {
+  return currentPhase10GlobalStatusReport || {};
+}
+
+function copyPhase10GlobalAIHandoffPayload() {
+  return currentPhase10GlobalStatusReport?.ai_handoff_summary || "";
+}
+
+function copyPhase10GlobalNoGoReasonsPayload() {
+  return {
+    project_phase: currentPhase10GlobalStatusReport?.project_phase || "",
+    go_for_phase10: currentPhase10GlobalStatusReport?.go_for_phase10 === true,
+    no_go_reasons: sandboxCodes(currentPhase10GlobalStatusReport?.no_go_reasons),
+  };
+}
+
+function copyPhase10GlobalVerificationCommandsPayload() {
+  return {
+    project_phase: currentPhase10GlobalStatusReport?.project_phase || "",
+    verification_commands: sandboxCodes(currentPhase10GlobalStatusReport?.verification_commands),
+    expectations: currentPhase10GlobalStatusReport?.verification_command_status_expectations || [],
+  };
+}
+
+function copyPhase10GlobalSafetyBoundaryPayload() {
+  return {
+    project_phase: currentPhase10GlobalStatusReport?.project_phase || "",
+    safety_boundary: sandboxCodes(currentPhase10GlobalStatusReport?.safety_boundary),
+  };
+}
+
+function phase10GlobalStatusCopyStatusText(payloadKind) {
+  if (payloadKind === "ai_handoff_summary") {
+    return "Global AI handoff summary copied.";
+  }
+  if (payloadKind === "no_go_reasons") {
+    return "Global no-go reasons copied.";
+  }
+  if (payloadKind === "verification_commands") {
+    return "Global verification commands copied.";
+  }
+  if (payloadKind === "safety_boundary") {
+    return "Global safety boundary copied.";
+  }
+  return "Global status JSON copied.";
 }
 
 function setPhase9ExperimentSummary(rows) {

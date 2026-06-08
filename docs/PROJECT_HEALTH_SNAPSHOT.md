@@ -30,6 +30,10 @@ Latest expected state:
   release-candidate hardening only.
 - Phase 10.1 readiness cockpit can display deterministic GO/NO-GO data, but it
   remains NO-GO by default and does not grant execution permission.
+- Phase 10.2 global status cockpit can display deterministic project health,
+  safety, readiness, Phase 9 export/import/replay validation state,
+  verification expectations, and AI handoff context, but it remains
+  read-only/dry-run/debug-only and does not grant execution permission.
 
 ## Current Safety Boundary
 
@@ -73,6 +77,11 @@ The cockpit can:
   `/phase10-readiness/demo`.
 - Copy Phase 10 AI handoff summary, readiness JSON, no-go reasons, and safety
   invariants from already loaded browser state.
+- Load and display a deterministic Phase 10.2 global status report from
+  `/phase10-global-status/demo`.
+- Copy Phase 10.2 global status JSON, AI handoff summary, no-go reasons,
+  verification commands, and safety boundary from already loaded browser
+  state.
 
 ## What The Cockpit Cannot Do
 
@@ -89,6 +98,8 @@ The cockpit cannot:
   permission matrix from the UI.
 - Treat cockpit display, export, import, replay, validation, readiness, or AI
   handoff as authorization to execute.
+- Treat the Phase 10.2 Global Status / AI Handoff dashboard as permission,
+  authorization, execution, or AI control.
 
 ## Completed Phase Summary
 
@@ -115,6 +126,9 @@ The cockpit cannot:
   safety invariants, AI handoff context, and read-only status helper.
 - Phase 10.1 readiness cockpit and report: deterministic NO-GO readiness
   report, read-only endpoint, cockpit display, and copy helpers.
+- Phase 10.2 global status cockpit and AI handoff dashboard: deterministic
+  NO-GO global status report, read-only endpoint, project health summary,
+  Phase 9 validation state, local filters, and copy helpers.
 
 ## Test And Verification Commands
 
@@ -163,6 +177,8 @@ The expected release-prep state is:
   documentation or invariant-test additions may move it upward.
 - Phase 9 replay and validation tests remain deterministic and do not require
   live desktop access.
+- Phase 10.2 global status tests remain deterministic and do not require live
+  desktop access.
 
 ## Known Non-goals
 
@@ -219,6 +235,13 @@ Phase 10.1 report status: `go_for_phase10 = false`,
 `real_actions_enabled = false`, and
 `phase10_real_actions_implemented = false`.
 
+Phase 10.2 global status report status: `go_for_phase10 = false`,
+`real_actions_enabled = false`, and
+`phase10_real_actions_implemented = false`. The Global Status / AI Handoff
+dashboard is visibility only. Readiness is not permission, cockpit display is
+not authorization, export/import/replay is not execution, and AI handoff is
+not AI control.
+
 ## Recommended Next Work
 
 - Keep Phase 9 replay validation stable while adding small regression tests for
@@ -232,6 +255,8 @@ Phase 10.1 report status: `go_for_phase10 = false`,
 - Use `docs/PHASE_10_READINESS_CHECKLIST.md`,
   `docs/AI_HANDOFF_CONTEXT.md`, and `docs/SAFETY_INVARIANTS.md` as the first
   handoff bundle for future Phase 10 discussions.
+- Use `/phase10-global-status/demo` and the Phase 10.2 cockpit panel as a
+  compact read-only handoff layer for current project health and no-go state.
 - Defer all real-action work until Phase 10 is explicitly approved and scoped.
 
 ## AI Handoff Summary
@@ -243,6 +268,8 @@ For the next AI handoff:
   path from Phase 8 or Phase 9 cockpit UI.
 - Phase 9.x is about deterministic sandbox reports, reproducibility bundles,
   import/replay validation, and cockpit readability.
+- Phase 10.2 is about deterministic global status visibility and AI handoff,
+  not desktop control.
 - Imported bundles are untrusted local input.
 - Prefer docs and tests for release-prep work unless the user explicitly asks
   for runtime changes.
@@ -272,4 +299,5 @@ For the next AI handoff:
 16. Phase 10 real actions are not implemented yet.
 17. Read `docs/PHASE_10_READINESS_CHECKLIST.md` before Phase 10 work.
 18. The Phase 10.1 readiness panel reports NO-GO by default.
-19. Run `.\scripts\verify.ps1` and `python scripts\safety_scan.py`.
+19. The Phase 10.2 global status panel reports NO-GO by default.
+20. Run `.\scripts\verify.ps1` and `python scripts\safety_scan.py`.

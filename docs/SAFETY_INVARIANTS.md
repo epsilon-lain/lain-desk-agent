@@ -24,9 +24,10 @@ developers.
 - No real-action toggle.
 - No sandbox action trigger.
 - No Phase 10 readiness UI trigger for real action.
+- No Phase 10 global status UI trigger for real action.
 - UI controls for sandbox, Phase 9, export, import, validation, replay,
-  filtering, grouping, expand/collapse, and copy are local-only or read-only
-  report loading.
+  readiness, global status, filtering, grouping, expand/collapse, and copy are
+  local-only or read-only report loading.
 - Cockpit display is not authorization.
 
 ## Dry-run And Sandbox Invariants
@@ -37,6 +38,7 @@ developers.
 - `phase10_real_actions_implemented` remains false.
 - `go_for_phase10` remains false by default.
 - No real-action adapter exists in Phase 10.1.
+- No real-action adapter exists in Phase 10.2.
 - `real_action_attempted` remains false in Phase 8 and Phase 9 dry-run reports.
 - Non-dry-run requests with real action disabled are skipped, not executed.
 - Sandbox scope remains one named test window and one named target.
@@ -67,6 +69,7 @@ developers.
 - Validation is not mutation.
 - Export/replay is not action.
 - AI handoff is not AI control.
+- Global status is not permission.
 
 ## Documentation Invariants
 
@@ -97,3 +100,10 @@ handoff, and dry-run regression protection only.
 Phase 10.1 readiness reporting is also not permission. The readiness report,
 GO/NO-GO display, endpoint, and cockpit panel must remain read-only/debug-only,
 must not call `/execute`, and must not add a real-action UI trigger.
+
+Phase 10.2 global status reporting is visibility and handoff only. The global
+status report, endpoint, and cockpit panel must remain dry-run/read-only/
+debug-only, must report NO-GO while real actions are disabled, must not call
+`/execute`, and must not add a real-action UI trigger. Readiness is not
+permission, cockpit display is not authorization, export/import/replay is not
+execution, and AI handoff is not AI control.

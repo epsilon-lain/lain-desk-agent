@@ -618,6 +618,33 @@ handoff, copy readiness JSON, copy no-go reasons, and copy safety invariants.
 Phase 10.1 readiness is not permission. Cockpit display is not authorization.
 Export/import/replay is not execution. AI handoff is not AI control.
 
+### Phase 10.2 Global Status Cockpit And AI Handoff Dashboard
+
+Phase 10.2 adds `src/lain_desk_agent/phase10_global_status.py` as a
+deterministic global status report builder. It summarizes the current
+Phase 10 readiness state, project health, safety invariants, Phase 9
+export/import/replay validation state, verification command expectations,
+important docs/runtime files, current cockpit capabilities, no-go reasons, and
+recommended next work.
+
+`GET /phase10-global-status/demo` exposes the report to the cockpit. The
+endpoint does not observe the live desktop, inspect live OS state, read private
+runtime material, mutate state, call `/execute`, or call any action-performing
+endpoint.
+
+The cockpit panel displays a NO-GO status chip, dry-run/read-only/debug-only
+state, real actions disabled state, Phase 10 implementation state, completed
+phases, no-go reasons, safety boundary, safety invariants, forbidden
+actions/APIs, verification commands, important docs/runtime files, Phase 9
+validation state, recommended next work, and AI handoff summary. Its controls
+are local display and copy helpers only: show-all/readiness/safety/docs/
+verification/AI-handoff/no-go filters, expand/collapse, and copy helpers for
+already loaded text or JSON.
+
+Phase 10.2 does not grant execution permission. Readiness is not permission.
+Cockpit display is not authorization. Export/import/replay is not execution.
+AI handoff is not AI control. Real desktop actions remain disabled.
+
 ## Safety boundaries
 
 The current safety boundaries are intentionally narrow:
@@ -670,6 +697,9 @@ The current safety boundaries are intentionally narrow:
 - Phase 10.1 readiness cockpit is read-only/debug-only and reports NO-GO by
   default; it is not execution permission and it never attempts real desktop
   action.
+- Phase 10.2 global status cockpit is read-only/debug-only and reports NO-GO
+  handoff context; it is not authorization, execution permission, or AI
+  control, and it never attempts real desktop action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.
@@ -692,6 +722,7 @@ The current safety boundaries are intentionally narrow:
 | `/sandbox-evaluation/demo` | GET | Return deterministic Phase 8.1 sandbox evaluation trace for cockpit display; no observation or execution. |
 | `/phase9-experiment/demo` | GET | Return deterministic Phase 9.1 dry-run harness trace for cockpit display; no observation or execution. |
 | `/phase10-readiness/demo` | GET | Return deterministic Phase 10.1 readiness report for cockpit display; no observation or execution. |
+| `/phase10-global-status/demo` | GET | Return deterministic Phase 10.2 global status and AI handoff report for cockpit display; no observation or execution. |
 | `/execute` | POST | Execute only approved wait contracts and verify them. |
 
 ## Development rule

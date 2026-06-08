@@ -1,10 +1,10 @@
 {
-  "schema_version": "project_status_snapshot_v2",
+  "schema_version": "project_status_snapshot_v3",
   "project": "lain-desk-agent",
-  "phase": "phase_10_1_readiness_cockpit",
-  "project_phase": "Phase 10.1 readiness cockpit / release-candidate hardening",
+  "phase": "phase_10_2_global_status_cockpit",
+  "project_phase": "Phase 10.2 global status cockpit / AI handoff dashboard",
   "next_phase": "future_phase_10_real_action_experiment_only_if_explicitly_approved",
-  "latest_completed_phase": "Phase 9.x dry-run sandbox, replay, and validation pipeline",
+  "latest_completed_phase": "Phase 10.2 global status cockpit and AI handoff dashboard",
   "real_actions_enabled": false,
   "phase10_real_actions_implemented": false,
   "go_for_phase10": false,
@@ -13,6 +13,9 @@
   "debug_only_default": true,
   "read_only_cockpit": true,
   "debug_only_sandbox_and_replay": true,
+  "global_status_cockpit": true,
+  "ai_handoff_dashboard": true,
+  "phase9_export_import_replay_validation": "deterministic_read_only",
   "safety_boundary": [
     "no real desktop actions",
     "no real click/type/hotkey/scroll/switch_app",
@@ -21,7 +24,10 @@
     "imported bundles are untrusted input",
     "readiness is not permission",
     "proposal is not execution",
-    "cockpit display is not authorization"
+    "cockpit display is not authorization",
+    "export/import/replay is not execution",
+    "AI handoff is not AI control",
+    "global status is visibility only"
   ],
   "verification_commands": [
     ".\\scripts\\verify.ps1",
@@ -35,9 +41,11 @@
   "manual_checks": [
     "review docs/PHASE_10_READINESS_CHECKLIST.md",
     "confirm no sandbox or replay UI calls /execute",
+    "confirm the Phase 10.2 global status panel has no execution controls",
     "confirm Execution Policy, Permission Profile, and Capability Registry remain unchanged"
   ],
   "important_docs": [
+    "README.md",
     "docs/PROJECT_HEALTH_SNAPSHOT.md",
     "docs/PHASE_10_READINESS_CHECKLIST.md",
     "docs/AI_HANDOFF_CONTEXT.md",
@@ -48,8 +56,23 @@
     "docs/ROADMAP.md",
     "docs/ARCHITECTURE.md"
   ],
+  "important_runtime_files": [
+    "src/lain_desk_agent/phase10_global_status.py",
+    "src/lain_desk_agent/phase10_readiness.py",
+    "src/lain_desk_agent/phase9_experiment.py",
+    "src/lain_desk_agent/main.py",
+    "ui/index.html",
+    "ui/app.js",
+    "ui/styles.css"
+  ],
+  "read_only_endpoints": [
+    "/phase10-readiness/demo",
+    "/phase10-global-status/demo",
+    "/phase9-experiment/demo",
+    "/sandbox-evaluation/demo"
+  ],
   "recommended_next_work": [
-    "keep Phase 10 work in dry-run readiness reporting",
+    "keep Phase 10 work in dry-run readiness and global status reporting",
     "review Phase 7 and Phase 10 gates before any future implementation",
     "do not enable real actions without a new explicit user request"
   ]

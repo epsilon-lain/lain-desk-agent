@@ -33,7 +33,8 @@ Cockpit display is not authorization.
 ## Current Phase
 
 The project is post-Phase 9.x dry-run sandbox hardening and entering Phase 10
-readiness / release-candidate preparation.
+readiness / release-candidate preparation. The latest cockpit visibility layer
+is Phase 10.2 Global Status / AI Handoff.
 
 Phase 10 real actions are not implemented yet.
 
@@ -66,6 +67,8 @@ Phase 10 real actions are not implemented yet.
   export/import/replay helpers, and validation.
 - `src/lain_desk_agent/phase10_readiness.py`: deterministic Phase 10.1
   readiness report; NO-GO by default.
+- `src/lain_desk_agent/phase10_global_status.py`: deterministic Phase 10.2
+  global status and AI handoff report; NO-GO by default.
 - `src/lain_desk_agent/main.py`: HTTP endpoints; sandbox/Phase 9 endpoints are
   deterministic read-only report endpoints.
 - `ui/app.js`, `ui/index.html`, `ui/styles.css`: cockpit UI and local-only
@@ -130,6 +133,29 @@ Future AI must not change Execution Policy, Permission Profile, Capability
 Registry, permission matrix, safety scan, Phase 7 gate, Phase 9 gate, replay
 validation, or audit constraints to make the report green.
 
+## Phase 10.2 Global Status / AI Handoff Dashboard
+
+Phase 10.2 adds a deterministic global status report and cockpit panel.
+It summarizes Phase 10 readiness, project health, safety invariants, Phase 9
+export/import/replay validation state, verification commands, important docs
+and runtime files, no-go reasons, recommended next work, and AI handoff text.
+
+Future AI should interpret the report like this:
+
+- `go_for_phase10 = false` is the expected default.
+- `real_actions_enabled = false` means real desktop actions remain disabled.
+- `phase10_real_actions_implemented = false` means implementation has not
+  started.
+- The panel is read-only/dry-run/debug-only and copies only already loaded
+  text or JSON.
+- Readiness is not permission.
+- Cockpit display is not authorization.
+- Export/import/replay is not execution.
+- AI handoff is not AI control.
+
+Future AI must not treat the Phase 10.2 global status dashboard as permission,
+authorization, execution, or control.
+
 ## Phase 9 Export / Import / Replay Pipeline
 
 ```text
@@ -184,8 +210,10 @@ desktop APIs, /execute paths from sandbox/replay UI, approval buttons for real
 action, real-action toggles, or permission changes. Read
 docs/PROJECT_HEALTH_SNAPSHOT.md, docs/SAFETY_INVARIANTS.md, and
 docs/PHASE_10_READINESS_CHECKLIST.md before editing. Phase 10.1 readiness is
-NO-GO by default; do not make it GO by enabling real actions. Preserve proposal
-is not execution, readiness is not permission, cockpit display is not
-authorization, and imported bundles are untrusted input. Run verify.ps1,
-safety_scan.py, git diff --check, and node --check ui/app.js.
+NO-GO by default, and Phase 10.2 global status is also NO-GO by default; do
+not make either one GO by enabling real actions. Preserve proposal is not
+execution, readiness is not permission, cockpit display is not authorization,
+export/import/replay is not execution, AI handoff is not AI control, and
+imported bundles are untrusted input. Run verify.ps1, safety_scan.py,
+git diff --check, and node --check ui/app.js.
 ```

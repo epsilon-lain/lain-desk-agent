@@ -99,6 +99,16 @@ cockpit panel for GO/NO-GO status, expected no-go blockers, safety invariants,
 required gates, verification commands, important files, and AI handoff copy.
 It remains NO-GO by default and does not enable real actions.
 
+Phase 10.2 adds a Global Status / AI Handoff cockpit dashboard. It exposes
+`phase10_global_status.py`, `GET /phase10-global-status/demo`, and local-only
+cockpit filters/copy helpers for Phase 10 readiness, project health, safety
+invariants, Phase 9 export/import/replay validation state, verification
+expectations, important docs/runtime files, and recommended next work. It is
+read-only, dry-run, and debug-only. It does not grant execution permission;
+readiness is not permission, cockpit display is not authorization,
+export/import/replay is not execution, AI handoff is not AI control, and real
+desktop actions remain disabled.
+
 ## Completed
 
 - Observation / Understanding
@@ -134,6 +144,7 @@ It remains NO-GO by default and does not enable real actions.
 - Project Health Snapshot / Release-prep Handoff
 - Phase 10 Readiness / Release-candidate Hardening Docs
 - Phase 10.1 Readiness Report And Cockpit Panel
+- Phase 10.2 Global Status Cockpit And AI Handoff Dashboard
 - AI Handoff Context
 - Safety Invariants
 - Read-only Project Status Helper
@@ -187,6 +198,9 @@ It remains NO-GO by default and does not enable real actions.
   yet.
 - Phase 10.1 readiness cockpit is read-only/debug-only. It reports NO-GO by
   default and is not execution permission.
+- Phase 10.2 global status cockpit is read-only/debug-only. It reports NO-GO
+  and handoff context for visibility only; it is not authorization, execution,
+  permission, or AI control.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -742,6 +756,31 @@ Goal: make readiness state visible without enabling real desktop control.
   recommended next work, and AI handoff summary in the cockpit.
 - Keep all controls local-only after load: group filter, expand/collapse, and
   copy helpers.
+- Do not add execute buttons, approval buttons, real-action toggles, sandbox
+  action triggers, `/execute` calls, or action-performing endpoints.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions.
+
+## Phase 10.2: Global Status Cockpit And AI Handoff Dashboard
+
+Status: implemented as read-only global status reporting.
+
+Goal: make project health, readiness, safety, replay validation, and AI handoff
+state visible in one deterministic cockpit layer without enabling desktop
+control.
+
+- Build `src/lain_desk_agent/phase10_global_status.py` with deterministic
+  report, handoff payload, and summary builders.
+- Expose `/phase10-global-status/demo` as fixture-like read-only status data.
+- Display NO-GO status, dry-run/read-only/debug-only flags, real actions
+  disabled state, Phase 10 implementation state, no-go reasons, completed
+  phases, safety invariants, forbidden actions/APIs, Phase 9
+  export/import/replay validation state, verification commands, important
+  docs/runtime files, recommended next work, and AI handoff summary.
+- Keep cockpit filters, expand/collapse, and copy controls browser-local after
+  the report loads.
+- Do not grant execution permission. Readiness is not permission, cockpit
+  display is not authorization, export/import/replay is not execution, and AI
+  handoff is not AI control.
 - Do not add execute buttons, approval buttons, real-action toggles, sandbox
   action triggers, `/execute` calls, or action-performing endpoints.
 - Preserve disabled click/type/hotkey/scroll/switch_app permissions.

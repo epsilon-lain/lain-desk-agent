@@ -621,6 +621,65 @@
               <dl class="planner-evaluation-summary" id="phase10ReadinessSummary" hidden></dl>
               <div class="phase10-readiness-groups" id="phase10ReadinessGroups" hidden></div>
             </section>
+            <section
+              class="planner-evaluation-panel phase10-global-status-panel"
+              id="phase10GlobalStatusPanel"
+              aria-label="Global status and AI handoff"
+            >
+              <div class="planner-evaluation-header">
+                <div>
+                  <p class="planner-evaluation-title">Global Status / AI Handoff</p>
+                  <p class="planner-evaluation-helper">
+                    Read-only Phase 10.2 status dashboard. Visibility only; no desktop action.
+                  </p>
+                </div>
+                <button class="planner-evaluation-button" id="loadPhase10GlobalStatus" type="button">
+                  Load global status
+                </button>
+              </div>
+              <p class="planner-evaluation-status" id="phase10GlobalStatusStatus">Not loaded yet.</p>
+              <div class="sandbox-evaluation-controls" id="phase10GlobalStatusControls" hidden>
+                <label>
+                  View
+                  <select id="phase10GlobalStatusFilter">
+                    <option value="all">show all</option>
+                    <option value="readiness">readiness</option>
+                    <option value="safety">safety</option>
+                    <option value="docs">docs</option>
+                    <option value="verification">verification</option>
+                    <option value="ai_handoff">AI handoff</option>
+                    <option value="no_go">no-go reasons</option>
+                  </select>
+                </label>
+                <div class="sandbox-evaluation-detail-actions" aria-label="Global status controls">
+                  <button class="planner-evaluation-button" id="expandPhase10GlobalStatusGroups" type="button">
+                    Expand groups
+                  </button>
+                  <button class="planner-evaluation-button" id="collapsePhase10GlobalStatusGroups" type="button">
+                    Collapse groups
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10GlobalStatusJson" type="button">
+                    Copy global status JSON
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10GlobalAIHandoffSummary" type="button">
+                    Copy AI handoff summary
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10GlobalNoGoReasons" type="button">
+                    Copy no-go reasons
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10GlobalVerificationCommands" type="button">
+                    Copy verification commands
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10GlobalSafetyBoundary" type="button">
+                    Copy safety boundary
+                  </button>
+                </div>
+              </div>
+              <p class="sandbox-evaluation-copy-status" id="phase10GlobalStatusCopyStatus" hidden></p>
+              <div class="phase10-readiness-strip" id="phase10GlobalStatusStrip" hidden></div>
+              <dl class="planner-evaluation-summary" id="phase10GlobalStatusSummary" hidden></dl>
+              <div class="phase10-readiness-groups" id="phase10GlobalStatusGroups" hidden></div>
+            </section>
             <section class="safety-action-area" id="safetyActionArea" aria-label="Safety gate action">
               <p id="safetyBrakeMessage">No safety decision yet.</p>
               <div class="safety-buttons" id="safetyButtons" hidden>
