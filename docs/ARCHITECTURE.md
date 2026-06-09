@@ -673,6 +673,28 @@ Phase 10.3 is not a capability layer. It does not add backend endpoints,
 mutation paths, approval/execute controls, action adapters, permission
 broadening, or desktop control APIs. The action runtime pipeline is unchanged.
 
+### Phase 10.4 Minimal Cockpit UX With Lazy Popup Inputs
+
+Phase 10.4 adds a minimal observation-mode cockpit layer. The default cockpit
+view shows a compact NO-GO/status bar, validation state when available, and a
+dry-run/read-only/no-real-actions indicator. Advanced controls, filters,
+summary cards, and detail groups remain hidden until the user expands them or
+a validation/error/unsafe condition needs attention.
+
+The Phase 10.4 lazy input popup is local UI only. It can appear for
+input-required event types such as approval, password, MFA, login, or consent,
+and it supports Confirm, Cancel, and ESC close behavior. Confirm records only
+local dry-run metadata, including whether a value was present. Raw password,
+MFA, login, or other secret text is cleared from the input and is not persisted
+in reports, browser storage, backend state, or audit payloads.
+
+Phase 10.4 does not add backend endpoints, mutation paths, real approval
+submission, execute controls, real-action toggles, sandbox action triggers, or
+desktop actuation. It does not call `/execute` or `/approval`, does not upload
+popup input, and does not change Capability Registry, Permission Profile,
+Execution Policy, Action Contract behavior, Click Readiness, or any permission
+matrix. The popup is a dry-run/read-only prompt for future UX shape only.
+
 ### Phase 10.5 Experiment / Guardrail Results Cockpit Display
 
 Phase 10.5 adds `build_phase10_experiment_display_report(...)` in
@@ -754,6 +776,10 @@ The current safety boundaries are intentionally narrow:
   control, and it never attempts real desktop action.
 - Phase 10.3 release-candidate guardrails are pure validation helpers,
   browser-local display, documentation, and regression tests only; they do not
+  authorize or implement real desktop action.
+- Phase 10.4 minimal cockpit UX and lazy popup inputs are browser-local
+  display/input-shape helpers only; they record dry-run metadata, do not
+  persist raw secrets, do not call `/execute` or `/approval`, and do not
   authorize or implement real desktop action.
 - Phase 10.5 experiment / guardrail results display is deterministic
   read-only/debug-only cockpit output; it does not authorize, implement, or

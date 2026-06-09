@@ -24,6 +24,10 @@ dry-run, read-only, debug-only cockpit with wait-only execution.
   browser-local cockpit validation, documentation, and regression tests exist;
   they protect the current NO-GO boundary and do not grant execution
   permission.
+- Phase 10.4 status: minimal cockpit observation UX and lazy popup inputs
+  exist; advanced controls are hidden by default, popup Confirm records only
+  local dry-run metadata, and raw password/MFA/login values are not persisted.
+  It does not grant execution permission.
 - Phase 10.5 status: read-only experiment / guardrail results display exists;
   it reuses Phase 10 readiness, global status, and guardrail data for cockpit
   inspection and AI handoff only. It does not grant execution permission.
@@ -39,6 +43,9 @@ dry-run, read-only, debug-only cockpit with wait-only execution.
 - No mutation endpoint may perform desktop action.
 - No global status, readiness, handoff, export, import, replay, or validation
   display may grant authorization.
+- No Phase 10.4 lazy popup input may trigger real action, upload input, call
+  `/execute` or `/approval`, or persist raw password, MFA, login, consent, or
+  approval text.
 - No `pyautogui` click/move/write/press/hotkey/scroll actuation, `pynput`,
   `keyboard`, `mouse`, `win32api`, `ctypes` `SendInput` / `mouse_event`,
   `xdotool`, AppleScript UI scripting, or other real desktop control API may
@@ -236,6 +243,38 @@ Phase 10.3 validation may produce:
   findings, readiness findings, and consistency checks
 
 These outputs are handoff/debug data only. They are not authorization.
+
+## Phase 10.4 Minimal Cockpit UX Status
+
+Phase 10.4 adds:
+
+- `phase10MinimalCockpit`
+- `phase10MinimalStatusbar`
+- hidden-by-default `phase10MinimalControls`
+- local-only minimal summary and scenario groups
+- `phase10InputPopup` with title, reason, input field, Confirm, and Cancel
+- ESC close behavior for the popup
+- local dry-run input metadata recording
+
+The Phase 10.4 cockpit must keep:
+
+- advanced controls hidden by default
+- status bar visible by default
+- `go_for_phase10 = false` when reports provide the expected NO-GO state
+- `real_actions_enabled = false`
+- `phase10_real_actions_implemented = false`
+- local-only filters, grouping, and expand/collapse behavior
+- popup input support limited to approval, password, MFA, login, and consent
+- `value_present` metadata only for popup submissions
+- raw secrets cleared from the input and not persisted
+
+Phase 10.4 is UX shape and readability work only. It does not call `/execute`
+or `/approval`, upload user input, add mutation endpoints, add real execute or
+approval controls, add real-action toggles, or modify Execution Policy,
+Permission Profile, Capability Registry, or any permission matrix.
+
+Readiness is not permission. Cockpit display is not authorization. Popup
+input metadata is not approval to execute. Real actions are still disabled.
 
 ## Phase 10.5 Experiment / Guardrail Results Display Status
 

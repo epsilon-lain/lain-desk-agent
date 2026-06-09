@@ -28,9 +28,13 @@ developers.
 - No Phase 10 readiness UI trigger for real action.
 - No Phase 10 global status UI trigger for real action.
 - No Phase 10.3 guardrail UI trigger for real action.
+- No Phase 10.4 minimal cockpit UI trigger for real action.
 - No Phase 10.5 experiment result UI trigger for real action.
 - Phase 10.3 guardrail cockpit validation is browser-local and must not add a
   backend endpoint.
+- Phase 10.4 lazy popup inputs are browser-local dry-run prompts only. They
+  must not call `/execute` or `/approval`, upload input, persist raw password,
+  MFA, login, consent, or approval text, or grant execution permission.
 - UI controls for sandbox, Phase 9, export, import, validation, replay,
   readiness, global status, filtering, grouping, expand/collapse, and copy are
   local-only or read-only report loading.
@@ -46,6 +50,7 @@ developers.
 - No real-action adapter exists in Phase 10.1.
 - No real-action adapter exists in Phase 10.2.
 - No real-action adapter exists in Phase 10.3.
+- No real-action adapter exists in Phase 10.4.
 - No real-action adapter exists in Phase 10.5.
 - Phase 10.3 validation may inspect imported release-candidate bundles, but it
   must keep `replay_allowed_as_read_only` separate from execution permission.
@@ -129,6 +134,13 @@ tests must remain dry-run/read-only/debug-only, must not add backend endpoints
 or cockpit execution controls, must not broaden permissions, and must not make
 readiness, global status, export/import/replay, or AI handoff act like
 authorization.
+
+Phase 10.4 minimal cockpit UX is browser-local display and input-shape polish
+only. The minimal status bar, hidden-by-default controls, local filters,
+expand/collapse behavior, and lazy popup inputs must remain dry-run/read-only/
+debug-only. Popup Confirm may record local metadata such as `value_present`,
+but must not persist raw secrets, call `/execute` or `/approval`, upload input,
+or make input submission act like execution approval.
 
 Phase 10.5 experiment / guardrail results display is deterministic read-only
 cockpit output only. The report builder, endpoint, panel, local filters,

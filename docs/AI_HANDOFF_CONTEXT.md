@@ -36,7 +36,8 @@ The project is post-Phase 9.x dry-run sandbox hardening and in Phase 10
 readiness / release-candidate preparation. The latest runtime cockpit
 visibility layer is Phase 10.2 Global Status / AI Handoff. The latest
 release-candidate protection layer is Phase 10.3 deterministic guardrail
-validation. The latest cockpit display layer is Phase 10.5 deterministic
+validation. Phase 10.4 adds the minimal observation-mode cockpit and lazy
+popup inputs. The latest cockpit display layer is Phase 10.5 deterministic
 experiment / guardrail results display.
 
 Phase 10 real actions are not implemented yet.
@@ -49,6 +50,8 @@ Phase 10 real actions are not implemented yet.
 - no sandbox or replay `/execute` call
 - no execute button, real-action approval button, sandbox action trigger, or
   real-action toggle
+- no Phase 10.4 lazy popup input may call `/execute` or `/approval`, upload
+  input, persist raw password/MFA/login text, or act as execution approval
 - no real-action toggle
 - no `pyautogui` click/move/write/press/hotkey/scroll actuation, `pynput`,
   `keyboard`, `mouse`, `win32api`, `ctypes` `SendInput` / `mouse_event`,
@@ -89,6 +92,8 @@ Phase 10 real actions are not implemented yet.
 - `scripts/project_status.ps1`: read-only project health command helper.
 - `tests/test_release_candidate_guardrails.py`: Phase 10.3 regression pack.
 - `tests/test_phase10_guardrails.py`: Phase 10.3 validation and cockpit hooks.
+- `tests/test_phase10_minimal_cockpit.py`: Phase 10.4 minimal cockpit and
+  lazy popup safety hooks.
 
 ## Important Test Commands
 
@@ -195,6 +200,34 @@ Future AI must not weaken the guardrail tests, safety scan, Phase 7 gate,
 Phase 9 gate, replay validation, Capability Registry, Permission Profile, or
 Execution Policy to make Phase 10 appear ready.
 
+## Phase 10.4 Minimal Cockpit UX And Lazy Popup Inputs
+
+Phase 10.4 adds a browser-local minimal observation mode. Normal users see a
+compact status bar with NO-GO/validation state and a dry-run/read-only/no-real-
+actions reminder. Advanced controls, detail groups, and summary cards are
+hidden by default and remain local display controls when expanded.
+
+The lazy popup is shown only for input-required event types: approval,
+password, MFA, login, and consent. Confirm records local dry-run metadata only,
+including whether a value was present. Cancel and ESC close the popup without
+submission. Password-like values are cleared from the input and raw secret text
+must not be written to reports, browser storage, backend state, or audit
+payloads.
+
+Future AI should interpret Phase 10.4 like this:
+
+- hidden-by-default controls are UX polish, not a safety gate bypass
+- popup input metadata is not real approval
+- popup Confirm is not execution permission
+- no Phase 10.4 function should call `/execute` or `/approval`
+- no Phase 10.4 function should upload popup input or persist raw secrets
+- Phase 10.4 does not change Execution Policy, Permission Profile, Capability
+  Registry, or any permission matrix
+
+Future AI must not connect the lazy popup to action execution unless a new user
+request separately satisfies the Phase 10 readiness checklist and all required
+gates.
+
 ## Phase 10.5 Experiment / Guardrail Results Display
 
 Phase 10.5 adds a deterministic read-only cockpit panel and
@@ -274,11 +307,14 @@ docs/PROJECT_HEALTH_SNAPSHOT.md, docs/SAFETY_INVARIANTS.md, and
 docs/PHASE_10_READINESS_CHECKLIST.md, and
 docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md before editing. Phase 10.1
 readiness is NO-GO by default, Phase 10.2 global status is NO-GO by default,
-Phase 10.3 is deterministic local validation only, and Phase 10.5 experiment
-display is read-only/debug-only; do not make any of them GO by enabling real
-actions. Preserve proposal is not execution, readiness is
-not permission, cockpit display is not authorization, export/import/replay is
-not execution, export/copy is not execution, AI handoff is not AI control, and
-imported bundles are untrusted input. Run verify.ps1, safety_scan.py,
-git diff --check, node --check ui/app.js, and both Phase 10.3 guardrail tests.
+Phase 10.3 is deterministic local validation only, Phase 10.4 minimal cockpit
+lazy popup input is local dry-run metadata only and must not persist raw
+secrets or call /execute or /approval, and Phase 10.5 experiment display is
+read-only/debug-only; do not make any of them GO by enabling real actions.
+Preserve proposal is not execution, readiness is not permission, cockpit
+display is not authorization, popup input is not execution approval,
+export/import/replay is not execution, export/copy is not execution, AI
+handoff is not AI control, and imported bundles are untrusted input. Run
+verify.ps1, safety_scan.py, git diff --check, node --check ui/app.js, and the
+Phase 10 guardrail/minimal cockpit tests.
 ```

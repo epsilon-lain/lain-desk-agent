@@ -6,6 +6,22 @@ const taskForm = document.querySelector("#taskForm");
 const taskInput = document.querySelector("#taskInput");
 const primaryAction = document.querySelector("#primaryAction");
 const statusText = document.querySelector("#statusText");
+const phase10MinimalCockpit = document.querySelector("#phase10MinimalCockpit");
+const phase10MinimalStatusbar = document.querySelector("#phase10MinimalStatusbar");
+const phase10MinimalControls = document.querySelector("#phase10MinimalControls");
+const phase10ObservationModeToggle = document.querySelector("#phase10ObservationModeToggle");
+const phase10MinimalOutcome = document.querySelector("#phase10MinimalOutcome");
+const phase10MinimalValidation = document.querySelector("#phase10MinimalValidation");
+const phase10MinimalSafety = document.querySelector("#phase10MinimalSafety");
+const phase10MinimalSummaryCards = document.querySelector("#phase10MinimalSummaryCards");
+const phase10MinimalScenarioGroups = document.querySelector("#phase10MinimalScenarioGroups");
+const phase10InputPopup = document.querySelector("#phase10InputPopup");
+const phase10InputForm = document.querySelector("#phase10InputForm");
+const phase10InputTitle = document.querySelector("#phase10InputTitle");
+const phase10InputReason = document.querySelector("#phase10InputReason");
+const phase10InputField = document.querySelector("#phase10InputField");
+const phase10InputConfirm = document.querySelector("#phase10InputConfirm");
+const phase10InputCancel = document.querySelector("#phase10InputCancel");
 const proposalPanel = document.querySelector("#proposalPanel");
 const proposalTitle = document.querySelector("#proposalTitle");
 const proposalSummary = document.querySelector("#proposalSummary");
@@ -588,6 +604,8 @@ const PHASE10_EXPERIMENT_FILTERS = {
     description: "show verification commands",
   },
 };
+const PHASE10_INPUT_REQUIRED_TYPES = new Set(["approval", "password", "mfa", "login", "consent"]);
+const PHASE10_SECRET_INPUT_TYPES = new Set(["password", "mfa", "login"]);
 const savedName = window.localStorage.getItem("agent.displayName");
 let currentProposal = null;
 let currentSafetyDecision = null;
@@ -609,6 +627,10 @@ let currentPhase10ExperimentFilter = "all";
 let currentPhase10GuardrailBundle = null;
 let currentPhase10GuardrailValidation = null;
 let currentPhase10GuardrailValidationFilter = "all";
+let currentPhase10MinimalReport = null;
+let currentPhase10InputEvent = null;
+let lastPhase10InputEventKey = "";
+const phase10DryRunInputMetadata = [];
 
 setDisplayedAgentName(savedName || DEFAULT_AGENT_NAME);
 setDemoScenarioSelectionDefaults();
@@ -629,6 +651,390 @@ function setAgentName(name) {
 function setDisplayedAgentName(name) {
   agentName.textContent = name;
   document.title = name;
+}
+
+function initPhase10MinimalCockpit(root = document) {
+  const panel = root.querySelector("#phase10MinimalCockpit");
+  if (!panel || panel.dataset.phase10Initialized === "true") {
+    return;
+  }
+
+  panel.dataset.phase10Initialized = "true";
+  panel.dataset.phase10Mode = "minimal_observation";
+  panel.dataset.phase10DryRun = "true";
+  panel.dataset.phase10ReadOnly = "true";
+  panel.dataset.phase10RealActionsEnabled = "false";
+  panel.dataset.phase10InputRequired = "false";
+  bindPhase10MinimalControls(root);
+  bindPhase10InputPopup(root);
+  setPhase10MinimalStatus();
+}
+
+function setPhase10MinimalStatus(report = null) {
+  if (!phase10MinimalCockpit) {
+    return;
+  }
+
+  currentPhase10MinimalReport = report;
+  const goForPhase10 = report?.go_for_phase10 === true;
+  const validationStatus = phase10MinimalValidationText(report);
+  const inputRequired = phase10MinimalCockpit.dataset.phase10InputRequired === "true";
+  const displayStatus = inputRequired
+    ? `input required: ${phase10MinimalCockpit.dataset.phase10CurrentInputType || "user"}`
+    : validationStatus;
+  phase10MinimalCockpit.dataset.phase10GoForPhase10 = String(goForPhase10);
+  phase10MinimalCockpit.dataset.phase10ValidationStatus = validationStatus;
+  phase10MinimalCockpit.dataset.state = inputRequired || phase10MinimalAttentionRequired(report)
+    ? "attention"
+    : "watching";
+  phase10MinimalOutcome.textContent = goForPhase10 ? "GO reported" : "NO-GO";
+  phase10MinimalValidation.textContent = `validation: ${displayStatus}`;
+  phase10MinimalSafety.textContent = "dry-run / read-only / no real actions";
+
+  renderPhase10MinimalSummary(report);
+  renderPhase10MinimalGroups(report);
+  if (phase10MinimalAttentionRequired(report)) {
+    phase10MinimalControls.hidden = false;
+    phase10MinimalSummaryCards.hidden = false;
+    phase10MinimalScenarioGroups.hidden = false;
+    phase10ObservationModeToggle.setAttribute("aria-expanded", "true");
+  }
+}
+
+function phase10MinimalValidationText(report = null) {
+  if (!report) {
+    return "not loaded";
+  }
+
+  const guardrailStatus = report.guardrail_status?.status;
+  if (guardrailStatus) {
+    return String(guardrailStatus);
+  }
+
+  const validationSummary = report.replay_validation_summary || report.validation_summary;
+  if (validationSummary?.validation_passed === true) {
+    return "passed";
+  }
+  if (validationSummary?.validation_passed === false) {
+    return "blocked";
+  }
+
+  if (Array.isArray(report.no_go_reasons) && report.no_go_reasons.length) {
+    return "no-go";
+  }
+
+  return "loaded";
+}
+
+function phase10MinimalAttentionRequired(report = null) {
+  if (!report) {
+    return false;
+  }
+
+  const guardrailStatus = report.guardrail_status || {};
+  const validationSummary = report.replay_validation_summary || report.validation_summary || {};
+  return (
+    guardrailStatus.validation_error_count > 0
+    || guardrailStatus.unsafe_flag_count > 0
+    || Array.isArray(validationSummary.validation_errors) && validationSummary.validation_errors.length > 0
+    || Array.isArray(validationSummary.unsafe_flags_detected) && validationSummary.unsafe_flags_detected.length > 0
+  );
+}
+
+function renderPhase10MinimalSummary(report = null) {
+  if (!phase10MinimalSummaryCards) {
+    return;
+  }
+
+  phase10MinimalSummaryCards.replaceChildren();
+  const guardrailStatus = report?.guardrail_status || {};
+  const validationSummary = report?.replay_validation_summary || report?.validation_summary || {};
+  const cards = [
+    ["outcome", report?.go_for_phase10 === true ? "GO reported" : "NO-GO"],
+    ["validation", phase10MinimalValidationText(report)],
+    ["errors", String(guardrailStatus.validation_error_count || validationSummary.validation_errors?.length || 0)],
+    ["warnings", String(guardrailStatus.validation_warning_count || validationSummary.validation_warnings?.length || 0)],
+    ["unsafe", String(guardrailStatus.unsafe_flag_count || validationSummary.unsafe_flags_detected?.length || 0)],
+  ];
+
+  for (const [key, value] of cards) {
+    const card = document.createElement("div");
+    const label = document.createElement("span");
+    const count = document.createElement("strong");
+    card.className = "phase10-minimal-summary-card";
+    card.dataset.phase10MinimalSummaryCard = key;
+    label.textContent = key;
+    count.textContent = value;
+    card.append(count, label);
+    phase10MinimalSummaryCards.appendChild(card);
+  }
+}
+
+function renderPhase10MinimalGroups(report = null) {
+  if (!phase10MinimalScenarioGroups) {
+    return;
+  }
+
+  phase10MinimalScenarioGroups.replaceChildren();
+  const groups = phase10MinimalGroupsFromReport(report);
+  for (const group of groups) {
+    phase10MinimalScenarioGroups.appendChild(phase10MinimalGroup(group));
+  }
+  applyPhase10MinimalFilter(phase10MinimalScenarioGroups.dataset.activeFilter || "all");
+}
+
+function phase10MinimalGroupsFromReport(report = null) {
+  if (!report) {
+    return [
+      {
+        key: "outcome",
+        title: "Outcome",
+        items: ["NO-GO by default. Waiting for deterministic report data."],
+      },
+      {
+        key: "gate",
+        title: "Gate status",
+        items: ["No Phase 10 gate has granted execution permission."],
+      },
+    ];
+  }
+
+  const validationSummary = report.replay_validation_summary || report.validation_summary || {};
+  return [
+    {
+      key: "outcome",
+      title: "Outcome",
+      items: [
+        report.go_for_phase10 === true ? "GO reported; display is still not permission." : "NO-GO",
+        `real_actions_enabled: ${formatSandboxBool(report.real_actions_enabled)}`,
+        `phase10_real_actions_implemented: ${formatSandboxBool(report.phase10_real_actions_implemented)}`,
+      ],
+    },
+    {
+      key: "gate",
+      title: "Gate status",
+      items: sandboxCodes(report.no_go_reasons).concat(
+        phase10ExperimentGuardrailCheckItems(report.guardrail_checks)
+      ),
+    },
+    {
+      key: "risk",
+      title: "Risk",
+      items: sandboxCodes(report.forbidden_actions).concat(sandboxCodes(report.forbidden_apis)),
+    },
+    {
+      key: "consistency",
+      title: "Consistency",
+      items: phase10MinimalCheckItems(report.guardrail_checks, "consistency").concat(
+        sandboxCodes(report.safety_invariants)
+      ),
+    },
+    {
+      key: "sensitive",
+      title: "Sensitive key findings",
+      items: sandboxCodes(validationSummary.sensitive_key_findings).length
+        ? sandboxCodes(validationSummary.sensitive_key_findings)
+        : ["No sensitive key findings in the already loaded validation summary."],
+    },
+  ];
+}
+
+function phase10MinimalCheckItems(checks, groupName) {
+  if (!Array.isArray(checks)) {
+    return [];
+  }
+  return phase10ExperimentGuardrailCheckItems(
+    checks.filter((check) => check.group === groupName)
+  );
+}
+
+function phase10MinimalGroup(group) {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const list = document.createElement("ul");
+
+  details.className = "phase10-minimal-group";
+  details.dataset.phase10MinimalGroup = group.key;
+  details.dataset.phase10MinimalFilterKey = group.key;
+  details.open = false;
+  summary.textContent = `${group.title} (${group.items.length})`;
+  list.className = "phase10-minimal-list";
+
+  for (const item of group.items) {
+    const row = document.createElement("li");
+    row.dataset.phase10MinimalItem = group.key;
+    row.textContent = item;
+    list.appendChild(row);
+  }
+
+  details.append(summary, list);
+  return details;
+}
+
+function bindPhase10MinimalControls(root = document) {
+  const controls = root.querySelector("#phase10MinimalControls");
+  if (!controls || controls.dataset.phase10Bound === "true") {
+    return;
+  }
+
+  controls.dataset.phase10Bound = "true";
+  controls.dataset.phase10DefaultHidden = "true";
+  phase10ObservationModeToggle.addEventListener("click", () => {
+    const nextHidden = !phase10MinimalControls.hidden;
+    phase10MinimalControls.hidden = nextHidden;
+    phase10MinimalSummaryCards.hidden = nextHidden;
+    phase10MinimalScenarioGroups.hidden = nextHidden;
+    phase10ObservationModeToggle.setAttribute("aria-expanded", String(!nextHidden));
+  });
+
+  controls.querySelectorAll("[data-phase10-minimal-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyPhase10MinimalFilter(button.dataset.phase10MinimalFilter || "all");
+    });
+  });
+
+  controls.querySelector("[data-phase10-minimal-expand-all]")?.addEventListener("click", () => {
+    setPhase10MinimalGroupsOpen(true);
+  });
+  controls.querySelector("[data-phase10-minimal-collapse-all]")?.addEventListener("click", () => {
+    setPhase10MinimalGroupsOpen(false);
+  });
+}
+
+function applyPhase10MinimalFilter(filterKey) {
+  if (!phase10MinimalScenarioGroups) {
+    return;
+  }
+
+  phase10MinimalScenarioGroups.dataset.activeFilter = filterKey;
+  phase10MinimalControls?.querySelectorAll("[data-phase10-minimal-filter]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.phase10MinimalFilter === filterKey));
+  });
+  phase10MinimalScenarioGroups
+    .querySelectorAll("[data-phase10-minimal-group]")
+    .forEach((group) => {
+      group.hidden = filterKey !== "all" && group.dataset.phase10MinimalGroup !== filterKey;
+    });
+}
+
+function setPhase10MinimalGroupsOpen(open) {
+  phase10MinimalScenarioGroups
+    ?.querySelectorAll("details[data-phase10-minimal-group]")
+    .forEach((details) => {
+      details.open = open;
+    });
+}
+
+function bindPhase10InputPopup(root = document) {
+  const dialog = root.querySelector("#phase10InputPopup");
+  if (!dialog || dialog.dataset.phase10Bound === "true") {
+    return;
+  }
+
+  dialog.dataset.phase10Bound = "true";
+  phase10InputForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    recordPhase10DryRunInputMetadata(currentPhase10InputEvent);
+    closePhase10InputPopup(true);
+  });
+  phase10InputCancel.addEventListener("click", () => {
+    closePhase10InputPopup(false);
+  });
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closePhase10InputPopup(false);
+  });
+  dialog.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePhase10InputPopup(false);
+    }
+  });
+}
+
+function phase10HandleInputRequiredEvent(event = {}) {
+  const inputType = phase10InputType(event);
+  if (!PHASE10_INPUT_REQUIRED_TYPES.has(inputType)) {
+    return false;
+  }
+
+  const eventKey = `${event.event_id || event.proposal_id || "phase10_input"}:${inputType}`;
+  if (lastPhase10InputEventKey === eventKey && phase10InputPopup.open) {
+    return true;
+  }
+
+  lastPhase10InputEventKey = eventKey;
+  showPhase10InputPopup({ ...event, required_input_type: inputType });
+  return true;
+}
+
+function phase10InputType(event = {}) {
+  return String(event.required_input_type || event.input_type || event.type || "").toLowerCase();
+}
+
+function showPhase10InputPopup(event = {}) {
+  currentPhase10InputEvent = event;
+  const inputType = phase10InputType(event);
+  phase10MinimalCockpit.dataset.phase10InputRequired = "true";
+  phase10MinimalCockpit.dataset.phase10CurrentInputType = inputType;
+  setPhase10MinimalStatus(currentPhase10MinimalReport);
+  phase10InputPopup.dataset.phase10InputType = inputType;
+  phase10InputPopup.dataset.phase10EventId = String(event.event_id || event.proposal_id || "");
+  phase10InputTitle.textContent = phase10InputTitleForType(inputType);
+  phase10InputReason.textContent = String(event.reason || "Dry-run input required.");
+  phase10InputField.type = PHASE10_SECRET_INPUT_TYPES.has(inputType) ? "password" : "text";
+  phase10InputField.value = "";
+  phase10InputField.autocomplete = "off";
+  phase10InputField.dataset.phase10StoresRawValue = "false";
+  phase10InputConfirm.disabled = false;
+  phase10InputPopup.showModal();
+  phase10InputField.focus();
+}
+
+function phase10InputTitleForType(inputType) {
+  const labels = {
+    approval: "Approval required",
+    password: "Password required",
+    mfa: "MFA required",
+    login: "Login input required",
+    consent: "Consent required",
+  };
+  return labels[inputType] || "Input required";
+}
+
+function closePhase10InputPopup(submitted = false) {
+  if (!phase10InputPopup) {
+    return;
+  }
+
+  phase10InputPopup.dataset.phase10Submitted = String(submitted);
+  phase10InputField.value = "";
+  currentPhase10InputEvent = null;
+  phase10MinimalCockpit.dataset.phase10InputRequired = "false";
+  delete phase10MinimalCockpit.dataset.phase10CurrentInputType;
+  setPhase10MinimalStatus(currentPhase10MinimalReport);
+  if (phase10InputPopup.open) {
+    phase10InputPopup.close();
+  }
+}
+
+function recordPhase10DryRunInputMetadata(event = {}) {
+  const inputType = phase10InputType(event);
+  const metadata = {
+    sequence: phase10DryRunInputMetadata.length + 1,
+    event_id: String(event?.event_id || event?.proposal_id || ""),
+    input_type: inputType,
+    value_present: Boolean(phase10InputField.value.trim()),
+    dry_run: true,
+    read_only: true,
+    raw_value_persisted: false,
+    submitted: true,
+  };
+  phase10DryRunInputMetadata.push(metadata);
+  phase10MinimalCockpit.dataset.phase10LastInputType = inputType;
+  phase10MinimalCockpit.dataset.phase10InputValuePresent = String(metadata.value_present);
+  phase10MinimalCockpit.dataset.phase10InputMetadataCount = String(phase10DryRunInputMetadata.length);
+  return metadata;
 }
 
 agentName.addEventListener("click", () => {
@@ -659,6 +1065,7 @@ window.addEventListener("resize", () => {
 });
 
 resizeTaskInput();
+initPhase10MinimalCockpit();
 renderProposalSummary();
 renderActionContract();
 renderClickReadiness();
@@ -2662,6 +3069,7 @@ function renderPhase10Readiness(report = null) {
     phase10ReadinessStrip.hidden = true;
     phase10ReadinessSummary.hidden = true;
     phase10ReadinessGroups.hidden = true;
+    setPhase10MinimalStatus();
     return;
   }
 
@@ -2675,6 +3083,7 @@ function renderPhase10Readiness(report = null) {
   phase10ReadinessStrip.hidden = false;
   phase10ReadinessSummary.hidden = false;
   phase10ReadinessGroups.hidden = false;
+  setPhase10MinimalStatus(report);
 
   renderPhase10ReadinessStrip(report);
   setPhase10ReadinessSummary([
@@ -3039,6 +3448,7 @@ function renderPhase10GlobalStatus(report = null) {
   phase10GlobalStatusStrip.hidden = false;
   phase10GlobalStatusSummary.hidden = false;
   phase10GlobalStatusGroups.hidden = false;
+  setPhase10MinimalStatus(report);
 
   renderPhase10GlobalStatusStrip(report);
   setPhase10GlobalStatusSummary([
@@ -3469,6 +3879,7 @@ function renderPhase10Experiment(report = null) {
   phase10ExperimentStrip.hidden = false;
   phase10ExperimentSummary.hidden = false;
   phase10ExperimentGroups.hidden = false;
+  setPhase10MinimalStatus(report);
 
   renderPhase10ExperimentStrip(report);
   renderPhase10ExperimentFilters(report);
@@ -9501,6 +9912,14 @@ taskForm.addEventListener("submit", async (event) => {
     currentProposal = payload.proposal ?? null;
     currentSafetyDecision = payload.safety_decision ?? null;
     currentTask = task;
+    if (currentSafetyDecision?.decision === "needs_approval") {
+      phase10HandleInputRequiredEvent({
+        event_id: currentProposal?.proposal_id || "phase10_approval_required",
+        proposal_id: currentProposal?.proposal_id || "",
+        required_input_type: "approval",
+        reason: currentSafetyDecision.reason || "Approval is required for this dry-run proposal.",
+      });
+    }
     statusText.textContent = "waiting for you";
     await fetchRuntimeStatus({ silent: true });
     await fetchRecentEvents({ silent: true });

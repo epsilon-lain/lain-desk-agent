@@ -120,6 +120,15 @@ project status snapshot shape, backend validation scenarios, and the read-only
 project status helper. No runtime permission, new backend endpoint, action
 adapter, or cockpit execution control is added.
 
+Phase 10.4 adds a minimal cockpit observation mode with lazy popup inputs. The
+normal cockpit view stays compact with a visible NO-GO/status bar and dry-run
+indicator, while advanced controls remain hidden until expanded or attention is
+needed. Input-required events for approval, password, MFA, login, or consent
+open a small local dialog; Confirm records only dry-run metadata such as
+`value_present`, and raw secret values are cleared rather than persisted. It
+does not call `/execute` or `/approval`, upload input, add mutation endpoints,
+or grant execution permission.
+
 Phase 10.5 adds a cockpit read-only display for deterministic Phase 10
 experiment / guardrail results. It exposes `GET /phase10-experiment/demo` and
 renders experiment status, guardrail status, GO/NO-GO state, no-go reasons,
@@ -166,6 +175,7 @@ permission, add mutation endpoints, or add cockpit action controls.
 - Phase 10.1 Readiness Report And Cockpit Panel
 - Phase 10.2 Global Status Cockpit And AI Handoff Dashboard
 - Phase 10.3 Readiness Regression Pack And Release-candidate Guardrails
+- Phase 10.4 Minimal Cockpit UX With Lazy Popup Inputs
 - Phase 10.5 Experiment / Guardrail Results Cockpit Display
 - AI Handoff Context
 - Safety Invariants
@@ -226,6 +236,10 @@ permission, add mutation endpoints, or add cockpit action controls.
 - Phase 10.3 release-candidate guardrails are deterministic validation,
   browser-local display, docs, and regression tests only. They do not
   authorize, implement, or enable real desktop action.
+- Phase 10.4 minimal cockpit UX is browser-local display/input-shape polish
+  only. It keeps advanced controls hidden by default, shows lazy input popups
+  only when needed, records local dry-run metadata only, does not persist raw
+  secrets, and does not call `/execute` or `/approval`.
 - Phase 10.5 experiment / guardrail results display is read-only/debug-only.
   It reports deterministic NO-GO state for inspection and AI handoff only; it
   is not authorization, permission, execution, or AI control.
@@ -846,6 +860,29 @@ real-action approval.
   real-action toggles, mutation endpoints, new backend endpoints, action
   adapters, `/execute` UI paths outside the existing wait-only self-test, or
   permission/capability/execution-policy changes.
+
+## Phase 10.4: Minimal Cockpit UX With Lazy Popup Inputs
+
+Status: implemented as browser-local minimal observation UX and dry-run input
+metadata only.
+
+Goal: reduce cockpit noise for normal users while preserving every safety
+boundary.
+
+- Add a compact Phase 10 minimal status bar for NO-GO state, validation state,
+  and dry-run/read-only/no-real-actions status.
+- Keep advanced controls, summary cards, and detail groups hidden by default.
+- Allow local expansion/collapse and local filtering without backend calls.
+- Show a lazy popup only for input-required event types: approval, password,
+  MFA, login, and consent.
+- Support Confirm, Cancel, and ESC close behavior with accessible dialog
+  labels.
+- Record only local dry-run metadata on Confirm, including `value_present`.
+- Do not persist raw password, MFA, login, consent, or approval text.
+- Do not call `/execute`, `/approval`, upload input, add mutation endpoints,
+  add real-action toggles, or add action-performing controls.
+- Preserve disabled click/type/hotkey/scroll/switch_app permissions and keep
+  Execution Policy, Permission Profile, and Capability Registry unchanged.
 
 ## Phase 10.5: Experiment / Guardrail Results Cockpit Display
 

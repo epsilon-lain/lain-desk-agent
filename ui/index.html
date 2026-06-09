@@ -51,6 +51,65 @@
 
           <section class="status-card" aria-label="Current status">
             <p><span class="status-label">Now:</span> <span id="statusText">waiting for you</span></p>
+            <section
+              class="phase10-minimal-cockpit"
+              id="phase10MinimalCockpit"
+              data-phase10-minimal-cockpit="true"
+              aria-label="Phase 10 minimal observation mode"
+            >
+              <div
+                class="phase10-minimal-statusbar"
+                id="phase10MinimalStatusbar"
+                data-phase10-minimal-statusbar="true"
+                role="status"
+                aria-live="polite"
+              >
+                <span id="phase10MinimalOutcome" data-phase10-minimal-outcome>NO-GO</span>
+                <span id="phase10MinimalValidation" data-phase10-minimal-validation>validation: not loaded</span>
+                <span id="phase10MinimalSafety" data-phase10-minimal-safety>dry-run / read-only / no real actions</span>
+                <button
+                  class="phase10-minimal-toggle"
+                  id="phase10ObservationModeToggle"
+                  data-phase10-observation-mode-toggle="true"
+                  type="button"
+                  aria-controls="phase10MinimalControls"
+                  aria-expanded="false"
+                >
+                  Details
+                </button>
+              </div>
+              <div
+                class="phase10-minimal-controls"
+                id="phase10MinimalControls"
+                data-phase10-minimal-controls="true"
+                hidden
+              >
+                <div class="phase10-minimal-filter-row" aria-label="Phase 10 local filters">
+                  <button type="button" data-phase10-minimal-filter="all">all</button>
+                  <button type="button" data-phase10-minimal-filter="outcome">outcome</button>
+                  <button type="button" data-phase10-minimal-filter="gate">gate</button>
+                  <button type="button" data-phase10-minimal-filter="risk">risk</button>
+                  <button type="button" data-phase10-minimal-filter="consistency">consistency</button>
+                  <button type="button" data-phase10-minimal-filter="sensitive">sensitive key</button>
+                </div>
+                <div class="phase10-minimal-action-row" aria-label="Phase 10 local display controls">
+                  <button type="button" data-phase10-minimal-expand-all>Expand groups</button>
+                  <button type="button" data-phase10-minimal-collapse-all>Collapse groups</button>
+                </div>
+              </div>
+              <div
+                class="phase10-minimal-summary"
+                id="phase10MinimalSummaryCards"
+                data-phase10-minimal-summary-cards="true"
+                hidden
+              ></div>
+              <div
+                class="phase10-minimal-groups"
+                id="phase10MinimalScenarioGroups"
+                data-phase10-minimal-scenario-groups="true"
+                hidden
+              ></div>
+            </section>
             <section class="proposal-panel" id="proposalPanel" aria-label="Proposal summary">
               <p class="proposal-title" id="proposalTitle">Read-only proposal</p>
               <p id="proposalSummary">Enter a task and choose Plan. Mirai will inspect the screen and stay read-only.</p>
@@ -1013,6 +1072,36 @@
         <menu>
           <button value="cancel" type="submit">Cancel</button>
           <button id="saveName" value="save" type="submit">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog
+      class="phase10-input-popup"
+      id="phase10InputPopup"
+      data-phase10-input-popup="true"
+      aria-labelledby="phase10InputTitle"
+      aria-describedby="phase10InputReason"
+    >
+      <form id="phase10InputForm" data-phase10-input-form="true" method="dialog">
+        <h2 id="phase10InputTitle" data-phase10-input-title="true">Input required</h2>
+        <p id="phase10InputReason" data-phase10-input-reason="true">Dry-run input required.</p>
+        <label class="phase10-input-label" for="phase10InputField">
+          Response
+          <input
+            id="phase10InputField"
+            data-phase10-input-field="true"
+            autocomplete="off"
+            aria-label="Phase 10 dry-run input"
+          />
+        </label>
+        <menu class="phase10-input-actions">
+          <button id="phase10InputCancel" data-phase10-input-cancel="true" value="cancel" type="button">
+            Cancel
+          </button>
+          <button id="phase10InputConfirm" data-phase10-input-confirm="true" value="confirm" type="submit">
+            Confirm
+          </button>
         </menu>
       </form>
     </dialog>

@@ -120,7 +120,11 @@ button {
 .demo-scenario-controls select:focus-visible,
 .demo-scenario-controls input:focus-visible,
 .rename-dialog button:focus-visible,
-.rename-dialog input:focus-visible {
+.rename-dialog input:focus-visible,
+.phase10-minimal-toggle:focus-visible,
+.phase10-minimal-controls button:focus-visible,
+.phase10-input-actions button:focus-visible,
+.phase10-input-label input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -2031,6 +2035,211 @@ button {
 
 .phase10-experiment-list li[data-phase10-experiment-item] {
   overflow-wrap: anywhere;
+}
+
+.phase10-minimal-cockpit {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.phase10-minimal-cockpit[data-state="attention"] .phase10-minimal-statusbar,
+.phase10-minimal-cockpit[data-phase10-input-required="true"] .phase10-minimal-statusbar {
+  border-color: rgba(255, 198, 109, 0.52);
+  background: rgba(120, 74, 20, 0.16);
+}
+
+.phase10-minimal-statusbar {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 1.25fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(134, 184, 220, 0.2);
+  border-radius: 8px;
+  padding: 8px 9px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.phase10-minimal-statusbar span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.phase10-minimal-statusbar [data-phase10-minimal-outcome] {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.phase10-minimal-toggle,
+.phase10-minimal-controls button,
+.phase10-input-actions button {
+  min-height: 32px;
+  border: 1px solid rgba(134, 184, 220, 0.2);
+  border-radius: 8px;
+  background: rgba(9, 18, 28, 0.66);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.phase10-minimal-toggle {
+  padding: 0 10px;
+}
+
+.phase10-minimal-controls[hidden],
+.phase10-minimal-summary[hidden],
+.phase10-minimal-groups[hidden] {
+  display: none;
+}
+
+.phase10-minimal-controls {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(134, 184, 220, 0.16);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.phase10-minimal-filter-row,
+.phase10-minimal-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.phase10-minimal-filter-row button[aria-pressed="true"] {
+  border-color: rgba(135, 244, 255, 0.66);
+  background: rgba(22, 98, 120, 0.28);
+}
+
+.phase10-minimal-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+  gap: 7px;
+}
+
+.phase10-minimal-summary-card {
+  border: 1px solid rgba(134, 184, 220, 0.14);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: rgba(9, 18, 28, 0.48);
+}
+
+.phase10-minimal-summary-card strong,
+.phase10-minimal-summary-card span {
+  display: block;
+}
+
+.phase10-minimal-summary-card strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.phase10-minimal-summary-card span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.phase10-minimal-groups {
+  display: grid;
+  gap: 7px;
+}
+
+.phase10-minimal-group {
+  border: 1px solid rgba(134, 184, 220, 0.16);
+  border-radius: 8px;
+  padding: 8px 9px;
+}
+
+.phase10-minimal-group[hidden] {
+  display: none;
+}
+
+.phase10-minimal-group summary {
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.phase10-minimal-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.phase10-minimal-list li {
+  border: 1px solid rgba(134, 184, 220, 0.12);
+  border-radius: 7px;
+  padding: 6px 7px;
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.phase10-input-popup {
+  width: min(90vw, 360px);
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  padding: 0;
+  background: rgba(8, 16, 24, 0.98);
+  color: var(--text);
+}
+
+.phase10-input-popup::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.phase10-input-popup form {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+}
+
+.phase10-input-popup h2,
+.phase10-input-popup p {
+  margin: 0;
+}
+
+.phase10-input-popup h2 {
+  color: var(--blue-strong);
+  font-size: 18px;
+}
+
+.phase10-input-popup p,
+.phase10-input-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.phase10-input-label {
+  display: grid;
+  gap: 6px;
+}
+
+.phase10-input-label input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--panel-line-soft);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: rgba(4, 10, 16, 0.9);
+  color: var(--text);
+  font: inherit;
+}
+
+.phase10-input-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
 }
 
 .phase10-readiness-strip {
