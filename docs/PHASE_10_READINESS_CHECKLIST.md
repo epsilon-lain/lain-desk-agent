@@ -24,6 +24,9 @@ dry-run, read-only, debug-only cockpit with wait-only execution.
   browser-local cockpit validation, documentation, and regression tests exist;
   they protect the current NO-GO boundary and do not grant execution
   permission.
+- Phase 10.5 status: read-only experiment / guardrail results display exists;
+  it reuses Phase 10 readiness, global status, and guardrail data for cockpit
+  inspection and AI handoff only. It does not grant execution permission.
 
 ## Hard Safety Boundary
 
@@ -233,6 +236,36 @@ Phase 10.3 validation may produce:
   findings, readiness findings, and consistency checks
 
 These outputs are handoff/debug data only. They are not authorization.
+
+## Phase 10.5 Experiment / Guardrail Results Display Status
+
+Phase 10.5 adds:
+
+- `build_phase10_experiment_display_report(...)`
+- `GET /phase10-experiment/demo`
+- a read-only cockpit panel for deterministic Phase 10 experiment and
+  guardrail results
+- local-only filters, expand/collapse controls, and copy helpers for
+  experiment summary, guardrail checks, no-go reasons, recommended next work,
+  AI handoff summary, and JSON
+
+The Phase 10.5 report must keep:
+
+- `go_for_phase10 = false`
+- `real_actions_enabled = false`
+- `phase10_real_actions_implemented = false`
+- `dry_run = true`
+- `read_only = true`
+- `debug_only = true`
+
+Phase 10.5 is display, debugging, and AI handoff only. It does not implement
+real actions, grant execution permission, add mutation endpoints, add
+approval/execute controls, or modify Execution Policy, Permission Profile,
+Capability Registry, or any permission matrix.
+
+Readiness is not permission. Cockpit display is not authorization. Export/copy
+is not execution. AI handoff is not AI control. Real actions are still
+disabled.
 
 ## Sandbox Scope Requirements
 

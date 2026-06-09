@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+from urllib.request import urlopen
 
 import _path  # noqa: F401
+from lain_desk_agent.main import create_server
 from lain_desk_agent.phase10_global_status import build_phase10_global_status_report
 from lain_desk_agent.phase10_guardrails import (
     PHASE10_GUARDRAIL_AUDIT_ORDER,
@@ -13,6 +17,11 @@ from lain_desk_agent.phase10_guardrails import (
     build_phase10_guardrail_validation_report,
     build_phase10_release_candidate_bundle,
     validate_phase10_release_candidate_bundle,
+)
+from lain_desk_agent.phase10_experiment import (
+    build_phase10_cockpit_experiment_summary,
+    build_phase10_experiment_display_report,
+    build_phase10_guardrail_display_report,
 )
 
 
@@ -25,6 +34,87 @@ UI_STYLES_CSS = PROJECT_ROOT / "ui" / "styles.css"
 
 
 class Phase10GuardrailBackendTests(unittest.TestCase):
+    def test_phase10_experiment_display_report_is_deterministic_no_go(self) -> None:
+        report = build_phase10_experiment_display_report()
+        second = build_phase10_experiment_display_report()
+        summary = build_phase10_cockpit_experiment_summary()
+        guardrail_display = build_phase10_guardrail_display_report()
+
+        self.assertEqual(report, second)
+        self.assertEqual(report["report_version"], "phase10_experiment_display_v1")
+        self.assertIn("Phase 10.5", report["project_phase"])
+        self.assertTrue(report["dry_run"])
+        self.assertTrue(report["read_only"])
+        self.assertTrue(report["debug_only"])
+        self.assertFalse(report["real_actions_enabled"])
+        self.assertFalse(report["phase10_real_actions_implemented"])
+        self.assertFalse(report["go_for_phase10"])
+        self.assertFalse(report["state_mutation"])
+        self.assertFalse(report["execution_attempted"])
+        self.assertFalse(report["real_desktop_actions"])
+        self.assertTrue(report["no_go_reasons"])
+        self.assertTrue(report["guardrail_checks"])
+        self.assertTrue(report["safety_invariants"])
+        self.assertTrue(report["forbidden_actions"])
+        self.assertTrue(report["forbidden_apis"])
+        self.assertTrue(report["ai_handoff_summary"])
+        self.assertEqual(summary["status"], "NO-GO")
+        self.assertEqual(guardrail_display["guardrail_status"], report["guardrail_status"])
+
+        commands = "\n".join(report["verification_commands"])
+        for command_fragment in [
+            "verify.ps1",
+            "safety_scan.py",
+            "node --check ui/app.js",
+            "git diff --check",
+        ]:
+            with self.subTest(command_fragment=command_fragment):
+                self.assertIn(command_fragment, commands)
+
+        forbidden_actions = " ".join(report["forbidden_actions"])
+        for action_name in ["real click", "real type", "real hotkey", "real scroll", "switch_app"]:
+            with self.subTest(action_name=action_name):
+                self.assertIn(action_name, forbidden_actions)
+
+        forbidden_apis = " ".join(report["forbidden_apis"])
+        for api_name in ["pyautogui", "pynput", "keyboard", "mouse", "win32api"]:
+            with self.subTest(api_name=api_name):
+                self.assertIn(api_name, forbidden_apis)
+
+        encoded = json.dumps(report).lower()
+        for forbidden in ["sk-", "password=", "token=", "secret=", "api_key="]:
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, encoded)
+
+    def test_phase10_experiment_display_endpoint_is_read_only(self) -> None:
+        server = create_server("127.0.0.1", 0)
+        host, port = server.server_address
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            with (
+                patch("lain_desk_agent.main.observe", side_effect=AssertionError("observe called")),
+                patch(
+                    "lain_desk_agent.main.execute_action_contract",
+                    side_effect=AssertionError("execution called"),
+                ),
+            ):
+                with urlopen(
+                    f"http://{host}:{port}/phase10-experiment/demo",
+                    timeout=5,
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+        finally:
+            server.shutdown()
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(payload["report_version"], "phase10_experiment_display_v1")
+        self.assertFalse(payload["go_for_phase10"])
+        self.assertFalse(payload["real_actions_enabled"])
+        self.assertFalse(payload["phase10_real_actions_implemented"])
+
     def test_release_candidate_bundle_validates_as_read_only_no_go(self) -> None:
         bundle = build_phase10_release_candidate_bundle()
         validation = validate_phase10_release_candidate_bundle(bundle)
@@ -137,6 +227,100 @@ class Phase10GuardrailBackendTests(unittest.TestCase):
 
 
 class Phase10GuardrailCockpitTests(unittest.TestCase):
+    def test_phase10_experiment_cockpit_hooks_exist(self) -> None:
+        html = UI_INDEX_HTML.read_text(encoding="utf-8")
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        styles = UI_STYLES_CSS.read_text(encoding="utf-8")
+        combined = html + source + styles
+
+        for hook in [
+            "phase10ExperimentPanel",
+            "loadPhase10Experiment",
+            "phase10ExperimentStatus",
+            "phase10ExperimentFilters",
+            "phase10ExperimentGroups",
+            "expandPhase10ExperimentGroups",
+            "collapsePhase10ExperimentGroups",
+            "copyPhase10ExperimentSummary",
+            "copyPhase10GuardrailChecks",
+            "copyPhase10ExperimentNoGoReasons",
+            "copyPhase10RecommendedNextWork",
+            "copyPhase10AiHandoffSummary",
+            "copyPhase10ExperimentJson",
+            "data-phase10-experiment-filter",
+            "data-phase10-experiment-group",
+            "data-phase10-experiment-item",
+        ]:
+            with self.subTest(hook=hook):
+                self.assertIn(hook, combined)
+
+        for function_name in [
+            "loadPhase10Experiment",
+            "renderPhase10Experiment",
+            "renderPhase10ExperimentFilters",
+            "renderPhase10ExperimentGroups",
+            "renderPhase10ExperimentStrip",
+            "copyPhase10ExperimentPayload",
+            "copyPhase10ExperimentSummaryPayload",
+            "copyPhase10GuardrailChecksPayload",
+            "copyPhase10ExperimentNoGoReasonsPayload",
+            "copyPhase10RecommendedNextWorkPayload",
+            "copyPhase10AiHandoffSummaryPayload",
+            "copyPhase10ExperimentJsonPayload",
+            "setPhase10ExperimentGroupsOpen",
+        ]:
+            with self.subTest(function_name=function_name):
+                self.assertIn(f"function {function_name}", source)
+
+        for css_selector in [
+            ".phase10-experiment-panel",
+            ".phase10-experiment-filters",
+            ".phase10-experiment-filter-chip",
+            ".phase10-experiment-section",
+            ".phase10-experiment-list",
+        ]:
+            with self.subTest(css_selector=css_selector):
+                self.assertIn(css_selector, styles)
+
+    def test_phase10_experiment_ui_section_is_read_only(self) -> None:
+        source = UI_APP_JS.read_text(encoding="utf-8")
+        start = source.index("async function loadPhase10Experiment")
+        end = source.index("function renderPhase10Guardrails", start)
+        section = source[start:end]
+
+        self.assertIn('fetch("/phase10-experiment/demo")', section)
+        self.assertIn("navigator.clipboard.writeText", section)
+        for forbidden_fragment in [
+            '"/execute"',
+            "'/execute'",
+            '"/approval"',
+            "'/approval'",
+            "recordApprovalDecision",
+            "runWaitExecutionSelfTest",
+            "realActionEnabled = true",
+            "real_action_enabled = true",
+            "execute_action_contract",
+            "pyautogui",
+            "pynput",
+            "win32api",
+            "SendInput",
+            "mouse_event",
+            "xdotool",
+            "AppleScript",
+        ]:
+            with self.subTest(forbidden_fragment=forbidden_fragment):
+                self.assertNotIn(forbidden_fragment, section)
+
+        html = UI_INDEX_HTML.read_text(encoding="utf-8")
+        panel_html = _source_between(
+            html,
+            'id="phase10ExperimentPanel"',
+            'id="phase10GuardrailsPanel"',
+        )
+        for forbidden_fragment in ["/execute", "approve", "real-action toggle"]:
+            with self.subTest(forbidden_fragment=forbidden_fragment):
+                self.assertNotIn(forbidden_fragment, panel_html.lower())
+
     def test_phase10_guardrail_cockpit_hooks_exist(self) -> None:
         html = UI_INDEX_HTML.read_text(encoding="utf-8")
         source = UI_APP_JS.read_text(encoding="utf-8")
@@ -247,6 +431,12 @@ class Phase10GuardrailCockpitTests(unittest.TestCase):
         ]:
             with self.subTest(forbidden_fragment=forbidden_fragment):
                 self.assertNotIn(forbidden_fragment, source)
+
+
+def _source_between(source: str, start_marker: str, end_marker: str) -> str:
+    start = source.index(start_marker)
+    end = source.index(end_marker, start)
+    return source[start:end]
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
 {
   "schema_version": "project_status_snapshot_v3",
   "project": "lain-desk-agent",
-  "phase": "phase_10_3_release_candidate_guardrails",
-  "project_phase": "Phase 10.3 readiness regression pack / release-candidate guardrails",
+  "phase": "phase_10_5_experiment_guardrail_display",
+  "project_phase": "Phase 10.5 experiment / guardrail results cockpit display",
   "next_phase": "future_phase_10_real_action_experiment_only_if_explicitly_approved",
-  "latest_completed_phase": "Phase 10.3 readiness regression pack and release-candidate guardrails",
+  "latest_completed_phase": "Phase 10.5 experiment / guardrail results cockpit display",
   "real_actions_enabled": false,
   "phase10_real_actions_implemented": false,
   "go_for_phase10": false,
@@ -17,6 +17,7 @@
   "ai_handoff_dashboard": true,
   "release_candidate_guardrails": true,
   "phase10_3_regression_pack": true,
+  "phase10_5_experiment_display": true,
   "phase10_guardrail_validation": "deterministic_browser_local_read_only",
   "phase9_export_import_replay_validation": "deterministic_read_only",
   "safety_boundary": [
@@ -32,7 +33,9 @@
     "AI handoff is not AI control",
     "global status is visibility only",
     "phase 10.3 guardrails are not approval",
-    "phase 10.3 valid bundles are not permission"
+    "phase 10.3 valid bundles are not permission",
+    "phase 10.5 experiment display is not authorization",
+    "export/copy is not execution"
   ],
   "verification_commands": [
     ".\\scripts\\verify.ps1",
@@ -50,6 +53,7 @@
     "review docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md",
     "confirm no sandbox or replay UI calls /execute",
     "confirm Phase 10.3 cockpit validation remains browser-local",
+    "confirm Phase 10.5 experiment display remains read-only",
     "confirm the Phase 10.2 global status panel has no execution controls",
     "confirm Execution Policy, Permission Profile, and Capability Registry remain unchanged"
   ],
@@ -87,12 +91,14 @@
   "read_only_endpoints": [
     "/phase10-readiness/demo",
     "/phase10-global-status/demo",
+    "/phase10-experiment/demo",
     "/phase9-experiment/demo",
     "/sandbox-evaluation/demo"
   ],
   "recommended_next_work": [
     "keep Phase 10 work in dry-run readiness and global status reporting",
     "keep Phase 10.3 guardrails as deterministic browser-local validation and regression tests only",
+    "keep Phase 10.5 experiment display deterministic, read-only, and NO-GO by default",
     "review Phase 7 and Phase 10 gates before any future implementation",
     "do not enable real actions without a new explicit user request"
   ]

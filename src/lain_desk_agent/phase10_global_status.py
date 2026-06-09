@@ -328,6 +328,7 @@ def _completed_phase_summary() -> list[str]:
         "Phase 10.1 read-only readiness cockpit",
         "Phase 10.2 global status cockpit and AI handoff dashboard",
         "Phase 10.3 release-candidate guardrail validation",
+        "Phase 10.5 cockpit experiment and guardrail display",
     ]
 
 
@@ -388,6 +389,7 @@ def _current_cockpit_capabilities() -> list[str]:
         "Phase 10.1 readiness display",
         "Phase 10.2 global status and AI handoff display",
         "Phase 10.3 release-candidate guardrail validation display",
+        "Phase 10.5 experiment and guardrail result display",
         "local-only filters, expand/collapse, and copy helpers",
     ]
 
@@ -396,6 +398,7 @@ def _recommended_next_work() -> list[str]:
     return [
         "Keep Phase 10.2 as visibility, handoff, docs, and regression protection.",
         "Keep Phase 10.3 guardrail validation deterministic, local-only, and read-only.",
+        "Keep Phase 10.5 experiment result display deterministic, read-only, and NO-GO by default.",
         "Preserve the dry-run/read-only/debug-only cockpit boundary.",
         "Keep Phase 9 replay validation stable and deterministic.",
         "Run the verification command set after UI or safety-related edits.",

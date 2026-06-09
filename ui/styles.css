@@ -1918,6 +1918,15 @@ button {
   border-color: rgba(88, 214, 141, 0.34);
 }
 
+.phase10-experiment-panel[data-state="warning"],
+.phase10-experiment-panel[data-state="error"] {
+  border-color: rgba(255, 115, 95, 0.42);
+}
+
+.phase10-experiment-panel[data-state="ready"] {
+  border-color: rgba(88, 214, 141, 0.34);
+}
+
 .phase10-guardrails-panel[data-state="warning"],
 .phase10-guardrails-panel[data-state="error"] {
   border-color: rgba(255, 115, 95, 0.42);
@@ -2000,6 +2009,28 @@ button {
 
 .phase10-guardrail-validation-details pre {
   max-height: 260px;
+}
+
+.phase10-experiment-filters {
+  margin-top: 4px;
+}
+
+.phase10-experiment-filter-chip[data-phase10-experiment-filter] {
+  border-color: rgba(134, 184, 220, 0.22);
+}
+
+.phase10-experiment-filter-chip[aria-pressed="true"] {
+  border-color: rgba(135, 244, 255, 0.66);
+  background: rgba(22, 98, 120, 0.28);
+  color: var(--text);
+}
+
+.phase10-experiment-section[data-phase10-experiment-group] {
+  position: relative;
+}
+
+.phase10-experiment-list li[data-phase10-experiment-item] {
+  overflow-wrap: anywhere;
 }
 
 .phase10-readiness-strip {

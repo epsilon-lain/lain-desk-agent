@@ -681,6 +681,61 @@
               <div class="phase10-readiness-groups" id="phase10GlobalStatusGroups" hidden></div>
             </section>
             <section
+              class="planner-evaluation-panel phase10-experiment-panel"
+              id="phase10ExperimentPanel"
+              aria-label="Phase 10 experiment results"
+            >
+              <div class="planner-evaluation-header">
+                <div>
+                  <p class="planner-evaluation-title">Phase 10 experiment results</p>
+                  <p class="planner-evaluation-helper">
+                    Read-only Phase 10.5 display. Deterministic guardrail status only; no execution permission.
+                  </p>
+                </div>
+                <button class="planner-evaluation-button" id="loadPhase10Experiment" type="button">
+                  Load experiment results
+                </button>
+              </div>
+              <p class="planner-evaluation-status" id="phase10ExperimentStatus">Not loaded yet.</p>
+              <div class="sandbox-evaluation-controls" id="phase10ExperimentControls" hidden>
+                <div
+                  class="sandbox-evaluation-quick-filters phase10-experiment-filters"
+                  id="phase10ExperimentFilters"
+                  aria-label="Phase 10 experiment result filters"
+                ></div>
+                <div class="sandbox-evaluation-detail-actions" aria-label="Phase 10 experiment controls">
+                  <button class="planner-evaluation-button" id="expandPhase10ExperimentGroups" type="button">
+                    Expand groups
+                  </button>
+                  <button class="planner-evaluation-button" id="collapsePhase10ExperimentGroups" type="button">
+                    Collapse groups
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10ExperimentSummary" type="button">
+                    Copy experiment summary
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10GuardrailChecks" type="button">
+                    Copy guardrail checks
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10ExperimentNoGoReasons" type="button">
+                    Copy no-go reasons
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10RecommendedNextWork" type="button">
+                    Copy next work
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10AiHandoffSummary" type="button">
+                    Copy AI handoff
+                  </button>
+                  <button class="planner-evaluation-button" id="copyPhase10ExperimentJson" type="button">
+                    Copy experiment JSON
+                  </button>
+                </div>
+              </div>
+              <p class="sandbox-evaluation-copy-status" id="phase10ExperimentCopyStatus" hidden></p>
+              <div class="phase10-readiness-strip" id="phase10ExperimentStrip" hidden></div>
+              <dl class="planner-evaluation-summary" id="phase10ExperimentSummary" hidden></dl>
+              <div class="phase10-readiness-groups" id="phase10ExperimentGroups" hidden></div>
+            </section>
+            <section
               class="planner-evaluation-panel phase10-guardrails-panel"
               id="phase10GuardrailsPanel"
               aria-label="Phase 10 release-candidate guardrails"

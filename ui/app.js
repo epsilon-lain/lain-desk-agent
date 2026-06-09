@@ -168,6 +168,23 @@ const phase10GlobalStatusCopyStatus = document.querySelector("#phase10GlobalStat
 const phase10GlobalStatusStrip = document.querySelector("#phase10GlobalStatusStrip");
 const phase10GlobalStatusSummary = document.querySelector("#phase10GlobalStatusSummary");
 const phase10GlobalStatusGroups = document.querySelector("#phase10GlobalStatusGroups");
+const phase10ExperimentPanel = document.querySelector("#phase10ExperimentPanel");
+const loadPhase10ExperimentButton = document.querySelector("#loadPhase10Experiment");
+const phase10ExperimentStatus = document.querySelector("#phase10ExperimentStatus");
+const phase10ExperimentControls = document.querySelector("#phase10ExperimentControls");
+const phase10ExperimentFilters = document.querySelector("#phase10ExperimentFilters");
+const expandPhase10ExperimentGroups = document.querySelector("#expandPhase10ExperimentGroups");
+const collapsePhase10ExperimentGroups = document.querySelector("#collapsePhase10ExperimentGroups");
+const copyPhase10ExperimentSummary = document.querySelector("#copyPhase10ExperimentSummary");
+const copyPhase10GuardrailChecks = document.querySelector("#copyPhase10GuardrailChecks");
+const copyPhase10ExperimentNoGoReasons = document.querySelector("#copyPhase10ExperimentNoGoReasons");
+const copyPhase10RecommendedNextWork = document.querySelector("#copyPhase10RecommendedNextWork");
+const copyPhase10AiHandoffSummary = document.querySelector("#copyPhase10AiHandoffSummary");
+const copyPhase10ExperimentJson = document.querySelector("#copyPhase10ExperimentJson");
+const phase10ExperimentCopyStatus = document.querySelector("#phase10ExperimentCopyStatus");
+const phase10ExperimentStrip = document.querySelector("#phase10ExperimentStrip");
+const phase10ExperimentSummary = document.querySelector("#phase10ExperimentSummary");
+const phase10ExperimentGroups = document.querySelector("#phase10ExperimentGroups");
 const phase10GuardrailsPanel = document.querySelector("#phase10GuardrailsPanel");
 const loadPhase10GuardrailDemo = document.querySelector("#loadPhase10GuardrailDemo");
 const phase10GuardrailBundleInput = document.querySelector("#phase10GuardrailBundleInput");
@@ -533,6 +550,44 @@ const DEMO_SCENARIOS = {
     labels: ["Search"],
   },
 };
+const PHASE10_EXPERIMENT_FILTERS = {
+  all: {
+    label: "all",
+    description: "show every Phase 10.5 experiment display group",
+  },
+  no_go: {
+    label: "no-go reasons",
+    description: "show expected blockers that keep Phase 10 NO-GO",
+  },
+  guardrails: {
+    label: "guardrails",
+    description: "show deterministic guardrail validation status and checks",
+  },
+  readiness: {
+    label: "readiness",
+    description: "show readiness checks without granting permission",
+  },
+  safety: {
+    label: "safety",
+    description: "show safety invariants and disabled real-action state",
+  },
+  forbidden: {
+    label: "forbidden",
+    description: "show forbidden actions and APIs",
+  },
+  audit: {
+    label: "audit",
+    description: "show read-only audit notes",
+  },
+  ai_handoff: {
+    label: "AI handoff",
+    description: "show AI handoff context and recommended next work",
+  },
+  verification: {
+    label: "verification",
+    description: "show verification commands",
+  },
+};
 const savedName = window.localStorage.getItem("agent.displayName");
 let currentProposal = null;
 let currentSafetyDecision = null;
@@ -549,6 +604,8 @@ let currentPhase9ReplayReport = null;
 let currentPhase9ReplayValidationFilter = "all";
 let currentPhase10ReadinessReport = null;
 let currentPhase10GlobalStatusReport = null;
+let currentPhase10ExperimentReport = null;
+let currentPhase10ExperimentFilter = "all";
 let currentPhase10GuardrailBundle = null;
 let currentPhase10GuardrailValidation = null;
 let currentPhase10GuardrailValidationFilter = "all";
@@ -616,6 +673,7 @@ renderPlannerEvaluation();
 renderSandboxEvaluation();
 renderPhase9Experiment();
 renderPhase10Readiness();
+renderPhase10Experiment();
 renderPhase10Guardrails();
 renderPermissionProfile();
 renderCapabilities();
@@ -673,6 +731,10 @@ loadPhase10GlobalStatusButton.addEventListener("click", async () => {
   await loadPhase10GlobalStatus();
 });
 
+loadPhase10ExperimentButton.addEventListener("click", async () => {
+  await loadPhase10Experiment();
+});
+
 phase10ReadinessGroupFilter.addEventListener("change", () => {
   renderPhase10Readiness(currentPhase10ReadinessReport);
 });
@@ -695,6 +757,14 @@ expandPhase10GlobalStatusGroups.addEventListener("click", () => {
 
 collapsePhase10GlobalStatusGroups.addEventListener("click", () => {
   setPhase10GlobalStatusGroupsOpen(false);
+});
+
+expandPhase10ExperimentGroups.addEventListener("click", () => {
+  setPhase10ExperimentGroupsOpen(true);
+});
+
+collapsePhase10ExperimentGroups.addEventListener("click", () => {
+  setPhase10ExperimentGroupsOpen(false);
 });
 
 copyPhase10AIHandoffSummary.addEventListener("click", async () => {
@@ -731,6 +801,30 @@ copyPhase10GlobalVerificationCommands.addEventListener("click", async () => {
 
 copyPhase10GlobalSafetyBoundary.addEventListener("click", async () => {
   await copyPhase10GlobalStatusPayload("safety_boundary");
+});
+
+copyPhase10ExperimentSummary.addEventListener("click", async () => {
+  await copyPhase10ExperimentPayload("experiment_summary");
+});
+
+copyPhase10GuardrailChecks.addEventListener("click", async () => {
+  await copyPhase10ExperimentPayload("guardrail_checks");
+});
+
+copyPhase10ExperimentNoGoReasons.addEventListener("click", async () => {
+  await copyPhase10ExperimentPayload("no_go_reasons");
+});
+
+copyPhase10RecommendedNextWork.addEventListener("click", async () => {
+  await copyPhase10ExperimentPayload("recommended_next_work");
+});
+
+copyPhase10AiHandoffSummary.addEventListener("click", async () => {
+  await copyPhase10ExperimentPayload("ai_handoff_summary");
+});
+
+copyPhase10ExperimentJson.addEventListener("click", async () => {
+  await copyPhase10ExperimentPayload("experiment_json");
 });
 
 loadPhase10GuardrailDemo.addEventListener("click", () => {
@@ -3317,6 +3411,446 @@ function phase10GlobalStatusCopyStatusText(payloadKind) {
     return "Global safety boundary copied.";
   }
   return "Global status JSON copied.";
+}
+
+async function loadPhase10Experiment() {
+  phase10ExperimentPanel.dataset.state = "running";
+  loadPhase10ExperimentButton.disabled = true;
+  phase10ExperimentStatus.textContent = "Loading Phase 10 experiment display report...";
+  phase10ExperimentControls.hidden = true;
+  phase10ExperimentCopyStatus.hidden = true;
+  phase10ExperimentStrip.hidden = true;
+  phase10ExperimentSummary.hidden = true;
+  phase10ExperimentGroups.hidden = true;
+  phase10ExperimentGroups.replaceChildren();
+  statusText.textContent = "loading Phase 10 experiment display...";
+
+  try {
+    const response = await fetch("/phase10-experiment/demo");
+    if (!response.ok) {
+      throw new Error(`Phase 10 experiment display failed: HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    renderPhase10Experiment(payload);
+    statusText.textContent = "Phase 10 experiment display loaded";
+  } catch (error) {
+    renderPhase10ExperimentError(error);
+    statusText.textContent = "Phase 10 experiment display failed";
+  } finally {
+    loadPhase10ExperimentButton.disabled = false;
+  }
+}
+
+function renderPhase10Experiment(report = null) {
+  currentPhase10ExperimentReport = report;
+  phase10ExperimentCopyStatus.hidden = true;
+  phase10ExperimentStrip.replaceChildren();
+  phase10ExperimentSummary.replaceChildren();
+  phase10ExperimentFilters.replaceChildren();
+  phase10ExperimentGroups.replaceChildren();
+
+  if (!report) {
+    phase10ExperimentPanel.dataset.state = "empty";
+    phase10ExperimentStatus.textContent = "Not loaded yet.";
+    phase10ExperimentControls.hidden = true;
+    phase10ExperimentStrip.hidden = true;
+    phase10ExperimentSummary.hidden = true;
+    phase10ExperimentGroups.hidden = true;
+    return;
+  }
+
+  const noGo = report.go_for_phase10 !== true;
+  phase10ExperimentPanel.dataset.state = noGo ? "warning" : "ready";
+  phase10ExperimentPanel.dataset.phase10ExperimentGoForPhase10 = String(report.go_for_phase10 === true);
+  phase10ExperimentStatus.textContent = noGo
+    ? "Phase 10 experiment display loaded: NO-GO. This panel is read-only guardrail visibility."
+    : "Phase 10 experiment display loaded: GO reported. Display still grants no authorization.";
+  phase10ExperimentControls.hidden = false;
+  phase10ExperimentStrip.hidden = false;
+  phase10ExperimentSummary.hidden = false;
+  phase10ExperimentGroups.hidden = false;
+
+  renderPhase10ExperimentStrip(report);
+  renderPhase10ExperimentFilters(report);
+  setPhase10ExperimentSummary([
+    ["Report", report.report_version || "phase10_experiment_display_v1"],
+    ["Project phase", report.project_phase || "Phase 10 experiment display"],
+    ["GO/NO-GO", noGo ? "NO-GO" : "GO"],
+    ["Experiment status", report.experiment_status?.status || "unknown"],
+    ["Guardrail status", report.guardrail_status?.status || "unknown"],
+    ["Dry-run", formatSandboxBool(report.dry_run)],
+    ["Read-only", formatSandboxBool(report.read_only)],
+    ["Debug-only", formatSandboxBool(report.debug_only)],
+    ["Real actions enabled", formatSandboxBool(report.real_actions_enabled)],
+    ["Phase 10 implemented", formatSandboxBool(report.phase10_real_actions_implemented)],
+    ["No-go reasons", String(sandboxCodes(report.no_go_reasons).length)],
+    ["Guardrail checks", String(Array.isArray(report.guardrail_checks) ? report.guardrail_checks.length : 0)],
+  ]);
+  renderPhase10ExperimentGroups(report);
+}
+
+function renderPhase10ExperimentError(error) {
+  currentPhase10ExperimentReport = null;
+  phase10ExperimentPanel.dataset.state = "error";
+  phase10ExperimentStatus.textContent = "Phase 10 experiment display report could not be loaded.";
+  phase10ExperimentControls.hidden = true;
+  phase10ExperimentCopyStatus.hidden = true;
+  phase10ExperimentStrip.hidden = true;
+  phase10ExperimentSummary.hidden = true;
+  phase10ExperimentGroups.hidden = false;
+  phase10ExperimentGroups.replaceChildren(plannerEvaluationEmptyState(error.message || String(error)));
+}
+
+function renderPhase10ExperimentStrip(report) {
+  phase10ExperimentStrip.replaceChildren();
+  const guardrailStatus = report.guardrail_status || {};
+  const experimentStatus = report.experiment_status || {};
+  const items = [
+    ["GO/NO-GO", report.go_for_phase10 === true ? "GO" : "NO-GO", report.go_for_phase10 === true ? "ok" : "risk"],
+    ["experiment", experimentStatus.status || "unknown", "warn"],
+    ["guardrails", guardrailStatus.status || "unknown", guardrailStatus.validation_passed ? "ok" : "warn"],
+    ["dry-run", formatSandboxBool(report.dry_run), report.dry_run ? "ok" : "risk"],
+    ["read-only", formatSandboxBool(report.read_only), report.read_only ? "ok" : "risk"],
+    ["debug-only", formatSandboxBool(report.debug_only), report.debug_only ? "ok" : "risk"],
+    [
+      "real actions",
+      report.real_actions_enabled === true ? "enabled" : "disabled",
+      report.real_actions_enabled === true ? "risk" : "ok",
+    ],
+    [
+      "Phase 10 implemented",
+      formatSandboxBool(report.phase10_real_actions_implemented),
+      report.phase10_real_actions_implemented === true ? "warn" : "ok",
+    ],
+  ];
+
+  for (const [label, value, tone] of items) {
+    const chip = document.createElement("div");
+    const valueNode = document.createElement("span");
+    const labelNode = document.createElement("span");
+    chip.className = "phase10-readiness-chip";
+    chip.dataset.phase10ExperimentChip = label;
+    chip.dataset.tone = tone;
+    valueNode.className = "phase10-readiness-chip-value";
+    valueNode.textContent = value;
+    labelNode.className = "phase10-readiness-chip-label";
+    labelNode.textContent = label;
+    chip.append(valueNode, labelNode);
+    phase10ExperimentStrip.appendChild(chip);
+  }
+}
+
+function setPhase10ExperimentSummary(rows) {
+  phase10ExperimentSummary.replaceChildren();
+  for (const [label, value] of rows) {
+    phase10ExperimentSummary.appendChild(plannerEvaluationFact(label, value));
+  }
+}
+
+function renderPhase10ExperimentFilters(report) {
+  const sections = phase10ExperimentSections(report);
+  const availableKeys = new Set(sections.map((section) => section.filterKey).concat("all"));
+  if (!availableKeys.has(currentPhase10ExperimentFilter)) {
+    currentPhase10ExperimentFilter = "all";
+  }
+
+  phase10ExperimentFilters.replaceChildren();
+  phase10ExperimentFilters.hidden = false;
+  phase10ExperimentFilters.dataset.phase10ExperimentFilters = "true";
+  for (const [filterKey, filter] of Object.entries(PHASE10_EXPERIMENT_FILTERS)) {
+    const count = filterKey === "all"
+      ? sections.reduce((total, section) => total + section.items.length, 0)
+      : sections
+        .filter((section) => section.filterKey === filterKey)
+        .reduce((total, section) => total + section.items.length, 0);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "sandbox-evaluation-quick-filter phase10-experiment-filter-chip";
+    button.dataset.phase10ExperimentFilter = filterKey;
+    button.title = filter.description;
+    button.setAttribute("aria-pressed", String(currentPhase10ExperimentFilter === filterKey));
+    button.textContent = `${filter.label} (${count})`;
+    button.addEventListener("click", () => {
+      currentPhase10ExperimentFilter =
+        currentPhase10ExperimentFilter === filterKey ? "all" : filterKey;
+      renderPhase10ExperimentFilters(report);
+      renderPhase10ExperimentGroups(report);
+    });
+    phase10ExperimentFilters.appendChild(button);
+  }
+}
+
+function renderPhase10ExperimentGroups(report) {
+  const sections = phase10ExperimentSections(report).filter((section) =>
+    currentPhase10ExperimentFilter === "all"
+      ? true
+      : section.filterKey === currentPhase10ExperimentFilter
+  );
+  phase10ExperimentGroups.replaceChildren();
+  phase10ExperimentGroups.hidden = false;
+  phase10ExperimentGroups.dataset.phase10ExperimentGroups = "true";
+  phase10ExperimentGroups.dataset.activeFilter = currentPhase10ExperimentFilter;
+
+  if (!sections.length) {
+    const empty = plannerEvaluationEmptyState("No Phase 10 experiment result groups match the active filter.");
+    empty.dataset.phase10ExperimentEmpty = "true";
+    phase10ExperimentGroups.appendChild(empty);
+    return;
+  }
+
+  for (const section of sections) {
+    phase10ExperimentGroups.appendChild(phase10ExperimentSection(section));
+  }
+}
+
+function phase10ExperimentSections(report) {
+  return [
+    {
+      key: "experiment_status",
+      filterKey: "guardrails",
+      title: "Experiment status",
+      tone: "warn",
+      items: phase10GlobalObjectItems(report.experiment_status),
+    },
+    {
+      key: "guardrail_status",
+      filterKey: "guardrails",
+      title: "Guardrail status",
+      tone: report.guardrail_status?.validation_passed ? "ok" : "warn",
+      items: phase10GlobalObjectItems(report.guardrail_status),
+    },
+    {
+      key: "no_go_reasons",
+      filterKey: "no_go",
+      title: "NO-GO reasons",
+      tone: "risk",
+      items: sandboxCodes(report.no_go_reasons),
+    },
+    {
+      key: "guardrail_checks",
+      filterKey: "guardrails",
+      title: "Guardrail checks",
+      tone: "ok",
+      items: phase10ExperimentGuardrailCheckItems(report.guardrail_checks),
+    },
+    {
+      key: "readiness_checks",
+      filterKey: "readiness",
+      title: "Readiness checks",
+      tone: "warn",
+      items: phase10ReadinessCheckItems(report.readiness_checks),
+    },
+    {
+      key: "safety_invariants",
+      filterKey: "safety",
+      title: "Safety invariants",
+      tone: "ok",
+      items: sandboxCodes(report.safety_invariants),
+    },
+    {
+      key: "forbidden_actions",
+      filterKey: "forbidden",
+      title: "Forbidden actions",
+      tone: "risk",
+      items: sandboxCodes(report.forbidden_actions),
+    },
+    {
+      key: "forbidden_apis",
+      filterKey: "forbidden",
+      title: "Forbidden APIs",
+      tone: "risk",
+      items: sandboxCodes(report.forbidden_apis),
+    },
+    {
+      key: "audit_notes",
+      filterKey: "audit",
+      title: "Audit notes",
+      tone: "neutral",
+      items: sandboxCodes(report.audit_notes),
+    },
+    {
+      key: "recommended_next_work",
+      filterKey: "ai_handoff",
+      title: "Recommended next work",
+      tone: "neutral",
+      items: sandboxCodes(report.recommended_next_work),
+    },
+    {
+      key: "ai_handoff_summary",
+      filterKey: "ai_handoff",
+      title: "AI handoff summary",
+      tone: "neutral",
+      items: [report.ai_handoff_summary || "No AI handoff summary available."],
+    },
+    {
+      key: "verification_commands",
+      filterKey: "verification",
+      title: "Verification commands",
+      tone: "ok",
+      items: sandboxCodes(report.verification_commands),
+    },
+  ];
+}
+
+function phase10ExperimentSection(section) {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const list = document.createElement("ul");
+
+  details.className = "phase10-readiness-section phase10-experiment-section";
+  details.dataset.phase10ExperimentGroup = section.key;
+  details.dataset.phase10ExperimentFilterKey = section.filterKey;
+  details.dataset.tone = section.tone || "neutral";
+  details.open = true;
+  summary.className = "phase10-readiness-section-summary";
+  summary.textContent = `${section.title} (${section.items.length})`;
+  list.className = "phase10-readiness-list phase10-experiment-list";
+
+  if (!section.items.length) {
+    const li = document.createElement("li");
+    li.dataset.phase10ExperimentItem = "empty";
+    li.textContent = "No entries.";
+    list.appendChild(li);
+  } else {
+    for (const item of section.items) {
+      const li = document.createElement("li");
+      li.dataset.phase10ExperimentItem = "true";
+      li.textContent = item;
+      list.appendChild(li);
+    }
+  }
+
+  details.append(summary, list);
+  return details;
+}
+
+function phase10ExperimentGuardrailCheckItems(checks) {
+  if (!Array.isArray(checks)) {
+    return [];
+  }
+  return checks.map((check) => {
+    const status = check.passed === true ? "pass" : "blocked";
+    const code = check.code ? ` ${check.code}` : "";
+    const detail = check.detail ? ` - ${check.detail}` : "";
+    return `${check.group || "guardrail"} / ${check.name || "check"}: ${status}${code}${detail}`;
+  });
+}
+
+function setPhase10ExperimentGroupsOpen(open) {
+  const detailsNodes = phase10ExperimentGroups.querySelectorAll(
+    "details[data-phase10-experiment-group]"
+  );
+  for (const details of detailsNodes) {
+    details.open = open;
+  }
+}
+
+async function copyPhase10ExperimentPayload(payloadKind) {
+  phase10ExperimentCopyStatus.hidden = false;
+  if (!currentPhase10ExperimentReport) {
+    phase10ExperimentCopyStatus.textContent = "No Phase 10 experiment display report loaded.";
+    return;
+  }
+  if (!navigator.clipboard?.writeText) {
+    phase10ExperimentCopyStatus.textContent = "Clipboard unavailable in this browser.";
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(phase10ExperimentPayloadText(payloadKind));
+    phase10ExperimentCopyStatus.textContent = phase10ExperimentCopyStatusText(payloadKind);
+  } catch (error) {
+    phase10ExperimentCopyStatus.textContent = `Copy failed: ${error.message || String(error)}`;
+  }
+}
+
+function phase10ExperimentPayloadText(payloadKind) {
+  const payload = phase10ExperimentPayload(payloadKind);
+  return typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+}
+
+function phase10ExperimentPayload(payloadKind) {
+  if (payloadKind === "experiment_summary") {
+    return copyPhase10ExperimentSummaryPayload();
+  }
+  if (payloadKind === "guardrail_checks") {
+    return copyPhase10GuardrailChecksPayload();
+  }
+  if (payloadKind === "no_go_reasons") {
+    return copyPhase10ExperimentNoGoReasonsPayload();
+  }
+  if (payloadKind === "recommended_next_work") {
+    return copyPhase10RecommendedNextWorkPayload();
+  }
+  if (payloadKind === "ai_handoff_summary") {
+    return copyPhase10AiHandoffSummaryPayload();
+  }
+  return copyPhase10ExperimentJsonPayload();
+}
+
+function copyPhase10ExperimentSummaryPayload() {
+  return {
+    project_phase: currentPhase10ExperimentReport?.project_phase || "",
+    experiment_status: currentPhase10ExperimentReport?.experiment_status || {},
+    guardrail_status: currentPhase10ExperimentReport?.guardrail_status || {},
+    dry_run: currentPhase10ExperimentReport?.dry_run === true,
+    read_only: currentPhase10ExperimentReport?.read_only === true,
+    debug_only: currentPhase10ExperimentReport?.debug_only === true,
+    real_actions_enabled: currentPhase10ExperimentReport?.real_actions_enabled === true,
+    phase10_real_actions_implemented:
+      currentPhase10ExperimentReport?.phase10_real_actions_implemented === true,
+    go_for_phase10: currentPhase10ExperimentReport?.go_for_phase10 === true,
+  };
+}
+
+function copyPhase10GuardrailChecksPayload() {
+  return {
+    project_phase: currentPhase10ExperimentReport?.project_phase || "",
+    guardrail_status: currentPhase10ExperimentReport?.guardrail_status || {},
+    guardrail_checks: currentPhase10ExperimentReport?.guardrail_checks || [],
+  };
+}
+
+function copyPhase10ExperimentNoGoReasonsPayload() {
+  return {
+    project_phase: currentPhase10ExperimentReport?.project_phase || "",
+    go_for_phase10: currentPhase10ExperimentReport?.go_for_phase10 === true,
+    no_go_reasons: sandboxCodes(currentPhase10ExperimentReport?.no_go_reasons),
+  };
+}
+
+function copyPhase10RecommendedNextWorkPayload() {
+  return {
+    project_phase: currentPhase10ExperimentReport?.project_phase || "",
+    recommended_next_work: sandboxCodes(currentPhase10ExperimentReport?.recommended_next_work),
+  };
+}
+
+function copyPhase10AiHandoffSummaryPayload() {
+  return currentPhase10ExperimentReport?.ai_handoff_summary || "";
+}
+
+function copyPhase10ExperimentJsonPayload() {
+  return currentPhase10ExperimentReport || {};
+}
+
+function phase10ExperimentCopyStatusText(payloadKind) {
+  if (payloadKind === "experiment_summary") {
+    return "Phase 10 experiment summary copied.";
+  }
+  if (payloadKind === "guardrail_checks") {
+    return "Phase 10 guardrail checks copied.";
+  }
+  if (payloadKind === "no_go_reasons") {
+    return "Phase 10 experiment no-go reasons copied.";
+  }
+  if (payloadKind === "recommended_next_work") {
+    return "Phase 10 recommended next work copied.";
+  }
+  if (payloadKind === "ai_handoff_summary") {
+    return "Phase 10 experiment AI handoff summary copied.";
+  }
+  return "Phase 10 experiment JSON copied.";
 }
 
 function renderPhase10Guardrails(validation = currentPhase10GuardrailValidation) {

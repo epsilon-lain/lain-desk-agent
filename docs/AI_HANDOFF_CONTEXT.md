@@ -36,7 +36,8 @@ The project is post-Phase 9.x dry-run sandbox hardening and in Phase 10
 readiness / release-candidate preparation. The latest runtime cockpit
 visibility layer is Phase 10.2 Global Status / AI Handoff. The latest
 release-candidate protection layer is Phase 10.3 deterministic guardrail
-validation.
+validation. The latest cockpit display layer is Phase 10.5 deterministic
+experiment / guardrail results display.
 
 Phase 10 real actions are not implemented yet.
 
@@ -77,7 +78,8 @@ Phase 10 real actions are not implemented yet.
 - `src/lain_desk_agent/phase10_guardrails.py`: deterministic Phase 10.3
   release-candidate bundle validation helpers; read-only only.
 - `src/lain_desk_agent/phase10_experiment.py`: Phase 10.3 read-only guardrail
-  facade; not an action adapter.
+  facade and Phase 10.5 experiment display report builder; not an action
+  adapter.
 - `src/lain_desk_agent/main.py`: HTTP endpoints; sandbox/Phase 9 endpoints are
   deterministic read-only report endpoints.
 - `ui/app.js`, `ui/index.html`, `ui/styles.css`: cockpit UI and local-only
@@ -193,6 +195,26 @@ Future AI must not weaken the guardrail tests, safety scan, Phase 7 gate,
 Phase 9 gate, replay validation, Capability Registry, Permission Profile, or
 Execution Policy to make Phase 10 appear ready.
 
+## Phase 10.5 Experiment / Guardrail Results Display
+
+Phase 10.5 adds a deterministic read-only cockpit panel and
+`/phase10-experiment/demo` endpoint for Phase 10 experiment / guardrail result
+inspection. It reuses Phase 10 readiness, global status, and guardrail
+validation data. It remains NO-GO by default.
+
+Future AI should interpret the display like this:
+
+- `go_for_phase10 = false` is the expected default.
+- `real_actions_enabled = false` means real desktop actions remain disabled.
+- `phase10_real_actions_implemented = false` means implementation has not
+  started.
+- Guardrail checks and readiness checks are diagnostics, not permission.
+- Copy/export helpers are handoff/debug aids, not execution.
+- AI handoff summary is not AI control.
+
+Future AI must not treat the Phase 10.5 experiment result panel as
+authorization, permission, execution, approval, or control.
+
 ## Phase 9 Export / Import / Replay Pipeline
 
 ```text
@@ -252,10 +274,11 @@ docs/PROJECT_HEALTH_SNAPSHOT.md, docs/SAFETY_INVARIANTS.md, and
 docs/PHASE_10_READINESS_CHECKLIST.md, and
 docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md before editing. Phase 10.1
 readiness is NO-GO by default, Phase 10.2 global status is NO-GO by default,
-and Phase 10.3 is deterministic local validation only; do not make any of them
-GO by enabling real actions. Preserve proposal is not execution, readiness is
+Phase 10.3 is deterministic local validation only, and Phase 10.5 experiment
+display is read-only/debug-only; do not make any of them GO by enabling real
+actions. Preserve proposal is not execution, readiness is
 not permission, cockpit display is not authorization, export/import/replay is
-not execution, AI handoff is not AI control, and imported bundles are
-untrusted input. Run verify.ps1, safety_scan.py, git diff --check, node --check
-ui/app.js, and both Phase 10.3 guardrail tests.
+not execution, export/copy is not execution, AI handoff is not AI control, and
+imported bundles are untrusted input. Run verify.ps1, safety_scan.py,
+git diff --check, node --check ui/app.js, and both Phase 10.3 guardrail tests.
 ```

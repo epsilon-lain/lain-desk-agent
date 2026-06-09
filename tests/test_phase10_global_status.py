@@ -65,6 +65,10 @@ class Phase10GlobalStatusTests(unittest.TestCase):
         self.assertIs(report["go_for_phase10"], False)
         self.assertIn("real_actions_disabled", report["no_go_reasons"])
         self.assertIn("phase10_real_actions_not_implemented", report["no_go_reasons"])
+        self.assertIn(
+            "Phase 10.5 experiment and guardrail result display",
+            report["current_cockpit_capabilities"],
+        )
         self.assertEqual(build_phase10_global_status_report(), report)
 
     def test_global_status_report_lists_forbidden_apis_and_verification_commands(self) -> None:

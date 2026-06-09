@@ -6,6 +6,10 @@ cockpit validation panel, documentation, and tests for the current
 release-candidate boundary; it does not implement, authorize, or enable real
 desktop actions.
 
+Phase 10.5 builds on those guardrails with a deterministic read-only cockpit
+display for Phase 10 experiment / guardrail results. It does not change replay
+semantics, grant execution permission, or implement a real-action experiment.
+
 ## Current Status
 
 The current project is not a real-action agent yet. Mirai remains a supervised
@@ -14,6 +18,8 @@ Approved `wait` remains the only executable action.
 
 Real desktop actions remain disabled. Click, type, hotkey, scroll, and
 switch_app are still non-executable. Phase 10 real actions are not implemented.
+Phase 10.5 displays NO-GO experiment / guardrail result data for inspection
+and AI handoff only.
 
 ## Non-permission Signals
 
@@ -23,6 +29,8 @@ switch_app are still non-executable. Phase 10 real actions are not implemented.
 - AI handoff is not AI control.
 - A green parser, safety scan, replay validation, or copied status payload does
   not grant desktop action permission.
+- A Phase 10.5 experiment result panel, copied guardrail checks, or AI handoff
+  summary does not grant desktop action permission.
 
 ## Release-candidate No-go Criteria
 
@@ -56,6 +64,7 @@ approves a scoped Phase 10 real-action experiment:
 - Add click/type/hotkey/scroll/switch_app actuation.
 - Add a sandbox, replay, readiness, global-status, or AI handoff call to
   `/execute`.
+- Add a Phase 10 experiment display call to `/execute`.
 - Add execute buttons, real-action approval buttons, sandbox action triggers,
   or real-action toggles to the cockpit.
 - Add mutation endpoints that perform desktop action.
@@ -86,6 +95,11 @@ debugging clarity while preserving the current boundary. Browser-local bundle
 validation may inspect pasted JSON, but it must not call a backend endpoint or
 turn copied validation data into execution.
 
+Phase 10.5 display helpers may call the read-only
+`/phase10-experiment/demo` endpoint, but they must not add mutation endpoints,
+approval/execute controls, real-action toggles, action adapters, or any
+desktop control API.
+
 ## Required Verification
 
 Run these before handing off release-candidate guardrail work:
@@ -108,3 +122,9 @@ the cockpit validates release-candidate bundles locally only, and the guardrail
 tests fail loudly if future code adds desktop actuation, real-action cockpit
 controls, unsafe `/execute` UI paths, backend execution endpoints, or
 true-by-default real-action flags.
+
+Phase 10.5 expected result: cockpit users can inspect deterministic
+experiment/guardrail status, blockers, checks, audit notes, recommended next
+work, verification commands, and AI handoff context while all real desktop
+actions remain disabled. Display is not authorization, export/copy is not
+execution, and AI handoff is not AI control.

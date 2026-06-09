@@ -28,6 +28,7 @@ developers.
 - No Phase 10 readiness UI trigger for real action.
 - No Phase 10 global status UI trigger for real action.
 - No Phase 10.3 guardrail UI trigger for real action.
+- No Phase 10.5 experiment result UI trigger for real action.
 - Phase 10.3 guardrail cockpit validation is browser-local and must not add a
   backend endpoint.
 - UI controls for sandbox, Phase 9, export, import, validation, replay,
@@ -45,6 +46,7 @@ developers.
 - No real-action adapter exists in Phase 10.1.
 - No real-action adapter exists in Phase 10.2.
 - No real-action adapter exists in Phase 10.3.
+- No real-action adapter exists in Phase 10.5.
 - Phase 10.3 validation may inspect imported release-candidate bundles, but it
   must keep `replay_allowed_as_read_only` separate from execution permission.
 - `real_action_attempted` remains false in Phase 8 and Phase 9 dry-run reports.
@@ -76,6 +78,7 @@ developers.
 - Action Contract is not execution permission.
 - Validation is not mutation.
 - Export/replay is not action.
+- Export/copy is not execution.
 - AI handoff is not AI control.
 - Global status is not permission.
 
@@ -125,4 +128,12 @@ regression protection only. The guardrail helpers, cockpit panel, document, and
 tests must remain dry-run/read-only/debug-only, must not add backend endpoints
 or cockpit execution controls, must not broaden permissions, and must not make
 readiness, global status, export/import/replay, or AI handoff act like
+authorization.
+
+Phase 10.5 experiment / guardrail results display is deterministic read-only
+cockpit output only. The report builder, endpoint, panel, local filters,
+expand/collapse controls, and copy helpers must remain dry-run/read-only/
+debug-only, must report NO-GO while real actions are disabled, must not call
+`/execute`, must not add mutation endpoints or cockpit execution controls, and
+must not make readiness, guardrail checks, export/copy, or AI handoff act like
 authorization.

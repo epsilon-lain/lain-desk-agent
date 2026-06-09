@@ -652,7 +652,7 @@ release-candidate NO-GO boundary in
 `docs/PHASE_10_RELEASE_CANDIDATE_GUARDRAILS.md`, adds
 `src/lain_desk_agent/phase10_guardrails.py` and
 `src/lain_desk_agent/phase10_experiment.py` as pure deterministic validation
-helpers, and adds `tests/test_release_candidate_guardrails.py` plus
+and display helpers, and adds `tests/test_release_candidate_guardrails.py` plus
 `tests/test_phase10_guardrails.py` as regression packs for the current safety
 posture.
 
@@ -672,6 +672,30 @@ scenarios, browser-local UI hooks, and the read-only project status helper.
 Phase 10.3 is not a capability layer. It does not add backend endpoints,
 mutation paths, approval/execute controls, action adapters, permission
 broadening, or desktop control APIs. The action runtime pipeline is unchanged.
+
+### Phase 10.5 Experiment / Guardrail Results Cockpit Display
+
+Phase 10.5 adds `build_phase10_experiment_display_report(...)` in
+`src/lain_desk_agent/phase10_experiment.py` as a deterministic display report
+builder. The report reuses the existing Phase 10 readiness, global status, and
+release-candidate guardrail validation structures. It keeps
+`dry_run = true`, `read_only = true`, `debug_only = true`,
+`real_actions_enabled = false`, `phase10_real_actions_implemented = false`,
+and `go_for_phase10 = false`.
+
+`GET /phase10-experiment/demo` exposes this display report to the cockpit. The
+endpoint does not observe the live desktop, inspect live OS state, read
+secrets, mutate runtime state, call `/execute`, or call any action-performing
+endpoint.
+
+The cockpit panel shows experiment status, guardrail status, GO/NO-GO state,
+no-go reasons, guardrail checks, readiness checks, safety invariants,
+forbidden actions/APIs, audit notes, recommended next work, AI handoff
+summary, and verification commands. Its filters, expand/collapse controls,
+and copy helpers operate only on the already loaded report in browser memory.
+
+Phase 10.5 display is not authorization. Readiness is not permission.
+Export/copy is not execution. AI handoff is not AI control.
 
 ## Safety boundaries
 
@@ -731,6 +755,9 @@ The current safety boundaries are intentionally narrow:
 - Phase 10.3 release-candidate guardrails are pure validation helpers,
   browser-local display, documentation, and regression tests only; they do not
   authorize or implement real desktop action.
+- Phase 10.5 experiment / guardrail results display is deterministic
+  read-only/debug-only cockpit output; it does not authorize, implement, or
+  enable real desktop action.
 - Approval and rejection only record audit events.
 - The UI may show a dry-run preview and screenshot overlay, but it does not interact with the desktop.
 - There is no real mouse or keyboard desktop control.
@@ -754,6 +781,7 @@ The current safety boundaries are intentionally narrow:
 | `/phase9-experiment/demo` | GET | Return deterministic Phase 9.1 dry-run harness trace for cockpit display; no observation or execution. |
 | `/phase10-readiness/demo` | GET | Return deterministic Phase 10.1 readiness report for cockpit display; no observation or execution. |
 | `/phase10-global-status/demo` | GET | Return deterministic Phase 10.2 global status and AI handoff report for cockpit display; no observation or execution. |
+| `/phase10-experiment/demo` | GET | Return deterministic Phase 10.5 experiment / guardrail results for cockpit display; no observation or execution. |
 | `/execute` | POST | Execute only approved wait contracts and verify them. |
 
 ## Development rule

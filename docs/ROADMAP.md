@@ -120,6 +120,15 @@ project status snapshot shape, backend validation scenarios, and the read-only
 project status helper. No runtime permission, new backend endpoint, action
 adapter, or cockpit execution control is added.
 
+Phase 10.5 adds a cockpit read-only display for deterministic Phase 10
+experiment / guardrail results. It exposes `GET /phase10-experiment/demo` and
+renders experiment status, guardrail status, GO/NO-GO state, no-go reasons,
+guardrail checks, readiness checks, safety invariants, forbidden actions/APIs,
+audit notes, verification commands, recommended next work, and AI handoff
+summary. Local filters, expand/collapse, and copy helpers operate only on the
+already loaded report. It does not implement real actions, grant execution
+permission, add mutation endpoints, or add cockpit action controls.
+
 ## Completed
 
 - Observation / Understanding
@@ -157,6 +166,7 @@ adapter, or cockpit execution control is added.
 - Phase 10.1 Readiness Report And Cockpit Panel
 - Phase 10.2 Global Status Cockpit And AI Handoff Dashboard
 - Phase 10.3 Readiness Regression Pack And Release-candidate Guardrails
+- Phase 10.5 Experiment / Guardrail Results Cockpit Display
 - AI Handoff Context
 - Safety Invariants
 - Read-only Project Status Helper
@@ -216,6 +226,9 @@ adapter, or cockpit execution control is added.
 - Phase 10.3 release-candidate guardrails are deterministic validation,
   browser-local display, docs, and regression tests only. They do not
   authorize, implement, or enable real desktop action.
+- Phase 10.5 experiment / guardrail results display is read-only/debug-only.
+  It reports deterministic NO-GO state for inspection and AI handoff only; it
+  is not authorization, permission, execution, or AI control.
 
 ## Phase 4: AI Planner Evaluation And Reliability
 
@@ -833,6 +846,33 @@ real-action approval.
   real-action toggles, mutation endpoints, new backend endpoints, action
   adapters, `/execute` UI paths outside the existing wait-only self-test, or
   permission/capability/execution-policy changes.
+
+## Phase 10.5: Experiment / Guardrail Results Cockpit Display
+
+Status: implemented as deterministic read-only report data, cockpit display,
+documentation, and regression tests only.
+
+Goal: make Phase 10 experiment and guardrail results inspectable for users and
+future AI handoff without changing runtime execution behavior.
+
+- Add `build_phase10_experiment_display_report(...)` to reuse existing
+  readiness, global status, and guardrail validation data.
+- Expose `/phase10-experiment/demo` as a deterministic read-only endpoint.
+- Add a cockpit panel for experiment status, guardrail status, GO/NO-GO state,
+  dry-run/read-only/debug-only flags, disabled real-action state, no-go
+  reasons, guardrail checks, readiness checks, safety invariants, forbidden
+  actions/APIs, audit notes, verification commands, recommended next work, and
+  AI handoff summary.
+- Add local-only filters, expand/collapse controls, and copy helpers for the
+  already loaded report.
+- Keep `go_for_phase10 = false`, `real_actions_enabled = false`,
+  `phase10_real_actions_implemented = false`, `dry_run = true`,
+  `read_only = true`, and `debug_only = true`.
+- Do not add real-action implementation, desktop actuation APIs, approval or
+  execute controls, action adapters, mutation endpoints, `/execute` calls, or
+  permission/capability/execution-policy changes.
+- Preserve readiness is not permission, cockpit display is not authorization,
+  export/copy is not execution, and AI handoff is not AI control.
 
 ## Historical Drafts
 

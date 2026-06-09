@@ -217,7 +217,7 @@ class Phase10ReadinessDocTests(unittest.TestCase):
         payload = json.loads(STATUS_JSON.read_text(encoding="utf-8"))
 
         self.assertEqual(payload["schema_version"], "project_status_snapshot_v3")
-        self.assertIn("Phase 10.3", payload["project_phase"])
+        self.assertIn("Phase 10.5", payload["project_phase"])
         self.assertIs(payload["dry_run_default"], True)
         self.assertIs(payload["read_only_default"], True)
         self.assertIs(payload["debug_only_default"], True)
@@ -225,6 +225,8 @@ class Phase10ReadinessDocTests(unittest.TestCase):
         self.assertIs(payload["phase10_real_actions_implemented"], False)
         self.assertIs(payload["go_for_phase10"], False)
         self.assertIs(payload["global_status_cockpit"], True)
+        self.assertIs(payload["phase10_5_experiment_display"], True)
+        self.assertIn("/phase10-experiment/demo", payload["read_only_endpoints"])
         self.assertIn(".\\scripts\\verify.ps1", payload["verification_commands"])
 
     def test_phase10_readiness_doc_exists_and_states_not_implemented(self) -> None:
@@ -245,6 +247,7 @@ class Phase10ReadinessDocTests(unittest.TestCase):
             "cockpit display is not authorization",
             "phase 10.1 readiness cockpit status",
             "phase 10.2 global status cockpit status",
+            "phase 10.5 experiment / guardrail results display status",
             "go_for_phase10 = false",
             "real actions are still disabled",
         ]:
@@ -272,6 +275,7 @@ class Phase10ReadinessDocTests(unittest.TestCase):
             "Stop Immediately If",
             "AI Handoff Checklist",
             "Phase 10.1 Readiness Cockpit Status",
+            "Phase 10.5 Experiment / Guardrail Results Display Status",
         ]:
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, text)
